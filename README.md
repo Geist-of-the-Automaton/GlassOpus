@@ -6,9 +6,7 @@ The focus of Glass Opus, is to provide a free software that students and artists
 
 Microsoft coding guidelines are used. Found [here](https://www.cise.ufl.edu/~mschneid/Research/C++%20Programming%20Style%20Guidelines.htm) and implemented via [this](https://docs.microsoft.com/en-us/cpp/code-quality/using-the-cpp-core-guidelines-checkers?view=vs-2019https://docs.microsoft.com/en-us/cpp/code-quality/using-the-cpp-core-guidelines-checkers?view=vs-2019).
 
-## External Requirements
-
-The app should be able to be run by using the executable in the bin folder.
+The app can be run via the information below in the running section
 
 ## Dev Setup
 
@@ -23,5 +21,5 @@ The app should be able to be run by using the executable in the bin folder.
 
 There are two options to running the software:  
 1. Once Qt and the OpenCV libs have been correctly installed, one must open the project in Qt and press the run button in the bottom left of the Qt gui. (This option requires the Qt libraries to be on your path.)
-2. Open the bin folder and run the Roto.exe file.  
+2. Open the bin folder and run the Roto.exe file. Found [here](https://github.com/Geist-of-the-Automaton/GlassOpus/releases/tag/v0.1)
 
