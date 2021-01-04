@@ -23,3 +23,13 @@ There are two options to running the software:
 1. Once Qt and the OpenCV libs have been correctly installed, one must open the project in Qt and press the run button in the bottom left of the Qt gui. (This option requires the Qt libraries to be on your path.)
 2. Open the bin folder and run the Roto.exe file. Found [here](https://github.com/Geist-of-the-Automaton/GlassOpus/releases/tag/v0.1)
 
+## Videos of program running followed by videos of peripherals to be added
+
+https://youtu.be/wA5ZYv1swbU
+
+https://youtu.be/CzgefMS0O_Q
+
+https://youtu.be/9Q7ZjGNGi_Y
+
+https://youtu.be/XUTLOKrGKds
+
