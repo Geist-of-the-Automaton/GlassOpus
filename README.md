@@ -25,9 +25,11 @@ There are two options to running the software:
 
 ## Videos of program running followed by videos of peripherals to be added
 
+https://youtu.be/YO4rZiHFvdQ
+
 https://youtu.be/wA5ZYv1swbU
 
-https://youtu.be/CzgefMS0O_Q
+https://youtu.be/p1WU3VXfM3Y
 
 https://youtu.be/9Q7ZjGNGi_Y
 
