@@ -35,3 +35,18 @@ https://youtu.be/9Q7ZjGNGi_Y
 
 https://youtu.be/XUTLOKrGKds
 
+## Images of program running
+
+![Icon_View](https://user-images.githubusercontent.com/44931507/109450387-c3571500-7a18-11eb-9ebe-5ec7456ffaed.png)
+
+![Spline_Example_1](https://user-images.githubusercontent.com/44931507/109450396-cb16b980-7a18-11eb-8ec9-137f5bc2f685.png)
+
+![Spline_Brush_Example_1](https://user-images.githubusercontent.com/44931507/109450419-d669e500-7a18-11eb-9f5e-c339581bfaa5.png)
+
+![Spline_Brush_Example_2](https://user-images.githubusercontent.com/44931507/109450432-dbc72f80-7a18-11eb-84c6-f2a0b3ed0945.png)
+
+![Spline_Brush_Example_3](https://user-images.githubusercontent.com/44931507/109450440-dec22000-7a18-11eb-9de4-7f6569bb464c.png)
+
+![Spline_Example_2](https://user-images.githubusercontent.com/44931507/109450447-e5509780-7a18-11eb-8910-055c4971a558.png)
+
+
