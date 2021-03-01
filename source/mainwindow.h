@@ -1,7 +1,6 @@
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
-#include <iostream>
 #include <string>
 #include <list>
 #include <functional>
@@ -22,6 +21,7 @@
 #include <QInputDialog>
 #include <QTimer>
 #include <QTextBrowser>
+#include <QScrollBar>
 
 #include <opencv2/opencv.hpp>
 #include <opencv2/videoio.hpp>
@@ -29,22 +29,24 @@
 #include <opencv2/imgproc/imgproc.hpp>
 
 #include <dataIOHandler.h>
-#include <brushHandler.h>
+#include <brushhandler.h>
 #include <graphics.h>
 #include <stdfuncs.h>
 #include <resizewindow.h>
+#include <screenrender.h>
+#include <radialprofiler.h>
+#include <viewscroller.h>
 
 using cv::VideoCapture;
 using cv::Mat;
 using cv::destroyAllWindows;
 
+using graphics::vectorFilters;
 using graphics::filterNames;
 using graphics::Filter;
-using graphics::ImgSupport;
 
-using std::cout;
-using std::endl;
 using std::string;
+using std::to_string;
 using std::list;
 using std::to_string;
 using std::function;
@@ -54,11 +56,28 @@ using std::fstream;
 using std::ios;
 using std::pair;
 
+using Qt::MouseButton;
+using Qt::NoButton;
+using Qt::LeftButton;
+using Qt::RightButton;
+using Qt::Key_Shift;
+using Qt::Key_Control;
+using Qt::Key_Up;
+using Qt::Key_Down;
+using Qt::Key_Left;
+using Qt::Key_Right;
+using Qt::Key_Escape;
+using Qt::Key_Delete;
+using Qt::Key_Backspace;
+using Qt::Key_X;
+using Qt::Key_C;
+using Qt::Key_V;
+
 const string UI_FileType = ".txt";
 const string UI_FileName = "mainMenubar";
 const int trackDrawSpeed = 0;
-const int ptSize = 5;
-const int sampleFlashTime = 400;
+
+enum EditMode {Brush_Mode, Spline_Mode};
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -70,44 +89,49 @@ class MainWindow : public QMainWindow
 
 public:
     MainWindow(QWidget *parent = nullptr);
+    ~MainWindow();
     void mouseMoveEvent(QMouseEvent *event);
     void mousePressEvent(QMouseEvent *event);
     void mouseReleaseEvent(QMouseEvent *event);
     void mouseDoubleClickEvent(QMouseEvent *event);
+    void wheelEvent(QWheelEvent *event);
     void keyPressEvent(QKeyEvent *event);
+    void keyReleaseEvent(QKeyEvent *event);
+    void resizeEvent(QResizeEvent *event);
     void paintEvent(QPaintEvent *event);
-    ~MainWindow();
     void log(string title, QObject *obj);
-    void createMenubar(string filename);
+    void createMenubar();
     void addItems(QMenu *menu, string items);
     void addAction(QMenu *menu, string s);
-
-    DataIOHandler *ioh;
-    brushHandler bh;
-    resizeWindow *resizeCheck;
-
-    QColorDialog cd;
-    Qt::MouseButton lastButton;
-    QTimer *sampleFlasher;
-    char sampleFlag;
-
-    QTextBrowser qtb;
-
-    ImgSupport imgSupport;
-
-    unordered_map <string, QObject *> objFetch;
-    list <QObject *> toDel;
+    void refresh();
 
 public slots:
+    void changeVectorFilter(string s);
     void changeScreenFilter(string s);
     void changeBrushFilter(string s);
     void changeBrushMethod(string s);
     void changeBrushShape(string s);
     void doSomething(string btnPress);
-    void toggleSamplePnt();
 
 private:
+    void setShiftFlag(bool b);
+    void setSamplePt(QPoint qp);
+
     Ui::MainWindow *ui;
+    screenRender *sr;
+    viewScroller *vs;
+    EditMode mode;
+    bool shiftFlag, ctrlFlag, onePress;
+    MouseButton lastButton;
+    DataIOHandler *ioh;
+    brushHandler bh;
+    resizeWindow *resizeCheck;
+    RadialProfiler *radialProfiler;
+    QColorDialog cd;
+    QTextBrowser qtb;
+    unordered_map <string, QObject *> objFetch;
+    list <QObject *> toDel;
+
 };
 
 void appTo(QImage *qi, Filter f);

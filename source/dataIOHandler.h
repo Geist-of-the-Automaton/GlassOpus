@@ -1,20 +1,22 @@
 #ifndef DATAIO_H
 #define DATAIO_H
 
+#include <vector>
+#include <list>
 #include <QImageReader>
-#include <QFileDialog>      // import should be within MainWindow.h for now.
+#include <QFileDialog>
 #include <QImage>
-
+#include <QPainter>
+#include <layer.h>
 #include <graphics.h>
 
-#include <list>
-
+using std::vector;
 using std::list;
 using std::pair;
-
+using std::iter_swap;
 using graphics::Filter;
 
-const int defaultSize = 700;
+const QSize defaultSize (1200, 900);
 
 struct RGB {
     uchar blue;
@@ -23,10 +25,33 @@ struct RGB {
 };
 
 class DataIOHandler {
+
 public:
+
     DataIOHandler();
-    //DataIOHandler(QImage * qi);
     ~DataIOHandler();
+    void copyVectors();
+    void cutVectors();
+    void deleteVectors();
+    void pasteVectors();
+    void addLayer(QImage qi = QImage());
+    void copyLayer();
+    void pasteLayer();
+    void deleteLayer();
+    void moveBackward();
+    void moveForward();
+
+    void deleteFrame();
+    /*
+    void addFrame(int num);
+    void duplicateFrame(int count);
+    void copyFrames(int first, int last = -1);
+    void pasteFrames(int after);
+    void removeFrames(int first, int last = -1);
+    // Update the menu file to match.
+    */
+
+    // almost everything below is outdated
     bool importImage(QString fileName);
     void exportImage(QString fileName);
     bool importVideo(QString fileName);
@@ -37,24 +62,26 @@ public:
     void setFilterStrength(int strength);
     int getFilterIndex();
     int getFilterStrength();
-    QImage *getCanvasLayer();
-    QImage *getMediaLayer();
-    QImage getFilteredMLayer();
-    QSize getBounds();
-    QSize fullBounds();
+    Layer *getWorkingLayer();
+    QImage getBackground();
+    QImage getForeground();
     void scale(int option1, int option2);
 
-    void setMediaLayer (QImage qi);
-
 private:
+
+    void correctRender();
     void scaleLayers(int option1, int option2);
     void scaleLists(int layer, int scaleType);
     void applyFilter();
 
-    QImage *canvasLayer, *mediaLayer, filteredMLayer;
-    list <QImage *> canvasLeft, canvasRight, mediaLeft, mediaRight;
+    QSize dims;
+    vector <vector <Layer *> > frames;
+    list <SplineVector> vectorCopySlot;
+    Layer layerCopySlot;
     QString file;
-    Filter screenFilter;    
+    Filter screenFilter;
+    unsigned char activeLayer, activeFrame;
 };
 
 #endif // DATAIO_H
+
