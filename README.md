@@ -27,9 +27,9 @@ There are two options to running the software:
 
 ## Videos of program running
 
-![Creation of second image below](https://youtu.be/XCe56i6esuc)
+[Creation of second image below](https://youtu.be/XCe56i6esuc)
 
-https://youtu.be/YO4rZiHFvdQ
+[Vectoring 3](https://youtu.be/YO4rZiHFvdQ)
 
 https://youtu.be/wA5ZYv1swbU
 
