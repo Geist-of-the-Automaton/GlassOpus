@@ -6,9 +6,7 @@ The focus of Glass Opus is to provide a free software that students and artists 
 
 The Microsoft coding guidelines are used. Found [here](https://www.cise.ufl.edu/~mschneid/Research/C++%20Programming%20Style%20Guidelines.htm) and implemented via [this](https://docs.microsoft.com/en-us/cpp/code-quality/using-the-cpp-core-guidelines-checkers?view=vs-2019https://docs.microsoft.com/en-us/cpp/code-quality/using-the-cpp-core-guidelines-checkers?view=vs-2019).
 
-## External Requirements
-
-The app be run via the executable in the zip folder under the most recent release.
+The app be run via the installer found in the releases
 
 ## Dev Setup
 
