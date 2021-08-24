@@ -6,7 +6,7 @@ The focus of Glass Opus is to provide a free software that students and artists 
 
 The Microsoft coding guidelines are used. Found [here](https://www.cise.ufl.edu/~mschneid/Research/C++%20Programming%20Style%20Guidelines.htm).
 
-The app be run via the installer found in the releases. The most current release can be found here.
+The app be run via the installer found in the releases. The most current release can be found [here](https://github.com/Geist-of-the-Automaton/GlassOpus/releases/tag/1.0).
 
 ## Dev Setup
 
