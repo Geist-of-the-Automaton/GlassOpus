@@ -39,6 +39,12 @@ https://youtu.be/XUTLOKrGKds
 
 ## Images of program running
 
+![glassOpusGirl](https://user-images.githubusercontent.com/44931507/116170700-4f15b680-a6d5-11eb-851d-850b10630e07.png)
+
+![demo](https://user-images.githubusercontent.com/44931507/116170714-54730100-a6d5-11eb-87f5-9ba522397bc3.png)
+
+![shadowStreet](https://user-images.githubusercontent.com/44931507/116170747-605ec300-a6d5-11eb-832d-2af2a5faf98c.png)
+
 ![Icon_View](https://user-images.githubusercontent.com/44931507/109450387-c3571500-7a18-11eb-9ebe-5ec7456ffaed.png)
 
 ![Spline_Example_1](https://user-images.githubusercontent.com/44931507/109450396-cb16b980-7a18-11eb-8ec9-137f5bc2f685.png)
