@@ -31,7 +31,7 @@ There are two options to running the software:
 
 [Vectoring 3](https://youtu.be/YO4rZiHFvdQ)
 
-https://youtu.be/wA5ZYv1swbU
+[Brushes and filters](https://youtu.be/wA5ZYv1swbU)
 
 https://youtu.be/p1WU3VXfM3Y
 
