@@ -1,5 +1,16 @@
 #include <splinevector.h>
 
+// This should only be called as a blank vector to populate in dataIOHandler::load()
+SplineVector::SplineVector() {
+    width = 0;
+    color1 = color2 = 0xFF000000;
+    taper1 = taper2 = 0;
+    band = 20;
+    gap = 0;
+    taperType = Double;
+    filter.setFilter("Greyscale");
+    mode = ColorFill;
+}
 
 SplineVector::SplineVector(QPoint a, QPoint b, int Width) {
     controlPts.push_back(a);
@@ -7,8 +18,13 @@ SplineVector::SplineVector(QPoint a, QPoint b, int Width) {
     width = Width;
     color1 = color2 = 0xFF000000;
     taper1 = taper2 = 0;
-    taperType = 2;
+    band = 20;
+    gap = 0;
+    taperType = Double;
     filter.setFilter("Greyscale");
+    mode = ColorFill;
+    minX = minY = min(a.x(), a.y());
+    maxX = maxY = max(a.x(), a.y());
 }
 
 SplineVector::SplineVector(const SplineVector &sv) {
@@ -29,6 +45,8 @@ SplineVector& SplineVector::operator = (const SplineVector &sv) {
     maxX = sv.maxX;
     minY = sv.minY;
     maxY = sv.maxY;
+    band = sv.band;
+    gap = sv.gap;
     return *this;
 }
 
@@ -37,20 +55,16 @@ vector <QPoint> SplineVector::getControls() {
 }
 
 void SplineVector::addPt(QPoint qp, size_t index) {
-    if (controlPts.size() < UCHAR_MAX) {
+    if (controlPts.size() < maxPoints) {
         controlPts.push_back(QPoint(0,0));
         for (size_t i = controlPts.size() - 1; i > index; --i)
             controlPts[i] = controlPts[i - 1];
         controlPts[index] = qp;
     }
-    if (qp.x() < minX)
-        minX = qp.x();
-    if (qp.x() > maxX)
-        maxX = qp.x();
-    if (qp.y() < minY)
-        minY = qp.y();
-    if (qp.y() > maxY)
-        maxY = qp.y();
+    minX = min(minX, qp.x());
+    minY = min(minY, qp.y());
+    maxX = max(maxX, qp.x());
+    maxY = max(maxY, qp.y());
 }
 
 void SplineVector::removePt(size_t index) {
@@ -84,53 +98,57 @@ void SplineVector::removePt(size_t index) {
 
 void SplineVector::movePt(QPoint loc, size_t index) {
     if (controlPts.size() == 2) {
-        QPoint qp = controlPts[index];
-        controlPts[index] = loc;
-        if (controlPts[0].x() == controlPts[1].x() && controlPts[0].y() == controlPts[1].y())
+        QPoint qp = controlPts[1 - index];
+        if (loc.x() != qp.x() || loc.y() != qp.y()) {
             controlPts[index] = qp;
+            minX = min(controlPts[0].x(), controlPts[1].x());
+            minY = min(controlPts[0].y(), controlPts[1].y());
+            maxX = max(controlPts[0].x(), controlPts[1].x());
+            maxY = max(controlPts[0].y(), controlPts[1].y());
+        }
+        else
+            return;
     }
-    else {
-        QPoint qp = controlPts[index];
-        controlPts[index] = loc;
-        if (qp.x() == minX) {
-            if (loc.x() <= minX)
-                minX = loc.x();
-            else {
-                minX = INT_MAX;
-                for (QPoint pt : controlPts)
-                    if (pt.x() < minX)
-                        minX = pt.x();
-            }
+    QPoint qp = controlPts[index];
+    controlPts[index] = loc;
+    if (qp.x() == minX) {
+        if (loc.x() <= minX)
+            minX = loc.x();
+        else {
+            minX = INT_MAX;
+            for (QPoint pt : controlPts)
+                if (pt.x() < minX)
+                    minX = pt.x();
         }
-        else if (qp.x() == maxX) {
-            if (loc.x() >= maxX)
-                maxX = loc.x();
-            else {
-                maxX = 0;
-                for (QPoint pt : controlPts)
-                    if (pt.x() > maxX)
-                        maxX = pt.x();
-            }
+    }
+    else if (qp.x() == maxX) {
+        if (loc.x() >= maxX)
+            maxX = loc.x();
+        else {
+            maxX = 0;
+            for (QPoint pt : controlPts)
+                if (pt.x() > maxX)
+                    maxX = pt.x();
         }
-        if (qp.y() == minY) {
-            if (loc.y() <= minY)
-                minY = loc.y();
-            else {
-                minY = INT_MAX;
-                for (QPoint pt : controlPts)
-                    if (pt.y() < minY)
-                        minY = pt.y();
-            }
+    }
+    if (qp.y() == minY) {
+        if (loc.y() <= minY)
+            minY = loc.y();
+        else {
+            minY = INT_MAX;
+            for (QPoint pt : controlPts)
+                if (pt.y() < minY)
+                    minY = pt.y();
         }
-        else if (qp.y() == maxY) {
-            if (loc.y() >= maxY)
-                maxY = loc.y();
-            else {
-                maxY = 0;
-                for (QPoint pt : controlPts)
-                    if (pt.y() > maxY)
-                        maxY = pt.y();
-            }
+    }
+    else if (qp.y() == maxY) {
+        if (loc.y() >= maxY)
+            maxY = loc.y();
+        else {
+            maxY = 0;
+            for (QPoint pt : controlPts)
+                if (pt.y() > maxY)
+                    maxY = pt.y();
         }
     }
 }
@@ -183,7 +201,7 @@ void SplineVector::scale(QPoint qp) {
 
 void SplineVector::cleanup() {
     backup.clear();
-    maxY = maxX = 0;
+    maxY = maxX = -INT_MAX;
     minY = minX = INT_MAX;
     for (QPoint qp : controlPts) {
         if (qp.x() < minX)
@@ -250,17 +268,36 @@ void SplineVector::setTaper2(int b) {
     taper2 = static_cast<char>(stdFuncs::clamp(b, minTaper, maxTaper));
 }
 
-void SplineVector::setTaperType(int i) {
-    taperType = static_cast<char>(i);
+void SplineVector::setTaperType(Taper t) {
+    taperType = t;
+}
+
+void SplineVector::setFilterStrength(int val) {
+    filter.setStrength(val);
 }
 
 void SplineVector::setFilter(string s) {
     filter.setFilter(s);
-    filter.setStrength(255);
 }
 
-void SplineVector::setMode(int i) {
-    mode = static_cast<unsigned char>(i);
+void SplineVector::setMode(VectorMode vm) {
+    mode = vm;
+}
+
+void SplineVector::setBand(int b) {
+    band = b;
+}
+
+void SplineVector::setGap(int g) {
+    gap = g;
+}
+
+short SplineVector::getBand() {
+    return band;
+}
+
+short SplineVector::getGap() {
+    return gap;
 }
 
 void SplineVector::swapColors() {
@@ -274,15 +311,15 @@ void SplineVector::swapTapers() {
     swapColors();
 }
 
-int SplineVector::getMode() {
-    return static_cast<int>(mode);
+VectorMode SplineVector::getMode() {
+    return mode;
 }
 
 Filter SplineVector::getFilter() {
     return filter;
 }
 
-char SplineVector::getTaperType() {
+Taper SplineVector::getTaperType() {
     return taperType;
 }
 
@@ -294,3 +331,32 @@ pair <QRgb, QRgb> SplineVector::getColors() {
     return pair <QRgb, QRgb> (color1, color2);
 }
 
+QString SplineVector::taperTypeString(Taper T) {
+    switch(T) {
+        case Single: return QString("Single");
+        case Double: return QString("Double");
+        default: return QString("");
+    }
+}
+
+QString SplineVector::modeString(VectorMode v) {
+    switch (v) {
+        case ColorFill: return QString("ColorFill");
+        case Filtered: return QString("Filtered");
+        default: return QString("");
+    }
+}
+
+Taper SplineVector::taperFromString(QString q) {
+    if (q == "Double")
+        return Double;
+    else
+        return Single;
+}
+
+VectorMode SplineVector::modeFromString(QString q) {
+    if (q == "ColorFill")
+        return ColorFill;
+    else
+        return Filtered;
+}

@@ -5,16 +5,12 @@
 #include <list>
 #include <functional>
 #include <unordered_map>
-#include <map>
 #include <fstream>
 #include <thread>
 #include <algorithm>
 #include <QMainWindow>
-#include <QImage>
-#include <QPainter>
 #include <QKeyEvent>
 #include <QFileDialog>
-#include <QImageReader>
 #include <QMenuBar>
 #include <QColorDialog>
 #include <QInputDialog>
@@ -28,11 +24,13 @@
 #include <QScrollBar>
 #include <QProcess>
 #include <QVBoxLayout>
-
-#include <opencv2/opencv.hpp>
-#include <opencv2/videoio.hpp>
-#include <opencv2/highgui/highgui.hpp>
-#include <opencv2/imgproc/imgproc.hpp>
+#include <QMessageBox>
+#include <QScreen>
+#include <QLabel>
+#include <QDropEvent>
+#include <QMimeData>
+#include <QDragEnterEvent>
+#include <QProgressDialog>
 
 #include <dataIOHandler.h>
 #include <brushhandler.h>
@@ -42,6 +40,10 @@
 #include <screenrender.h>
 #include <radialprofiler.h>
 #include <viewscroller.h>
+#include <algorithm>
+#include <brushshape.h>
+#include <patternprofiler.h>
+#include <Windows.h>
 
 using std::string;
 using std::to_string;
@@ -49,9 +51,9 @@ using std::list;
 using std::to_string;
 using std::function;
 using std::unordered_map;
-using std::map;
 using std::fstream;
 using std::ios;
+using std::find;
 using std::pair;
 using Qt::MouseButton;
 using Qt::NoButton;
@@ -70,10 +72,10 @@ using Qt::Key_X;
 using Qt::Key_C;
 using Qt::Key_V;
 using Qt::Key_A;
-
-using cv::VideoCapture;
-using cv::Mat;
-using cv::destroyAllWindows;
+using Qt::Key_Y;
+using Qt::Key_Z;
+using Qt::Key_D;
+using Qt::Key_F7;
 
 using graphics::vectorFilters;
 using graphics::filterNames;
@@ -81,12 +83,20 @@ using graphics::Filter;
 
 const QString UI_FileName = "mainMenubar.txt";
 const QString Doc_FileName = "Glass_Opus_Documentation.pdf";
+const QString WinIco_FileName = "execIco.png";
+const QString Logo_FileName = "Logo.png";
 const QString UI_Loc = "/Menus/";
 const QString Icon_Loc = UI_Loc + "Icons/";
 const QString Doc_Loc = "/Documentation/";
+const QString Kernal_Loc = "/Kernals/";
 const QString FetchLink = "https://github.com/SCCapstone/SnakyBusiness/raw/master";
+const vector <string> acceptedImportImageFormats = {"bmp", "jpg", "jpeg", "png", "ppm", "xbm", "xpm", "gif", "pbm", "pgm"};
+const vector <string> acceptedExportImageFormats = {"bmp", "jpg", "jpeg", "png", "ppm", "xbm", "xpm"};
+static mutex scrollLock;
 
 enum downloadAction {DownloadThenRestart, DownLoadThenOpen};
+
+const int bins = 256;
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -97,7 +107,7 @@ class MainWindow : public QMainWindow
     Q_OBJECT
 
 public:
-    MainWindow(QWidget *parent = nullptr);
+    MainWindow(string startPath, string projectFile, QWidget *parent = nullptr);
     ~MainWindow();
     void mouseMoveEvent(QMouseEvent *event);
     void mousePressEvent(QMouseEvent *event);
@@ -106,8 +116,11 @@ public:
     void wheelEvent(QWheelEvent *event);
     void keyPressEvent(QKeyEvent *event);
     void keyReleaseEvent(QKeyEvent *event);
+    void dragEnterEvent(QDragEnterEvent *event);
+    void dropEvent(QDropEvent *event);
     void resizeEvent(QResizeEvent *event);
-
+    void closeEvent(QCloseEvent *event);
+    void hoverEvent(QHoverEvent *event);
 
 public slots:
     void changeVectorFilter(string s);
@@ -115,6 +128,7 @@ public slots:
     void changeBrushFilter(string s);
     void changeBrushMethod(string s);
     void changeBrushShape(string s);
+    void applyRasterFilter(string s);
     void doSomething(string btnPress);
     void downloadFinished();
     void downloadTimeout();
@@ -128,6 +142,9 @@ private:
     void setShiftFlag(bool b);
     void setSamplePt(QPoint qp);
     void downloadItem(QString subfolder, QString fileName, downloadAction action, QString promptTitle, QString promptText);
+    void createDocImgs();
+    void setMode(EditMode emode);
+    int getBPP();
 
     Ui::MainWindow *ui;
     screenRender *sr;
@@ -148,10 +165,13 @@ private:
     QString dSubfolder, dFileName;
     downloadAction dAction;
     bool takeFlag;
-
+    QString saveFileName;
+    appMethod tempMethod = overwrite;
+    QProgressDialog *progress;
+    brushShape *brushProlfiler;
+    patternProfiler *pp;
+    bool lock;
+    QLabel *histograms;
 };
 
-void appTo(QImage *qi, Filter f);
-
 #endif // MAINWINDOW_H
-

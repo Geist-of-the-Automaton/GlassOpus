@@ -2,33 +2,61 @@
 #include "ui_mainwindow.h"
 
 
-MainWindow::MainWindow(QWidget *parent)
+MainWindow::MainWindow(string startPath, string projectFile, QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
+    setMinimumSize(450, 450);
+    hide();
+    long long t = stdFuncs::getTime();
+    QDir::setCurrent(startPath.c_str());
+    setAcceptDrops(true);
+    QLabel logo;
+    QFile file(QDir::currentPath() + UI_Loc + Logo_FileName);
+    bool logoFound = file.exists();
+    QPoint center;
+    QRect screenRect = QGuiApplication::screens().front()->availableGeometry();
+    if (logoFound) {
+        QImage qi(file.fileName());
+        logo.setPixmap(QPixmap::fromImage(qi));
+        center = screenRect.center();
+        logo.setFixedSize(qi.size());
+        logo.setWindowFlag(Qt::WindowType::FramelessWindowHint, true);
+        logo.setWindowFlag(Qt::WindowType::WindowStaysOnTopHint, true);
+        logo.move(center - logo.rect().center());
+        logo.show();
+        QCoreApplication::processEvents();
+    }
     qme = new QErrorMessage(this);
     shiftFlag = false;
     ctrlFlag = false;
     lastButton = NoButton;
     vs = new viewScroller(this);
     vs->setWidgetResizable(true);
-    ioh = new DataIOHandler();
+    progress = new QProgressDialog("Updating Views", "", 0, 0, this, Qt::WindowType::FramelessWindowHint);
+    progress->setCancelButton(nullptr);
+    progress->close();
+    ioh = new DataIOHandler(progress);
     sr = new screenRender(ioh, vs);
     setCentralWidget(vs);
-    setGeometry(0,0, defaultSize.width(), defaultSize.height());
+    setGeometry(screenRect.width() / 4, screenRect.height() / 4, screenRect.width() / 2, screenRect.height() / 2);
     setWindowTitle("Glass Opus");
     bool exists = createMenubar();
     if (exists) {
         QMenu* sFiltering = static_cast<QMenu *>(objFetch.at("Layer Filter"));
         QMenu* bFiltering = static_cast<QMenu *>(objFetch.at("Brush Filter"));
+        QMenu* rFiltering = static_cast<QMenu *>(objFetch.at("Apply Filter To Selection"));
         for (string name : filterNames) {
             QAction *sAction = sFiltering->addAction((name).c_str());
             QAction *bAction = bFiltering->addAction((name).c_str());
+            QAction *rAction = rFiltering->addAction((name).c_str());
             connect(sAction, &QAction::triggered, this, [=]() { this->changeScreenFilter(sAction->text().toStdString()); });
             connect(bAction, &QAction::triggered, this, [=]() { this->changeBrushFilter(bAction->text().toStdString()); });
+            connect(rAction, &QAction::triggered, this, [=]() { this->applyRasterFilter(rAction->text().toStdString()); });
             log(name, sAction);
             log(name, bAction);
+            log(name, rAction);
         }
         QMenu* vFiltering = static_cast<QMenu *>(objFetch.at("Vector Filter"));
         for (string name : vectorFilters) {
@@ -55,20 +83,68 @@ MainWindow::MainWindow(QWidget *parent)
             log(name, bAction);
         }
     }
-    else {
+    else
         downloadItem(UI_Loc, UI_FileName, DownloadThenRestart, "Menu Configuration Not Found", "Menu configuration not found locally/offline.\nFetch and download menu configuration online?");
-    }
     ui->menubar->setCornerWidget(dynamic_cast<QMenuBar *>(objFetch.at(UI_FileName.toStdString())), Qt::TopLeftCorner);
     resizeCheck = new resizeWindow(this, ioh);
     radialProfiler = new RadialProfiler(&bh, this);
-    mode = Brush_Mode;
     onePress = false;
     vs->setWidget(sr);
-    move(5, 5);
+    file.setFileName(QDir::currentPath() + UI_Loc + Icon_Loc + WinIco_FileName);
+    if (file.exists())
+        setWindowIcon(QIcon(file.fileName()));
     takeFlag = false;
+    move(center - rect().center());
+    if (projectFile == "") {
+        QInputDialog resPrompt;
+        QStringList items;
+        items.push_back("360p");
+        items.push_back("480p");
+        items.push_back("720p");
+        items.push_back("900p");
+        items.push_back("1080p");
+        items.push_back("1444p");
+        items.push_back("2160p");
+        resPrompt.setOptions(QInputDialog::UseListViewForComboBoxItems);
+        resPrompt.setComboBoxItems(items);
+        resPrompt.setTextValue(items.first());
+        resPrompt.setWindowTitle("New Project Resolution");
+        resPrompt.setWhatsThis("This will set the resolution of the layers and resulting export. Importing a saved project file after this dialog will update the resolution");
+        t = stdFuncs::getTime(t);
+        if (logoFound)
+            std::this_thread::sleep_for(std::chrono::milliseconds(t > 2000 ? 0 : 2000 - t));
+        show();
+        logo.hide();
+        //resPrompt.exec();
+        resPrompt.setTextValue("1080p");
+        int sizeY = stoi(resPrompt.textValue().toStdString());
+        ioh->setDims(QSize(static_cast<int>((16.0 / 9.0) * static_cast<float>(sizeY)), sizeY));
+    }
+    setMode(Brush_Mode);
+    sr->updateHoverMap(bh.getSize(), bh.getBrushMap());
+    sr->setHoverActive(true);
+    brushProlfiler = new brushShape(this);
+    pp = new patternProfiler(this);
+    if (projectFile != "") {
+        show();
+        ioh->load(QString(projectFile.c_str()));
+        saveFileName = projectFile.c_str();
+        string toFind = projectFile.find_last_of("/") >= projectFile.length() ? "\\" : "/";
+        projectFile = projectFile.substr(projectFile.find_last_of(toFind) + 1);
+        projectFile = projectFile.substr(0, projectFile.length() - 6);
+        setWindowTitle(QString("Glass Opus - ") + projectFile.c_str());
+        refresh();
+        t = stdFuncs::getTime(t);
+        if (logoFound)
+            std::this_thread::sleep_for(std::chrono::milliseconds(t > 2000 ? 0 : 2000 - t));
+        logo.hide();
+    }
+    histograms = new QLabel();
 }
 
 void MainWindow::mouseMoveEvent(QMouseEvent *event) {
+    if (ioh->getWorkingLayer() == nullptr)
+        return;
     if (takeFlag)
         return;
     QPoint qp = sr->getZoomCorrected(vs->getScrollCorrected(event->pos()));
@@ -80,7 +156,7 @@ void MainWindow::mouseMoveEvent(QMouseEvent *event) {
             if (bh.getMethodIndex() == appMethod::sample)
                 setSamplePt(qp);
             else
-                bh.applyBrush(ioh->getWorkingLayer()->getCanvas(), qp);
+                bh.erase(ioh->getWorkingLayer()->getCanvas(), qp);
         }
     }
     else if (mode == Spline_Mode || mode == Raster_Mode) {
@@ -91,15 +167,19 @@ void MainWindow::mouseMoveEvent(QMouseEvent *event) {
             layer->moveLeft(qp);
         else if (lastButton == RightButton && shiftFlag)
             layer->moveRight(qp);
+        refresh();
     }
-    refresh();
 }
 
 void MainWindow::mousePressEvent(QMouseEvent *event) {
+    if (ioh->getWorkingLayer() == nullptr)
+        return;
     if (ctrlFlag || onePress || takeFlag)
         return;
     onePress = true;
     if (event->button() >= 8) {
+        if (mode == Brush_Mode)
+            takeFlag = true;
         setShiftFlag(true);
         return;
     }
@@ -108,12 +188,12 @@ void MainWindow::mousePressEvent(QMouseEvent *event) {
     if (mode == Raster_Mode && event->button() == RightButton && !shiftFlag && !ioh->getWorkingLayer()->isRotating())
         ioh->getWorkingLayer()->fillColor(qp, bh.getFillColor());
     else if (mode == Brush_Mode) {
+        sr->setHoverActive(false);
         if (lastButton == RightButton) {
             if (bh.getMethodIndex() == appMethod::sample)
                 setSamplePt(qp);
             else {
-                bh.setAlpha(0);
-                bh.applyBrush(ioh->getWorkingLayer()->getCanvas(), qp);
+                bh.erase(ioh->getWorkingLayer()->getCanvas(), qp);
                 bh.setInterpolationActive(true);
             }
         }
@@ -134,22 +214,27 @@ void MainWindow::mousePressEvent(QMouseEvent *event) {
 }
 
 void MainWindow::mouseReleaseEvent(QMouseEvent *event) {
+    if (ioh->getWorkingLayer() == nullptr)
+        return;
     QPoint qp = sr->getZoomCorrected(vs->getScrollCorrected(event->pos()));
     if (takeFlag) {
         if (mode == Brush_Mode)
             bh.setBrushColor(ioh->getWorkingLayer()->getCanvas()->pixelColor(qp.x(), qp.y()));
         else if (mode == Raster_Mode)
             bh.setFillColor(ioh->getWorkingLayer()->getCanvas()->pixelColor(qp.x(), qp.y()));
-        takeFlag = false;
+        if (!shiftFlag)
+            takeFlag = false;
         return;
     }
     if (mode == Brush_Mode) {
+        sr->setHoverActive(true);
         bh.setInterpolationActive(false);
-        bh.setAlpha(ioh->getWorkingLayer()->getAlpha());
+        refresh();
     }
     else if (mode == Spline_Mode || (mode == Raster_Mode && event->button() != Qt::RightButton))
         ioh->getWorkingLayer()->release(qp, event->button());
     else if (event->button() >= 8) {
+        takeFlag = false;
         setShiftFlag(false);
         if (onePress)
             ioh->getWorkingLayer()->cleanUp();
@@ -159,6 +244,8 @@ void MainWindow::mouseReleaseEvent(QMouseEvent *event) {
 }
 
 void MainWindow::mouseDoubleClickEvent(QMouseEvent *event) {
+    if (ioh->getWorkingLayer() == nullptr)
+        return;
     QPoint qp = sr->getZoomCorrected(vs->getScrollCorrected(event->pos()));
     MouseButton button = event->button();
     if (mode == Spline_Mode) {
@@ -172,15 +259,24 @@ void MainWindow::mouseDoubleClickEvent(QMouseEvent *event) {
         sr->showPts();
         refresh();
     }
-    else if (mode == Raster_Mode) {
-        ioh->getWorkingLayer()->doubleClickLeft(qp, ctrlFlag);
-    }
 }
 
 void MainWindow::wheelEvent(QWheelEvent *event) {
-    int dy = event->angleDelta().y();
-    dy = abs(dy)/ dy;
-    if (mode == Brush_Mode) {
+    scrollLock.lock();
+    if (ioh->getWorkingLayer() == nullptr) {
+        scrollLock.unlock();
+        return;
+    }
+    int dy = event->angleDelta().y(), dx = event->angleDelta().x();
+    dy = dy > 0 ? 1 : -1;
+
+    if (dx != 0) {
+        double zoom = sr->getZoom();
+        double c = (dx < 0 ? 1.0 : -1.0) / pow(graphics::maxZoom - zoom, (graphics::maxZoom - zoom) / 3.0);
+        if ((zoom + c > graphics::minZoom && dx > 0 ) || (zoom + c < graphics::maxZoom && dx < 0))
+            sr->setZoom(zoom + c);
+    }
+    else if (mode == Brush_Mode) {
         if (shiftFlag) {
             bh.setStrength(bh.getStength() + dy);
             statusBar()->showMessage(("Brush Strength: " + to_string(bh.getStength())).c_str(), 1000);
@@ -191,6 +287,9 @@ void MainWindow::wheelEvent(QWheelEvent *event) {
         }
         else {
             radialProfiler->updateSize(bh.getSize() + dy);
+            if (bh.getBrushShape() == custom)
+                bh.setShape(brushShapes[bh.getBrushShape()], brushProlfiler->getShapeSize(bh.getSize()));
+            sr->updateHoverMap(bh.getSize(), bh.getBrushMap());
             statusBar()->showMessage(("Brush Radius: " + to_string(bh.getSize())).c_str(), 1000);
         }
     }
@@ -217,6 +316,7 @@ void MainWindow::wheelEvent(QWheelEvent *event) {
     }
     else if (mode == Raster_Mode)
         ioh->getWorkingLayer()->spinWheel(dy);
+    scrollLock.unlock();
     refresh();
 }
 
@@ -308,58 +408,112 @@ void MainWindow::addAction(QMenu *menu, string item) {
 void MainWindow::doSomething(string btnPress) {
     //cout << btnPress << endl;
     if (btnPress == "Import") {
-        QString fileName = QFileDialog::getOpenFileName(this, tr("Import"), "/", tr("Media Files (*.png *.jpg *.bmp *.mp4 *.avi *.mkv)"));
+        bool maxFlag = isMaximized();
+        QRect reset = geometry();
+        string formats = "";
+        for (string s : acceptedImportImageFormats)
+            formats += " *." + s;
+        formats = "Media Files (" + formats.substr(1) + ")";
+        QString fileName = QFileDialog::getOpenFileName(this, tr("Import"), "/", tr(formats.c_str()));
         if (fileName == "")
             return;
         string fn = fileName.toStdString();
         int index = fn.find_last_of('.');
         string fileType = fn.substr(index + 1);
-        if (fileType == "png" || fileType == "jpg" || fileType == "bmp") {
+        if (std::find(acceptedImportImageFormats.begin(), acceptedImportImageFormats.end(), fileType) != acceptedImportImageFormats.end()) {
             bool flag = ioh->importImage(fileName);
+            setGeometry(reset);
+            if (maxFlag)
+                this->showMaximized();
             if (flag)
                 resizeCheck->showRelative();
         }
-        else {
-            VideoCapture cap = VideoCapture(fileName.toStdString());
-            if(!cap.isOpened()) {
+        refresh();
+        setGeometry(reset);
+        if (maxFlag)
+            this->showMaximized();
+    }
+    else if (btnPress == "Open") {
+        QMessageBox::StandardButton prompt = QMessageBox::question(this, "Open Project File", "Opening a project file will replace the current work. Continue?", QMessageBox::Yes|QMessageBox::No);
+        if (prompt == QMessageBox::Yes) {
+            QString fileName = QFileDialog::getOpenFileName(this, tr("Open Project"), "/", tr("Glass Opus project files (*.glass)"));
+            if (fileName == "")
                 return;
-            }
-            list <Mat> list;
-            long long l;
-            while(true) {
-                l = stdFuncs::getTime();
-                Mat frame;
-                cap >> frame;
-                if (frame.empty())
-                    break;
-                list.push_back(frame);
-                l = stdFuncs::getTime();
-                QImage qi = QImage(frame.cols, frame.rows, QImage::Format_ARGB32_Premultiplied);
-                for(int r = 0; r < frame.rows; ++r)
-                    for(short c = 0; c < frame.cols; ++c) {
-                        RGB& rgb = frame.ptr<RGB>(r)[c];
-                        qi.setPixel(c, r, qRgb(rgb.red,rgb.green,rgb.blue));
-                    }
-                //ioh->setMediaLayer(qi);
+            int ret = 0;
+            ioh->load(fileName);
+            if (ret == 0) {
+                saveFileName = fileName;
+                string s = saveFileName.toStdString();
+                s = s.substr(s.find_last_of("/") + 1);
+                s = s.substr(0, s.length() - 6);
+                setWindowTitle(QString("Glass Opus - ") + s.c_str());
                 refresh();
             }
-            cap.release();
+            else if (ret == 1)
+                qme->showMessage("File load aborted. File may be corrupted.");
+            else if (ret == 2)
+                qme->showMessage("File could not be opened.");
         }
-        refresh();
     }
+    else if (btnPress == "Help") {
+        bool found = QDesktopServices::openUrl(QUrl::fromLocalFile(QDir::currentPath() + Doc_Loc + Doc_FileName));
+        if (!found)
+            downloadItem(Doc_Loc, Doc_FileName, DownLoadThenOpen, "Documentation Not Found", "Documentation PDF not found locally/offline.\nFetch and download documentation online?");
+    }
+    else if (btnPress == "About") {
+        QMessageBox qmb(QMessageBox::Question, "Glass Opus", "Glass Opus is an open source rotoscoping software for students and artists. The software will provide a variety of features to allow the users to see their work from start to finish. Drawing with a variety brushes and vectors, image manipulation, and filtering are among the many features than one can employ to create their vision.\n\nThe focus of Glass Opus, and the team behind it, is to provide a free software that students and artists can use to further their work and portfolio. This is often a difficult endeavor for artists due to the restrictive cost of major softwares. Since Glass Opus is open source, users can tweak features or add their own to suit specific needs. It will also serve as a foundation for those who seek to improve their knowledge in image processing and manipulation, as well as basic graphics programming.", QMessageBox::Yes, this);
+        qmb.exec();
+    }
+    else if (btnPress == "Exit") {
+        QMessageBox qmb(QMessageBox::Question, "Glass Opus", "Close Glass Opus?", QMessageBox::Yes, this);
+        if (ioh->getNumLayers() != 0)
+            qmb.addButton("Save and Close", QMessageBox::AcceptRole);
+        qmb.addButton("No", QMessageBox::RejectRole);
+        int choice = qmb.exec();
+        if (choice == QMessageBox::AcceptRole && ioh->getNumLayers() == 0)
+            choice = QMessageBox::RejectRole;
+        if (choice == QMessageBox::AcceptRole) {
+            if (saveFileName.isEmpty())
+                saveFileName = QFileDialog::getSaveFileName(this, tr("Save Project"), "/", tr("Glass Opus project files (*.glass)"));
+            ioh->save(saveFileName);
+        }
+        if (choice != QMessageBox::RejectRole)
+            QApplication::exit();
+    }
+    else if (btnPress == "Insert Layer")
+        ioh->addLayer();
+    if (ioh->getWorkingLayer() == nullptr)
+        return;
     else if (btnPress == "Export") {    //TODO
-        QString fileName = QFileDialog::getSaveFileName(this, tr("Export"), "/", tr("Image Files (*.png *.jpg *.bmp)"));
+        sr->stopFlashing();
+        string formats = "";
+        for (string s : acceptedExportImageFormats)
+            formats += " *." + s;
+        formats = "Media Files (" + formats.substr(1) + ")";
+        QString fileName = QFileDialog::getSaveFileName(this, tr("Export"), "/", tr(formats.c_str()));
         if (fileName == "")
             return;
         string fn = fileName.toStdString();
         int index = fn.find_last_of('.');
         string fileType = fn.substr(index + 1);
-        if (fileType == "png" || fileType == "jpg" || fileType == "bmp") {
+        if (std::find(acceptedExportImageFormats.begin(), acceptedExportImageFormats.end(), fileType) != acceptedExportImageFormats.end())
             ioh->exportImage(fileName);
-        }
-        else {
+        if (mode != Brush_Mode)
+            sr->resume();
+    }
+    else if (btnPress == "Save") {
+        if (saveFileName.isEmpty())
+            saveFileName = QFileDialog::getSaveFileName(this, tr("Save Project"), "/", tr("Glass Opus project files (*.glass)"));
+        ioh->save(saveFileName);
 
-        }
+    }
+    else if (btnPress == "Save As") {
+        saveFileName = QFileDialog::getSaveFileName(this, tr("Save Project As"), "/", tr("Glass Opus project files (*.glass)"));
+        ioh->save(saveFileName);
+        string s = saveFileName.toStdString();
+        s = s.substr(s.find_last_of("/") + 1);
+        s = s.substr(0, s.length() - 6);
+        setWindowTitle(QString("Glass Opus - ") + s.c_str());
     }
     else if (btnPress == "On")
         sr->showFg(true);
@@ -374,15 +528,13 @@ void MainWindow::doSomething(string btnPress) {
     }
     else if (btnPress == "Brush Radius") {
         bool ok = false;
-        int ret = QInputDialog::getInt(this, "Glass Opus", "Please enter a brush size/radius", bh.getSize(), minRadius, maxRadius, 1, &ok );
-        if (ok)
+        int ret = QInputDialog::getInt(this, "Glass Opus", "Please enter a brush radius", bh.getSize(), minRadius, maxRadius, 1, &ok);
+        if (ok) {
             radialProfiler->updateSize(ret);
-    }
-    else if (btnPress == "Screen Strength") {
-        bool ok = false;
-        int ret = QInputDialog::getInt(this, "Glass Opus", "Please enter a screen filter strength", ioh->getFilterStrength(), minStrength, maxStrength, 1, &ok );
-        if (ok)
-            ioh->setFilterStrength(ret);
+            if (bh.getBrushShape() == custom)
+                bh.setShape(brushShapes[bh.getBrushShape()], brushProlfiler->getShapeSize(bh.getSize()));
+            sr->updateHoverMap(bh.getSize(), bh.getBrushMap());
+        }
     }
     else if (btnPress == "Brush Strength") {
         bool ok = false;
@@ -396,35 +548,56 @@ void MainWindow::doSomething(string btnPress) {
         if (ok)
             bh.setDensity(ret);
     }
+    else if (btnPress == "Flip Selection Vertical")
+        ioh->getWorkingLayer()->flipVert();
+    else if (btnPress == "Flip Selection Horizontal")
+        ioh->getWorkingLayer()->flipHori();
+    else if (btnPress == "Pattern On")
+        bh.setPatternInUse(true);
+    else if (btnPress == "Pattern Off")
+        bh.setPatternInUse(false);
+    else if (btnPress == "Brush Filter Strength") {
+        int val = bh.getFilterStrength();
+        bool ok = false;
+        int ret = QInputDialog::getInt(this, "Glass Opus", "Please enter a brush filter strength", val, graphics::minColor, graphics::maxColor, 1, &ok );
+        if (ok)
+            bh.setFilterStrength(ret);
+    }
     else if (btnPress == "Vector Width") {
         vector <unsigned char> activeVects = ioh->getWorkingLayer()->getActiveVectors();
         if (activeVects.size() != 1)
             return;
         bool ok = false;
-        int ret = QInputDialog::getInt(this, "Glass Opus", "Please enter a spray density", ioh->getWorkingLayer()->getWidth(), minWidth, maxWidth, 1, &ok );
+        int ret = QInputDialog::getInt(this, "Glass Opus", "Please enter a vector width", ioh->getWorkingLayer()->getWidth(), minWidth, maxWidth, 1, &ok );
         if (ok)
             ioh->getWorkingLayer()->setWidth(ret);
-        refresh();
     }
-    else if (btnPress == "Vector Taper 1") {
+    else if (btnPress == "Vector Filter Strength") {
+        int val = ioh->getWorkingLayer()->getVectorFilterStrength();
+        if (val == -1)
+            return;
+        bool ok = false;
+        int ret = QInputDialog::getInt(this, "Glass Opus", "Please enter a vector filter strength", val, graphics::minColor, graphics::maxColor, 1, &ok );
+        if (ok)
+            ioh->getWorkingLayer()->setVectorFilterStrength(ret);
+    }
+    else if (btnPress == "Taper 1") {
         vector <unsigned char> activeVects = ioh->getWorkingLayer()->getActiveVectors();
         if (activeVects.size() != 1)
             return;
         bool ok = false;
-        int ret = QInputDialog::getInt(this, "Glass Opus", "Please enter a spray density", ioh->getWorkingLayer()->getVectorTapers().first, minTaper, maxTaper, 1, &ok);
+        int ret = QInputDialog::getInt(this, "Glass Opus", "Please enter a first taper degree", ioh->getWorkingLayer()->getVectorTapers().first, minTaper, maxTaper, 1, &ok);
         if (ok)
             ioh->getWorkingLayer()->setVectorTaper1(ret);
-        refresh();
     }
-    else if (btnPress == "Vector Taper 2") {
+    else if (btnPress == "Taper 2") {
         vector <unsigned char> activeVects = ioh->getWorkingLayer()->getActiveVectors();
         if (activeVects.size() != 1)
             return;
         bool ok = false;
-        int ret = QInputDialog::getInt(this, "Glass Opus", "Please enter a spray density", ioh->getWorkingLayer()->getVectorTapers().second, minTaper, maxTaper, 1, &ok);
+        int ret = QInputDialog::getInt(this, "Glass Opus", "Please enter a second taper degree", ioh->getWorkingLayer()->getVectorTapers().second, minTaper, maxTaper, 1, &ok);
         if (ok)
             ioh->getWorkingLayer()->setVectorTaper2(ret);
-        refresh();
     }
     else if (btnPress == "Vector Color 1") {
         vector <unsigned char> activeVects = ioh->getWorkingLayer()->getActiveVectors();
@@ -432,7 +605,6 @@ void MainWindow::doSomething(string btnPress) {
             return;
         QColor color = QColorDialog::getColor(ioh->getWorkingLayer()->getVectorColors().second, this);
         ioh->getWorkingLayer()->setVectorColor2(color.rgba());
-        refresh();
     }
     else if (btnPress == "Vector Color 2") {
         vector <unsigned char> activeVects = ioh->getWorkingLayer()->getActiveVectors();
@@ -440,31 +612,106 @@ void MainWindow::doSomething(string btnPress) {
             return;
         QColor color = QColorDialog::getColor(ioh->getWorkingLayer()->getVectorColors().first, this);
         ioh->getWorkingLayer()->setVectorColor1(color.rgba());
-        refresh();
     }
     else if (btnPress == "Single Taper") {
         ioh->getWorkingLayer()->setVectorTaperType(Single);
-        refresh();
     }
     else if (btnPress == "Double Taper") {
         ioh->getWorkingLayer()->setVectorTaperType(Double);
-        refresh();
+    }
+    else if (btnPress == "Band Size") {
+        vector <unsigned char> activeVects = ioh->getWorkingLayer()->getActiveVectors();
+        if (activeVects.size() != 1)
+            return;
+        bool ok = false;
+        int ret = QInputDialog::getInt(this, "Glass Opus", "Please enter a banding width", ioh->getWorkingLayer()->getBand(), minStyle, maxStyle, 1, &ok);
+        if (ok)
+            ioh->getWorkingLayer()->setBand(ret);
+    }
+    else if (btnPress == "Gap Size") {
+        vector <unsigned char> activeVects = ioh->getWorkingLayer()->getActiveVectors();
+        if (activeVects.size() != 1)
+            return;
+        bool ok = false;
+        int ret = QInputDialog::getInt(this, "Glass Opus", "Please enter a gap width", ioh->getWorkingLayer()->getGap(), 0, maxStyle, 1, &ok);
+        if (ok)
+            ioh->getWorkingLayer()->setGap(ret);
     }
     else if (btnPress == "Swap Colors") {
         ioh->getWorkingLayer()->swapColors();
-        refresh();
     }
     else if (btnPress == "Swap Tapers") {
         ioh->getWorkingLayer()->swapTapers();
-        refresh();
     }
     else if (btnPress == "Color Vector") {
         ioh->getWorkingLayer()->setVectorMode(ColorFill);
-        refresh();
     }
     else if (btnPress == "Filter Vector") {
         ioh->getWorkingLayer()->setVectorMode(Filtered);
-        refresh();
+    }
+    else if (btnPress == "Bayer") {
+        int bpp = getBPP();
+        if (bpp == -1)
+            return;
+        bool ok = false;
+        int matSizes[] = {2, 4, 8, 16, 32};
+        QStringList strs;
+        for (int i : matSizes)
+            strs.push_back((to_string(i) + "x" + to_string(i)).c_str());
+        QString item = QInputDialog::getItem(this, "Glass Opus", "Matrix Size", strs, 3, false, &ok);
+        if (ok) {
+            QImage *qi = ioh->getWorkingLayer()->getCanvas();
+            graphics::Filtering::ditherBayer(qi, bpp, matSizes[strs.indexOf(item)]);
+        }
+    }
+    else if (btnPress == "Random") {
+        int bpp = getBPP();
+        if (bpp != -1) {
+            QImage *qi = ioh->getWorkingLayer()->getCanvas();
+            graphics::Filtering::ditherRandom(qi, bpp);
+        }
+    }
+    else if (btnPress == "Floyd Steinberg") {
+        int bpp = getBPP();
+        if (bpp != -1) {
+            QImage *qi = ioh->getWorkingLayer()->getCanvas();
+            graphics::Filtering::ditherFloydSteinberg(qi, bpp);
+        }
+    }
+    else if (btnPress == "Sierra") {
+        int bpp = getBPP();
+        if (bpp != -1) {
+            QImage *qi = ioh->getWorkingLayer()->getCanvas();
+            graphics::Filtering::ditherSierra(qi, bpp);
+        }
+    }
+    else if (btnPress == "Sierra Lite") {
+        int bpp = getBPP();
+        if (bpp != -1) {
+            QImage *qi = ioh->getWorkingLayer()->getCanvas();
+            graphics::Filtering::ditherSierraLite(qi, bpp);
+        }
+    }
+    else if (btnPress == "Palette Reduction") {
+        int bpp = getBPP();
+        if (bpp != -1) {
+            QImage *qi = ioh->getWorkingLayer()->getCanvas();
+            graphics::Filtering::paletteReduction(qi, bpp);
+        }
+    }
+    else if (btnPress == "Color Transfer To Selection") {
+        Layer *l = ioh->getWorkingLayer();
+        if (l == nullptr)
+            return;
+
+        string formats = "";
+        for (string s : acceptedImportImageFormats)
+            formats += " *." + s;
+        formats = "Media Files (" + formats.substr(1) + ")";
+        QString fileName = QFileDialog::getOpenFileName(this, tr("Import"), "/", tr(formats.c_str()));
+        if (fileName == "")
+            return;
+        graphics::Filtering::colorTransfer(l->getCanvas(), QImage(fileName));
     }
     else if (btnPress == "Fill Color") {
         QColor color = QColorDialog::getColor(bh.getFillColor(), this);
@@ -472,28 +719,65 @@ void MainWindow::doSomething(string btnPress) {
     }
     else if (btnPress == "Take Color" && (mode == Brush_Mode || mode == Raster_Mode))
         takeFlag = true;
+    else if (btnPress == "Transparency Fill")
+        bh.setFillColor(QColor(255, 255, 255, 0));
+    else if (btnPress == "Apply Kernal To Selection") {
+        string ret;
+        while (true) {
+            QInputDialog kerPrompt;
+            QDir qdir(QDir::currentPath() + Kernal_Loc);
+            QStringList items, temp = qdir.entryList();
+            temp.pop_front();
+            temp.pop_front();
+            for (QString qs : temp)
+                if (qs != "(Custom)") {
+                    string str = qs.toStdString();
+                    str = str.substr(0, str.find_last_of("."));
+                    items.push_back(str.c_str());
+                }
+            items.push_back("(Custom)");
+            kerPrompt.setOptions(QInputDialog::UseListViewForComboBoxItems);
+            kerPrompt.setComboBoxItems(items);
+            kerPrompt.setTextValue(items.first());
+            kerPrompt.setWindowTitle("Kernal Selection");
+            kerPrompt.setWhatsThis("Kernals allow for a variety of effects to be applied to the image");
+            kerPrompt.exec();
+            ret = kerPrompt.textValue().toStdString();
+            if (ret != "(Custom)")
+                break;
+            else {
+                QString fileName = QFileDialog::getOpenFileName(this, tr("Import Kernal"), "/", tr("*.txt"));
+                if (fileName != "") {
+                    string file = fileName.toStdString();
+                    file = file.substr(file.find_last_of("/") + 1);
+                    vector <vector <float> > kernal = graphics::ImgSupport::loadKernal(fileName.toStdString()).second;
+                    if (!(kernal.size() == 1 && kernal[0].size() == 1 && kernal[0][0] == 1.0))
+                        QFile(fileName).copy(QDir::currentPath() + Kernal_Loc + file.c_str());
+                }
+            }
+        }
+        ioh->getWorkingLayer()->applyKernalToSelection(progress, QDir::currentPath().toStdString() + Kernal_Loc.toStdString() + ret + ".txt");
+    }
     else if (btnPress == "Layer Opacity (Alpha)") {
         bool ok = false;
         int ret = QInputDialog::getInt(this, "Glass Opus", "Please enter a layer alpha", ioh->getWorkingLayer()->getAlpha(), 1, graphics::maxColor, 1, &ok);
-        if (ok) {
+        if (ok)
             ioh->getWorkingLayer()->setAlpha(ret);
-            bh.setAlpha(ret);
-        }
     }
     else if (btnPress == "Brush Mode") {
-        mode = Brush_Mode;
-        ioh->getWorkingLayer()->setMode(mode);
         ioh->getWorkingLayer()->deselect();
+        setMode(Brush_Mode);
     }
-    else if (btnPress == "Spline Mode") {
-        mode = Spline_Mode;
-        ioh->getWorkingLayer()->setMode(mode);
+    else if (btnPress == "Vector Mode") {
+        ioh->getWorkingLayer()->deselect();
+        setMode(Spline_Mode);
         setSamplePt(QPoint(-1000, -1000));
     }
     else if (btnPress == "Raster Mode") {
-        mode = Raster_Mode;
-        ioh->getWorkingLayer()->setMode(mode);
+        ioh->getWorkingLayer()->deselect();
+        setMode(Raster_Mode);
         setSamplePt(QPoint(-1000, -1000));
+        ioh->getWorkingLayer()->deselect();
     }
     else if (btnPress == "Copy") {
         if (mode == Spline_Mode)
@@ -506,29 +790,29 @@ void MainWindow::doSomething(string btnPress) {
             ioh->cutVectors();
         else if (mode == Raster_Mode)
             ioh->cutRaster();
-        refresh();
     }
     else if (btnPress == "Delete") {
         if (mode == Spline_Mode)
             ioh->deleteVectors();
         else if (mode == Raster_Mode)
             ioh->deleteRaster();
-        refresh();
     }
     else if (btnPress == "Paste") {
         if (mode == Spline_Mode)
             ioh->pasteVectors();
         else if (mode == Raster_Mode)
             ioh->pasteRaster();
-        refresh();
     }
     else if (btnPress == "Select All")
         ioh->getWorkingLayer()->selectAll();
     else if (btnPress == "Set Active Layer") {
         bool ok = false;
         int ret = QInputDialog::getInt(this, "Glass Opus", "Select a layer to edit", ioh->getActiveLayer() + 1, 1, ioh->getNumLayers(), 1, &ok) - 1;
-        if (ok)
+        if (ok && ret != ioh->getActiveLayer()) {
+            ioh->getWorkingLayer()->deselect();
             ioh->setActiveLayer(ret, mode);
+            ioh->getWorkingLayer();
+        }
     }
     else if (btnPress == "Layer Filter Strength") {
         bool ok = false;
@@ -536,8 +820,6 @@ void MainWindow::doSomething(string btnPress) {
         if (ok)
             ioh->getWorkingLayer()->setFilterStrength(ret);
     }
-    else if (btnPress == "Move To Front")
-        ioh->moveToFront();
     else if (btnPress == "Move Backward")
         ioh->moveBackward();
     else if (btnPress == "Move Forward")
@@ -546,25 +828,22 @@ void MainWindow::doSomething(string btnPress) {
         ioh->moveToBack();
     else if (btnPress == "Move To Front")
         ioh->moveToFront();
-    else if (btnPress == "Insert Layer" && false)
-        ioh->addLayer();
-    else if (btnPress == "Copy Layer" && false)
+    else if (btnPress == "Copy Layer")
         ioh->copyLayer();
-    else if (btnPress == "Cut Layer" && false) {
+    else if (btnPress == "Cut Layer") {
         ioh->copyLayer();
         ioh->deleteLayer();
     }
-    else if (btnPress == "Paste Layer" && false)
+    else if (btnPress == "Paste Layer")
         ioh->pasteLayer();
-    else if (btnPress == "Delete Layer" && false)
+    else if (btnPress == "Delete Layer")
         ioh->deleteLayer();
     else if (btnPress == "Compile Layer")
         ioh->compileLayer();
     else if (btnPress == "Compile Frame")
         ioh->compileFrame();
-    else if (btnPress == "Zoom 100%") {
+    else if (btnPress == "Zoom 100%")
         sr->setZoom(1.0);
-    }
     else if (btnPress == "Set Zoom") {
         bool ok = false;
         double ret = QInputDialog::getDouble(this, "Glass Opus", "Select a layer to edit", sr->getZoom(), graphics::minZoom, graphics::maxZoom, 2, &ok);
@@ -575,18 +854,163 @@ void MainWindow::doSomething(string btnPress) {
         sr->zoomIn();
     else if (btnPress == "Zoom Out")
         sr->zoomOut();
-    else if (btnPress == "Help") {
-        bool found = QDesktopServices::openUrl(QUrl::fromLocalFile(QDir::currentPath() + Doc_Loc + Doc_FileName));
-        if (!found)
-            downloadItem(Doc_Loc, Doc_FileName, DownLoadThenOpen, "Documentation Not Found", "Documentation PDF not found locally/offline.\nFetch and download documentation online?");
+    else if (btnPress == "Shape Profiler") {
+        brushProlfiler->exec();
+        bh.setShape(brushShapes[bh.getBrushShape()], brushProlfiler->getShapeSize(bh.getSize()));
     }
-    else if (btnPress == "Exit") {
-        QMessageBox qmb(QMessageBox::Question, "Glass Opus", "Do you wish to Exit?", QMessageBox::Yes, this);
-        qmb.addButton("No", QMessageBox::NoRole);
-        int choice = qmb.exec();
-        if (choice == QMessageBox::Yes)
-            QApplication::exit();
+    else if (btnPress == "Pattern Profiler") {
+        pp->exec();
+        bh.setPattern(pp->getPattern());
     }
+    else if (btnPress == "Histogram Equalization") {
+        QInputDialog kerPrompt;
+        QStringList items;
+        items.push_back("Equalize Intensity");
+        items.push_back("Equalize Red Channel");
+        items.push_back("Equalize Green Channel");
+        items.push_back("Equalize Blue Channel");
+        kerPrompt.setOptions(QInputDialog::UseListViewForComboBoxItems);
+        kerPrompt.setComboBoxItems(items);
+        kerPrompt.setTextValue(items.first());
+        kerPrompt.setWindowTitle("Histogram Equalization");
+        int execCode = kerPrompt.exec();
+        if (execCode == 0)
+            return;
+        int index = items.indexOf(kerPrompt.textValue());
+        int histo[bins];
+        for (int i = 0; i < bins; ++i)
+            histo[i] = 0;
+        QImage image = ioh->getWorkingLayer()->getCanvas()->copy();
+        // Fill the array(s) tht the histograms will be constructed from.
+        int value;
+        int total = 0;
+        for (int x = 0; x < image.width(); ++x)
+            for (int y = 0; y < image.height(); ++y) {
+                QColor qc = image.pixelColor(x, y);
+                if (qc.alpha() != 0) {
+                    switch (index) {
+                    case 0:
+                        value = static_cast<int>(static_cast<float>(qc.red() + qc.green() + qc.blue()) / 3.0 + 0.5);
+                        break;
+                    case 1:
+                        value = qc.red();
+                        break;
+                    case 2:
+                        value = qc.green();
+                        break;
+                    case 3:
+                        value = qc.blue();
+                        break;
+                    }
+                    ++total;
+                    ++histo[value];
+                }
+            }
+        int i = 0;
+        while (i < bins && histo[i] == 0)
+            ++i;
+        if (i == bins || histo[i] == total)
+            return;
+        float scale = static_cast<double>(bins - 1) / static_cast<double>(total - histo[i]);
+        int lut[bins];
+        for (int j = 0; j < bins; ++j)
+            lut[j] = 0;
+        int sum = 0;
+        for (++i; i < bins; ++i) {
+            sum += histo[i];
+            lut[i] = max(0, min(255, static_cast<int>(static_cast<float>(sum) * scale)));
+        }
+        QImage *canvas = ioh->getWorkingLayer()->getCanvas();
+        for (int x = 0; x < image.width(); ++x)
+            for (int y = 0; y < image.height(); ++y) {
+                QColor qc = image.pixelColor(x, y);
+                if (qc.alpha() != 0) {
+                    switch (index) {
+                    case 0:
+                        qc = QColor(lut[qc.red()], lut[qc.green()], lut[qc.blue()]);
+                        break;
+                    case 1:
+                        qc.setRed(lut[qc.red()]);
+                        break;
+                    case 2:
+                        qc.setGreen(lut[qc.green()]);
+                        break;
+                    case 3:
+                        qc.setBlue(lut[qc.blue()]);
+                        break;
+                    }
+                    canvas->setPixelColor(x, y, qc);
+                }
+            }
+    }
+    else if (btnPress == "Histograms") {
+        int h = 3 * bins;
+        QImage qi (QSize(bins * 2, h), QImage::Format_ARGB32_Premultiplied);
+        histograms->resize(qi.width(), qi.height());
+        histograms->setWindowFilePath(("Histogram of Layer " + to_string(ioh->getActiveLayer() + 1)).c_str());
+        qi.fill(0xFF000000);
+        int histo[4][bins];
+        for (int x = 0; x < bins; ++x)
+            for (int y = 0; y < 4; ++y)
+                histo[y][x] = 0;
+        QImage image = ioh->getWorkingLayer()->getCanvas()->copy();
+        // Fill the array(s) tht the histograms will be constructed from.
+        int total = 0;
+        for (int x = 0; x < image.width(); ++x)
+            for (int y = 0; y < image.height(); ++y) {
+                QColor qc = image.pixelColor(x, y);
+                if (qc.alpha() != 0) {
+                    int intensity = static_cast<int>(static_cast<float>(qc.red() + qc.green() + qc.blue()) / 3.0 + 0.5);
+                    ++histo[0][intensity];
+                    ++histo[1][qc.red()];
+                    ++histo[2][qc.green()];
+                    ++histo[3][qc.blue()];
+                    ++total;
+                }
+            }
+        int maxI = 0, cutoff = (total) / 4;
+        for (int j = 0; j < 4; ++j)
+            for (int i = 1; i < bins - 1; ++i)
+                if (histo[j][i] < cutoff)
+                    maxI = max(maxI, histo[j][i]);
+        // Draw histograms.
+        double div = static_cast<double>(h / 2 - 1) / static_cast<double>(maxI);
+        for (int x = 0; x < bins; ++x) {
+            QRgb value = static_cast<QRgb>(bins + x) / 2;
+            for  (int j = 0; j < 4; ++j) {
+                QRgb color = 0xFF000000;
+                if (j != 0)
+                    color += (value << (8 * (2 - (j - 1))));
+                else
+                    for (unsigned char i= 0; i < 3; ++i)
+                        color += value << (8 * i);
+                int rowOffset = (h / 2) * (j / 2);
+                int colOffset = x + bins * (j % 2);
+                int stop = h / 2 + rowOffset;
+                int start = stop - static_cast<int>(static_cast<double>(histo[j][x]) * div);
+                start = max(start, rowOffset);
+                for (int y = start; y < stop; ++y)
+                    qi.setPixelColor(colOffset, y, color);
+            }
+        }
+        histograms->setPixmap(QPixmap::fromImage(qi));
+        histograms->setWindowModality(Qt::ApplicationModal);
+        histograms->show();
+    }
+    refresh();
+}
+
+int MainWindow::getBPP() {
+    Layer *l = ioh->getWorkingLayer();
+    if (l == nullptr)
+        return -1;
+    bool ok = false;
+    int bpps[] = {1, 2, 3, 4, 5, 6, 7};
+    QStringList strs;
+    for (int i : bpps)
+        strs.push_back((to_string(3 * i) + " BPP (" + to_string(i) + " per channel").c_str());
+    QString item = QInputDialog::getItem(this, "Glass Opus", "Please Select BPP, excluding alpha", strs, 0, false, &ok);
+    return ok ? bpps[strs.indexOf(item)] : -1;
 }
 
 void MainWindow::downloadItem(QString subfolder, QString fileName, downloadAction action, QString promptTitle, QString promptText) {
@@ -645,12 +1069,16 @@ void MainWindow::downloadTimeout() {
 }
 
 void MainWindow::changeVectorFilter(string s) {
+    if (ioh->getWorkingLayer() == nullptr || ioh->getWorkingLayer()->getActiveVectors().size() == 0)
+        return;
     ioh->getWorkingLayer()->setVectorFilter(s);
     refresh();
 }
 
 void MainWindow::changeScreenFilter(string filterName) {
-    ioh->setScreenFilter(filterName);
+    if (ioh->getWorkingLayer() == nullptr)
+        return;
+    ioh->getWorkingLayer()->setFilter(filterName);
     refresh();
 }
 
@@ -659,11 +1087,30 @@ void MainWindow::changeBrushFilter(string filterName) {
 }
 
 void MainWindow::changeBrushShape(string shape) {
-    bh.setShape(shape);
+    if (shape == "Custom") {
+        brushProlfiler->exec();
+        bh.setShape(shape, brushProlfiler->getShapeSize(bh.getSize()));
+    }
+    else
+        bh.setShape(shape);
+    sr->updateHoverMap(bh.getSize(), bh.getBrushMap());
 }
 
 void MainWindow::changeBrushMethod(string method) {
     bh.setAppMethod(method);
+}
+
+void MainWindow::applyRasterFilter(string s) {
+    int defaultStr = 255;
+    for (int i = 0; i < graphics::numFilters; ++i)
+        if (filterNames[i] == s) {
+            defaultStr = graphics::filterPresets[i];
+            break;
+        }
+    bool ok = false;
+    int ret = QInputDialog::getInt(this, "Glass Opus", "Please enter a strength", defaultStr, graphics::minColor, graphics::maxColor, 1, &ok);
+    if (ok)
+        ioh->getWorkingLayer()->applyFilterToRaster(Filter(defaultStr, s));
 }
 
 void MainWindow::log(string title, QObject *obj) {
@@ -671,12 +1118,9 @@ void MainWindow::log(string title, QObject *obj) {
     toDel.push_front(obj);
 }
 
-void appTo(QImage *qi, Filter f) {
-    f.applyTo(qi);
-}
-
 void MainWindow::keyPressEvent(QKeyEvent *event) {
-    QImage *qi = ioh->getWorkingLayer()->getCanvas();
+    if (ioh->getWorkingLayer() == nullptr)
+        return;
     switch (event->key()) {
     case Key_Up:
         sr->zoomIn();
@@ -725,8 +1169,11 @@ void MainWindow::keyPressEvent(QKeyEvent *event) {
             ctrlFlag = true;
         break;
     case Key_Shift:
-        if (!ctrlFlag)
+        if (!ctrlFlag) {
+            if (mode == Brush_Mode)
+                takeFlag = true;
             setShiftFlag(true);
+        }
         break;
     case Key_Escape:
         ioh->getWorkingLayer()->deselect();
@@ -760,33 +1207,17 @@ void MainWindow::keyPressEvent(QKeyEvent *event) {
         }
         break;
     case Key_A:
-        if (ctrlFlag) {
+        if (ctrlFlag)
             ioh->getWorkingLayer()->selectAll();
-        }
-        /*
-    case Qt::Key_I:
-        ImgSupport::rotate180(qi);
         break;
-    case Qt::Key_V:
-        ImgSupport::flipVertical(qi);
-        break;
-    case Qt::Key_H:
-        ImgSupport::flipHorizontal(qi);
-        break;
-    case Qt::Key_L:
-        ImgSupport::rotate90Left(qi);
-        break;
-    case Qt::Key_R:
-        ImgSupport::rotate90Right(qi);
-        break;
-        */
     }
-    refresh();
 }
 
 void MainWindow::keyReleaseEvent(QKeyEvent *event) {
     switch (event->key()) {
     case Key_Shift:
+        if (mode == Brush_Mode)
+            takeFlag = false;
         setShiftFlag(false);
         if (onePress)
             ioh->getWorkingLayer()->cleanUp();
@@ -796,6 +1227,7 @@ void MainWindow::keyReleaseEvent(QKeyEvent *event) {
         break;
     }
 }
+
 void MainWindow::resizeEvent(QResizeEvent *event) {
     if (objFetch.find(UI_FileName.toStdString()) != objFetch.end()) {
         QMenuBar *menu = dynamic_cast<QMenuBar *>(objFetch.at(UI_FileName.toStdString()));
@@ -803,11 +1235,73 @@ void MainWindow::resizeEvent(QResizeEvent *event) {
     }
 }
 
+void MainWindow::dragEnterEvent(QDragEnterEvent *event) {
+    if (event->mimeData()->hasUrls())
+        event->acceptProposedAction();
+}
+
+void MainWindow::dropEvent(QDropEvent *event) {
+    const QMimeData* mimeData = event->mimeData();
+    if (mimeData->hasUrls()) {
+        bool maxFlag = isMaximized();
+        QRect reset = geometry();
+        QList<QUrl> urlList = mimeData->urls();
+        for (int i = 0; i < urlList.size(); ++i) {
+            QString fileName = urlList.at(i).toLocalFile();
+            string fn = fileName.toStdString();
+            int index = fn.find_last_of('.');
+            string fileType = fn.substr(index + 1);
+            if (std::find(acceptedImportImageFormats.begin(), acceptedImportImageFormats.end(), fileType) != acceptedImportImageFormats.end()) {
+                bool flag = ioh->importImage(fileName);
+                if (flag) {
+                    setGeometry(reset);
+                    if (maxFlag)
+                        this->showMaximized();
+                    resizeCheck->showRelative();
+                    while (resizeCheck->isVisible())
+                        QCoreApplication::processEvents();
+                }
+            }
+        }
+        refresh();
+        setGeometry(reset);
+        if (maxFlag)
+            this->showMaximized();
+    }
+}
+
+void MainWindow::closeEvent(QCloseEvent *event) {
+    QMessageBox qmb(QMessageBox::Question, "Glass Opus", "Close Glass Opus?", QMessageBox::Yes, this);
+    if (ioh->getNumLayers() != 0)
+        qmb.addButton("Save and Close", QMessageBox::AcceptRole);
+    qmb.addButton("No", QMessageBox::RejectRole);
+    int choice = qmb.exec();
+    if (choice == QMessageBox::AcceptRole && ioh->getNumLayers() == 0)
+        choice = QMessageBox::RejectRole;
+    if (choice == QMessageBox::AcceptRole) {
+        if (saveFileName.isEmpty())
+            saveFileName = QFileDialog::getSaveFileName(this, tr("Save Project"), "/", tr("Glass Opus project files (*.glass)"));
+        ioh->save(saveFileName);
+    }
+    if (choice == QMessageBox::RejectRole)
+        event->ignore();
+    else
+        QApplication::exit();
+}
+
+void MainWindow::setMode(EditMode emode) {
+    mode = emode;
+    if (ioh->getWorkingLayer() != nullptr)
+        ioh->getWorkingLayer()->setMode(emode);
+    sr->setMode(emode);
+}
+
 void MainWindow::refresh() {
     sr->repaint();
 }
 
 MainWindow::~MainWindow() {
+    delete histograms;
     delete qme;
     resizeCheck->doClose();
     delete resizeCheck;
@@ -823,4 +1317,3 @@ MainWindow::~MainWindow() {
         toDel.pop_front();
     }
 }
-

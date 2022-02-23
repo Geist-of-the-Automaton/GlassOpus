@@ -1,5 +1,6 @@
 #include "layer.h"
 
+
 Layer::Layer() {
     activePt = -1;
     alpha = 0;
@@ -10,27 +11,27 @@ Layer::Layer() {
     selection = NoSelect;
     postAngle = 0.0;
     selectOgActive = false;
+    deltaMove =  boundPt1 = boundPt2 = rotateAnchor = QPoint(-1000, -1000);
 }
 
 Layer::Layer(QSize qs) {
     activePt = -1;
     alpha = 255;
-    qi = new QImage(qs, QImage::Format_ARGB32_Premultiplied);
+    qi = new QImage(qs, QImage::Format_ARGB32);
     qi->fill(0x00000000);
-    for (int i = 0; i < qs.width(); ++i)
-        for (int j = 0; j < qs.height(); ++j)
-            qi->setPixelColor(i, j, QColor(255.0 * static_cast<float>(i) / qi->width(), 255.0 * static_cast<float>(j) / qi->height(), 255.0 * (1.0 - static_cast<float>(i) / qi->width())));
     shiftFlag = false;
     ipolPts = ipolMin;
     mode = Brush_Mode;
     selection = NoSelect;
     postAngle = 0.0;
     selectOgActive = false;
+    deltaMove =  boundPt1 = boundPt2 = rotateAnchor = QPoint(-1000, -1000);
 }
 
 Layer::Layer(QImage in, int alphaValue) {
     activePt = -1;
     alpha = alphaValue;
+    // need to fill alpha?
     qi = new QImage(in);
     shiftFlag = false;
     ipolPts = ipolMin;
@@ -38,25 +39,33 @@ Layer::Layer(QImage in, int alphaValue) {
     selection = NoSelect;
     postAngle = 0.0;
     selectOgActive = false;
+    deltaMove =  boundPt1 = boundPt2 = rotateAnchor = QPoint(-1000, -1000);
 }
 
 Layer::Layer(const Layer &layer) {
+    *this = layer;
+}
+
+Layer& Layer::operator=(const Layer &layer) {
+    mode = Brush_Mode;
+    selection = NoSelect;
     vects = layer.vects;
-    tris = layer.tris;  //create assignment op and copy con
-    activeVects = layer.activeVects;
+    tris = layer.tris;
+    //active vects don't get copied.
     activePt = -1;
     qi = new QImage(layer.qi->copy());
+    // raster select og doesn't get copied
     ipolPts = layer.ipolPts;
     limiter = layer.limiter;
     limitCnt = layer.limitCnt;
+    postAngle = 0.0;
     alpha = layer.alpha;
     shiftFlag = false;
-    deltaMove = QPoint(-1000, -1000);
-    mode = Brush_Mode;
-    selection = NoSelect;
-    postAngle = 0.0;
     selectOgActive = false;
+    selecting = false;
+    deltaMove =  boundPt1 = boundPt2 = rotateAnchor = QPoint(-1000, -1000);
     filter = layer.filter;
+    return *this;
 }
 
 void Layer::pasteVectors(list<SplineVector> svs) {
@@ -65,6 +74,8 @@ void Layer::pasteVectors(list<SplineVector> svs) {
     vects.insert(vects.end(), svs.begin(), svs.end());
     while (tris.size() < vects.size())
         tris.push_back(list <Triangle> ());
+    for (size_t j = i; j < vects.size(); ++j)
+        vects[j].cleanup();
     while (i < vects.size())
         activeVects.push_back(i++);
     calcLine();
@@ -77,14 +88,6 @@ void Layer::pasteRaster(QImage rasterIn, double angleIn, pair<QPoint, QPoint> bo
     postAngle = angleIn;
     selectOgActive = true;
     deltaMove = rotateAnchor = boundPt1;
-    for (int i = 0; i < rasterselectOg.width(); ++i)
-        for (int j = 0; j < rasterselectOg.height(); ++j) {
-            QColor qc = rasterselectOg.pixelColor(i, j);
-            if (rasterselectOg.pixelColor(i, j).alpha() != 0) {
-                qc.setAlpha(alpha);
-                rasterselectOg.setPixelColor(i, j, qc);
-            }
-        }
 }
 
 QImage Layer::getRaster() {
@@ -111,7 +114,7 @@ QImage Layer::getRenderCanvas() {
     QImage img = qi->copy();
     if (selectOgActive)
         drawRasterSelection(&img);
-    return img;
+    return img.convertToFormat(QImage::Format_ARGB32);
 }
 
 vector <QPoint> Layer::getRasterEdges() {
@@ -127,6 +130,14 @@ vector <QPoint> Layer::getRasterEdges() {
         pts.push_back(QPoint((boundPt1.x() + pts[1].x()) / 2, pts[1].y()));
     }
     return pts;
+}
+
+void Layer::flipVert() {
+    graphics::ImgSupport::flipVertical(&rasterselectOg);
+}
+
+void Layer::flipHori() {
+    graphics::ImgSupport::flipHorizontal(&rasterselectOg);
 }
 
 void Layer::fillColor(QPoint qp, QColor qc) {
@@ -148,7 +159,48 @@ void Layer::fillColor(QPoint qp, QColor qc) {
             toProcess.push_back(QPoint(pt.x(), pt.y() + 1));
         }
     }
+}
 
+void Layer::patternFill(QPoint qp, QColor qc) {
+    int w = qi->width(), h = qi->height();
+    list <QPoint> toProcess;
+    toProcess.push_back(qp);
+    QRgb og = qi->pixel(qp.x(), qp.y());
+    QRgb nu = qc.rgba();
+    int xpsize = 20, ypsize = 20;
+    unsigned char **arr = new unsigned char *[xpsize];
+    for (int i = 0; i < xpsize; ++i) {
+        arr[i] = new unsigned char[ypsize];
+        for (int j = 0; j < ypsize; ++j)
+            arr[i][j] = (j > i) ? 1 : 0;
+    }
+    unsigned char **check = new unsigned char *[qi->width()];
+    for (int i = 0; i < qi->width(); ++i) {
+        check[i] = new unsigned char[qi->height()];
+        for (int j = 0; j < qi->height(); ++j)
+            check[i][j] = 1;
+    }
+    if (og == nu)
+        return;
+    while (!toProcess.empty()) {
+        QPoint pt = toProcess.front();
+        toProcess.pop_front();
+        if (pt.x() >= 0 && pt.x() < w && pt.y() >= 0 && pt.y() < h && qi->pixel(pt.x(), pt.y()) == og && check[pt.x()][pt.y()]) {
+            check[pt.x()][pt.y()] = 0;
+            if (arr[pt.x() % xpsize][pt.y() % ypsize])
+                qi->setPixel(pt.x(), pt.y(), nu);
+            toProcess.push_front(QPoint(pt.x() - 1, pt.y()));
+            toProcess.push_front(QPoint(pt.x() + 1, pt.y()));
+            toProcess.push_front(QPoint(pt.x(), pt.y() - 1));
+            toProcess.push_front(QPoint(pt.x(), pt.y() + 1));
+        }
+    }
+    for (int i = 0; i < xpsize; ++i)
+        delete [] arr[i];
+    delete [] arr;
+    for (int i = 0; i < qi->width(); ++i)
+        delete [] check[i];
+    delete [] check;
 }
 
 vector <list <Triangle> > Layer::getTriangles() {
@@ -163,13 +215,14 @@ vector <unsigned char> Layer::getActiveVectors() {
     return activeVects;
 }
 
-void Layer::setVectorTaperType(int i) {
+void Layer::setVectorTaperType(Taper t) {
     if (activeVects.size() != 1)
         return;
-    vects[activeVects[0]].setTaperType(i);
+    vects[activeVects[0]].setTaperType(t);
     calcLine();
 }
 
+//  TODO remove static cast and test
 float Layer::getipol(float a, float b, float ipol) {
     return a + static_cast<float>(b - a) * ipol;
 }
@@ -267,14 +320,20 @@ void Layer::release(QPoint qp, MouseButton button) {
     }
     else if(mode == Raster_Mode) {
         if (!selectOgActive) {
-            if (rasterselectOg.isNull()) {
+            if (rasterselectOg.isNull() && boundPt1 != qp) {
                 selecting = false;
                 boundPt2 = qp;
+                boundPt2.setX(min(boundPt2.x(), qi->width() - 1));
+                boundPt2.setY(min(boundPt2.y(), qi->height() - 1));
+                boundPt2.setX(max(boundPt2.x(), 0));
+                boundPt2.setY(max(boundPt2.y(), 0));
                 QPoint minPt(min(boundPt1.x(), boundPt2.x()), min(boundPt1.y(), boundPt2.y()));
                 QPoint maxPt(max(boundPt1.x(), boundPt2.x()), max(boundPt1.y(), boundPt2.y()));
                 boundPt1 = minPt;
                 boundPt2 = maxPt;
-                rasterselectOg = QImage((1 + boundPt2.x()) - boundPt1.x(), (1 + boundPt2.y()) - boundPt1.y(), QImage::Format_ARGB32_Premultiplied);
+                rasterselectOg = QImage((1 + boundPt2.x()) - boundPt1.x(), (1 + boundPt2.y()) - boundPt1.y(), QImage::Format_ARGB32);
+                if (boundPt1.x() < 0 || boundPt1.y() < 0)
+                    return;
                 for (int i = boundPt1.x(); i <= boundPt2.x(); ++i)
                     for (int j = boundPt1.y(); j <= boundPt2.y(); ++j) {
                         rasterselectOg.setPixel(i - boundPt1.x(), j - boundPt1.y(), qi->pixel(i, j));
@@ -283,7 +342,7 @@ void Layer::release(QPoint qp, MouseButton button) {
                 selectOgActive = true;
             }
             else
-                rasterselectOg = QImage();
+                deselect();
         }
         else {
             if (shiftFlag) {
@@ -291,8 +350,9 @@ void Layer::release(QPoint qp, MouseButton button) {
                 postAngle += atan2(rotateAnchor.y() - oy, rotateAnchor.x() - ox) - atan2(deltaMove.y() - oy, deltaMove.x() - ox);
                 deltaMove = rotateAnchor = qp;
             }
-            else
+            else {
                 selection = NoSelect;
+            }
        }
    }
 }
@@ -381,7 +441,6 @@ void Layer::pressLeft(QPoint qp) {
                         activePt = i;
                         break;
                     }
-                cout << controlPts[0].x() << "," << controlPts[0].y() << endl;
                 if (activePt == -1)
                     deltaMove = qp;
             }
@@ -410,6 +469,7 @@ void Layer::pressLeft(QPoint qp) {
     }
     else if (mode == Raster_Mode) {
         if (!selectOgActive) {
+            deselect();
             boundPt1 = qp;
             postAngle = 0.0;
             deltaMove = qp;
@@ -464,6 +524,13 @@ void Layer::pressLeft(QPoint qp) {
             }
             else if (qp.x() > boundPt1.x() && qp.x() < boundPt2.x() && qp.y() > boundPt1.y() && qp.y() < boundPt2.y())
                 selection = BodySelect;
+            else {
+                deselect();
+                boundPt1 = qp;
+                postAngle = 0.0;
+                deltaMove = qp;
+                selecting = true;
+            }
         }
     }
 }
@@ -522,24 +589,23 @@ MouseButton Layer::pressRight(QPoint qp) {
                     vects[activeVects[0]].removePt(index);
             }
             else if (flag) {
-                size_t minDist1 = INT_MAX, index1 = 1, index2 = 1, dist;
+                size_t minDist1 = INT_MAX, dist;
+                index = 1;
                 for (size_t i = 0; i < controlPts.size(); ++i) {
-                    dist = abs(qp.x() - controlPts[i].x()) + abs(qp.y() - controlPts[i].y());
+                    dist = stdFuncs::sqrDist(qp, controlPts[i]);
                     if (dist < minDist1) {
                         minDist1 = dist;
-                        index2 = index1;
-                        index1 = i;
+                        index = i;
                     }
                 }
-                index = index2 > index1 ? index1 + 1 : index1;
-                if (index1 == 0)
+                if (index == 0)
                     index = 1;
+                if (index != 0 && index != controlPts.size() - 1 && stdFuncs::sqrDist(qp, controlPts[index - 1]) > stdFuncs::sqrDist(qp, controlPts[index + 1]) && stdFuncs::sqrDist(qp, controlPts[0]) > stdFuncs::sqrDist(qp, controlPts[controlPts.size() - 1]))
+                        index = index + 1;
                 vects[activeVects[0]].addPt(qp, index);
                 activePt = index;
                 response = LeftButton;
             }
-            if (limitCnt > 1.0)
-                limitCnt -= 1.0;
             calcLine();
         }
     }
@@ -554,18 +620,18 @@ void Layer::doubleClickLeft(QPoint qp, bool ctrlFlag) {
     if (mode == Spline_Mode) {
         if (activeVects.size() != 0) {
             if (!ctrlFlag)
-                activeVects.clear();
+                deselect();
             else {
                 int dist = INT_MAX;
                 char index = -1, size = static_cast<char>(vects.size());
                 for (char i = 0; i < size; ++i) {
                     vector <QPoint> pts = vects[i].getControls();
-                    int tdist = abs(qp.x() - pts[0].x()) + abs(qp.y() - pts[0].y());
+                    int tdist = stdFuncs::sqrDist(qp, pts[0]);
                     if (tdist < dist) {
                         dist = tdist;
                         index = i;
                     }
-                    tdist = abs(qp.x() - pts[pts.size() - 1].x()) + abs(qp.y() - pts[pts.size() - 1].y());
+                    tdist = stdFuncs::sqrDist(qp, pts[pts.size() - 1]);
                     if (tdist < dist) {
                         dist = tdist;
                         index = i;
@@ -581,9 +647,25 @@ void Layer::doubleClickLeft(QPoint qp, bool ctrlFlag) {
                     activeVects.push_back(index);
             }
         }
+        else if (vects.size() != 0) {
+            int dist = INT_MAX;
+            char index = -1, size = static_cast<char>(vects.size());
+            for (char i = 0; i < size; ++i) {
+                vector <QPoint> pts = vects[i].getControls();
+                int tdist = stdFuncs::sqrDist(qp, pts[0]);
+                if (tdist < dist) {
+                    dist = tdist;
+                    index = i;
+                }
+                tdist = stdFuncs::sqrDist(qp, pts[pts.size() - 1]);
+                if (tdist < dist) {
+                    dist = tdist;
+                    index = i;
+                }
+            }
+            activeVects.push_back(index);
+        }
     }
-    else if (mode == Raster_Mode)
-        deselect();
 }
 
 void Layer::doubleClickRight(QPoint qp) {
@@ -611,20 +693,15 @@ void Layer::setMode(EditMode m) {
     mode = m;
 }
 
+bool Layer::isShiftActive() {
+    return shiftFlag;
+}
+
 void Layer::setShiftFlag(bool b) {
     shiftFlag = b;
 }
 
 void Layer::setAlpha(int a) {
-    QColor qc;
-    for (int i = 0; i < qi->width(); ++i)
-        for (int j = 0; j < qi->height(); ++j) {
-            qc = qi->pixelColor(i, j);
-            if (qc.alpha() != 0) {
-                qc.setAlpha(a);
-                qi->setPixelColor(i, j, qc);
-            }
-        }
     alpha = a;
 }
 
@@ -641,6 +718,7 @@ void Layer::setWidth(int w) {
         unsigned char i = activeVects[0];
         vects[i].setWidth(w);
     }
+    calcLine();
 }
 
 void Layer::widthUp() {
@@ -691,9 +769,27 @@ void Layer::setVectorFilter(string s) {
     vects[activeVects[0]].setFilter(s);
 }
 
-void Layer::setVectorMode(int m) {
+void Layer::setVectorMode(VectorMode vm) {
     if (activeVects.size() == 1)
-        vects[activeVects[0]].setMode(m);
+        vects[activeVects[0]].setMode(vm);
+}
+
+void Layer::setBand(int b) {
+    if (activeVects.size() == 1)
+        vects[activeVects[0]].setBand(static_cast<short>(b));
+}
+
+void Layer::setGap(int g) {
+    if (activeVects.size() == 1)
+        vects[activeVects[0]].setGap(static_cast<short>(g));
+}
+
+int Layer::getBand() {
+    return static_cast<int>(vects[activeVects[0]].getBand());
+}
+
+int Layer::getGap() {
+    return static_cast<int>(vects[activeVects[0]].getGap());
 }
 
 void Layer::swapColors() {
@@ -719,32 +815,48 @@ unsigned char Layer::getVectorTaperType() {
     return vects[activeVects[0]].getTaperType();
 }
 
+int Layer::getVectorFilterStrength() {
+    if (activeVects.size() != 1)
+        return -1;
+    return vects[activeVects[0]].getFilter().getStrength();
+}
+
+void Layer::setVectorFilterStrength(int str) {
+    if (activeVects.size() != 1)
+        return;
+    return vects[activeVects[0]].setFilterStrength(str);
+}
+
 void Layer::cleanUp() {
     for (unsigned char i : activeVects)
             vects[i].cleanup();
 }
 
 void Layer::deleteSelected() {
-    if (activeVects.size() == 0)
-        return;
-    sort(activeVects.begin(), activeVects.end());
-    for (int i = activeVects.size() - 1; i >= 0; --i) {
-        unsigned char activeVect = activeVects[i];
-        vects.erase(vects.begin() + activeVect);
-        tris.erase(tris.begin() + activeVect);
+    if (mode == Spline_Mode && activeVects.size() != 0) {
+        sort(activeVects.begin(), activeVects.end());
+        for (int i = activeVects.size() - 1; i >= 0; --i) {
+            unsigned char activeVect = activeVects[i];
+            vects.erase(vects.begin() + activeVect);
+            tris.erase(tris.begin() + activeVect);
+        }
     }
-    rasterselectOg = QImage();
+    else {
+
+        rasterselectOg = QImage();
+    }
     deselect();
-    activeVects.clear();
 }
 
 void Layer::drawRasterSelection(QImage *img) {
+    if (rasterselectOg.isNull())
+        return;
     QImage rasterEdit = rasterselectOg.scaled(1 + boundPt2.x() - boundPt1.x(), 1 + boundPt2.y() - boundPt1.y());
     int ox = (boundPt1.x() + boundPt2.x()) / 2, oy = (boundPt1.y() + boundPt2.y()) / 2;
     float angle = atan2(rotateAnchor.y() - oy, rotateAnchor.x() - ox) - atan2(deltaMove.y() - oy, deltaMove.x() - ox);
     angle += postAngle;
     int midX1 = rasterEdit.width() / 2, midY1 = rasterEdit.height() / 2;
-    QImage rasterOverlay(static_cast<int>(1.0 + abs(static_cast<float>(rasterEdit.width()) * cos(angle)) + abs(static_cast<float>(rasterEdit.height()) * sin(angle))), static_cast<int>(1.0 + abs(static_cast<float>(rasterEdit.width()) * sin(angle)) + abs(static_cast<float>(rasterEdit.height()) * cos(angle))), QImage::Format_ARGB32_Premultiplied);
+    QImage rasterOverlay(static_cast<int>(1.0 + abs(static_cast<float>(rasterEdit.width()) * cos(angle)) + abs(static_cast<float>(rasterEdit.height()) * sin(angle))), static_cast<int>(1.0 + abs(static_cast<float>(rasterEdit.width()) * sin(angle)) + abs(static_cast<float>(rasterEdit.height()) * cos(angle))), QImage::Format_ARGB32);
     rasterOverlay.fill(0x00000000);
     int midX2 = (rasterOverlay.width() - 1) / 2, midY2 = (rasterOverlay.height() - 1) / 2;
     for (int i = -midX2; i <= midX2; ++i)
@@ -778,17 +890,27 @@ void Layer::selectAll() {
 }
 
 void Layer::deselect() {
-    activeVects.clear();
-    drawRasterSelection(qi);
-    selection = NoSelect;
-    selectOgActive = false;
-    postAngle = 0.0;
-    activePt = -1;
+    if (mode == Spline_Mode) {
+        for (unsigned char i : activeVects)
+            vects[i].cleanup();
+        activeVects.clear();
+        activePt = -1;
+    }
+    else if (mode == Raster_Mode) {
+        drawRasterSelection(qi);
+        rasterselectOg = QImage();
+        selection = NoSelect;
+        selectOgActive = false;
+        postAngle = 0.0;
+        selecting = selectOgActive = false;
+    }
+    deltaMove =  boundPt1 = boundPt2 = rotateAnchor = QPoint(-1000, -1000);
 }
 
 void Layer::clearVectors() {
     vects.clear();
     tris.clear();
+    activeVects.clear();
 }
 
 Filter Layer::getFilter() {
@@ -811,3 +933,14 @@ bool Layer::isRotating() {
     return selectOgActive;
 }
 
+void Layer::applyFilterToRaster(Filter f) {
+    if (!rasterselectOg.isNull())
+        f.applyTo(&rasterselectOg);
+}
+
+void Layer::applyKernalToSelection(QProgressDialog *qpd, string fileName) {
+    if (!rasterselectOg.isNull()) {
+        KernalData kernalInfo = graphics::ImgSupport::loadKernal(fileName);
+        graphics::Filtering::applyKernal(qpd, &rasterselectOg, kernalInfo);
+    }
+}

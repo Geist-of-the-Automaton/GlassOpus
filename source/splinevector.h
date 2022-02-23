@@ -12,18 +12,24 @@ using std::pair;
 using graphics::Filter;
 using graphics::Filtering;
 
+enum VectorMode {ColorFill, Filtered};
+enum Taper {Single, Double};
+
+const VectorMode lastMode = Filtered;
+const Taper lastTaper = Double;
 const int minTaper = 0;
 const int maxTaper = 10;
 const int minWidth = 0;
 const int maxWidth = UCHAR_MAX;
-
-enum VectorMode {ColorFill, Filtered};
-enum Taper {Single, Double};
+const int maxPoints = CHAR_MAX;
+const int minStyle = 1;
+const int maxStyle = 100;
 
 class SplineVector {
 
 public:
 
+    SplineVector();
     SplineVector(QPoint a, QPoint b, int Width = 1);
     SplineVector(const SplineVector &sv);
     SplineVector& operator = (const SplineVector &sv);
@@ -46,17 +52,26 @@ public:
     void setColor2(QRgb b);
     void setTaper1(int a);
     void setTaper2(int b);
+    void setFilterStrength(int val);
     void setFilter(string s);
-    void setTaperType(int i);
-    void setMode(int i);
+    void setTaperType(Taper t);
+    void setMode(VectorMode vm);
+    void setBand(int b);
+    void setGap(int g);
+    short getBand();
+    short getGap();
     void swapColors();
     void swapTapers();
-    int getMode();
+    VectorMode getMode();
     Filter getFilter();
-    char getTaperType();
+    Taper getTaperType();
     pair <char, char> getTaper();
     pair <QRgb, QRgb> getColors();
     pair <QPoint, QPoint> getBounds();
+    QString taperTypeString(Taper T);
+    QString modeString(VectorMode v);
+    Taper taperFromString(QString q);
+    VectorMode modeFromString(QString q);
 
 private:
 
@@ -65,11 +80,13 @@ private:
     vector <QPoint> controlPts, backup;
     QPoint orig, offs;
     int minX, maxX, minY, maxY;
-    unsigned char width, mode;
-    char taper1, taper2, taperType;
+    unsigned char width;
+    unsigned short band, gap;
+    VectorMode mode;
+    unsigned char taper1, taper2;
+    Taper taperType;
     QRgb color1, color2;
     Filter filter;
 };
 
 #endif // VECTOR_H
-

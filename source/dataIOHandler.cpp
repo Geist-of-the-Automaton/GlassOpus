@@ -1,54 +1,80 @@
 #include "dataIOHandler.h"
 
 
-DataIOHandler::DataIOHandler() {
-    activeFrame = 0;
+DataIOHandler::DataIOHandler(QProgressDialog *qpd) {
+    progress = qpd;
     activeLayer = 0;
-    Layer *l = new Layer(defaultSize);
-    vector <Layer *> frame;
-    frame.push_back(l);
-    frames.push_back(frame);
     updated = true;
 }
 
 DataIOHandler::~DataIOHandler() {
-    for (size_t i = 0; i < frames.size(); ++i) {
-        for (size_t j = 0; j < frames[i].size(); ++j)
-            delete frames[i][j];
-        frames[i].clear();
-    }
+    for (size_t i = 0; i < frame.size(); ++i)
+        delete frame[i];
+}
+
+void DataIOHandler::setDims(QSize size) {
+    dims = size;
+}
+
+QSize DataIOHandler::getdims() {
+    return dims;
 }
 
 void DataIOHandler::compileFrame() {
-    QImage *qi = new QImage(frames[activeFrame][0]->getCanvas()->size(), QImage::Format_ARGB32_Premultiplied);
-    unsigned char temp = activeLayer;
-    activeLayer = 0;
-    renderFrame(qi, frames[temp]);
-    frames[temp].insert(frames[temp].begin(), new Layer(qi->copy(), 255));
-    for (size_t i = frames[temp].size(); i > 1; --i) {
-        delete frames[temp][i];
-        frames[temp].pop_back();
+    QImage *qi = new QImage(frame[0]->getCanvas()->size(), QImage::Format_ARGB32);
+    qi->fill(0x00FFFFFF);
+    progress->setLabelText("Compiling Frame");
+    renderFrame(progress, qi, frame);
+    frame[activeLayer]->clearVectors();
+    Layer *layer = frame[activeLayer];
+    for (size_t i = frame.size() - 1; i > activeLayer; --i) {
+        delete frame[i];
+        frame.pop_back();
     }
+    frame.pop_back();
+    for (int i = frame.size() - 1; i >= 0; --i) {
+        delete frame[i];
+        frame.pop_back();
+    }
+    frame.push_back(layer);
+    activeLayer = 0;
+    layer->setAlpha(255);
+    QImage *img = layer->getCanvas();
+    img->fill(0x00FFFFFF);
+    QPainter qp;
+    qp.begin(img);
+    qp.drawImage(0, 0, *qi);
+    qp.end();
+    delete qi;
     updated = true;
 }
 
 void DataIOHandler::compileLayer() {
     Layer *layer = getWorkingLayer();
     layer->deselect();
-    renderLayer(layer->getCanvas(), layer->getAlpha(), layer->getFilter(), layer->getVectors(), layer->getTriangles());
+    progress->setLabelText("Compiling Layer");
+    renderLayer(nullptr, progress, layer->getCanvas(), layer->getAlpha(), layer->getFilter(), layer->getVectors(), layer->getTriangles());
     layer->clearVectors();
 }
 
-void DataIOHandler::renderFrame(QImage *ret, vector <Layer *> layers) {
+void DataIOHandler::renderFrame(QProgressDialog *fqpd, QImage *ret, vector <Layer *> layers) {
+    progressMarker = 0;
+    fqpd->setValue(0);
+    fqpd->setMaximum(layers.size() + 2);
+    fqpd->show();
+    QCoreApplication::processEvents();
     ret->fill(0xFFFFFFFF);
     vector <QImage *> imgs;
     for (size_t i = 0; i < layers.size(); ++i)
         imgs.push_back(new QImage(layers[i]->getCanvas()->copy()));
     vector <thread> imgThreads;
     for(size_t i = 0; i < layers.size(); ++i) {
-        thread th = thread(renderLayer, imgs[i], layers[i]->getAlpha(), layers[i]->getFilter(), layers[i]->getVectors(), layers[i]->getTriangles());
+        thread th = thread(renderLayer, fqpd, nullptr, imgs[i], layers[i]->getAlpha(), layers[i]->getFilter(), layers[i]->getVectors(), layers[i]->getTriangles());
         imgThreads.push_back(move(th));
     }
+    ++progressMarker;
+    fqpd->setValue(progressMarker);
+    QCoreApplication::processEvents();
     for(auto &th : imgThreads)
         th.join();
     QPainter qp;
@@ -58,10 +84,19 @@ void DataIOHandler::renderFrame(QImage *ret, vector <Layer *> layers) {
         delete imgs[i];
     }
     qp.end();
-    // this assume everything will complete before leaving scope. probably don't need global var or mutex;
+    ++progressMarker;
+    fqpd->setValue(progressMarker);
+    fqpd->close();
+    fqpd->hide();
 }
 
-void DataIOHandler::renderLayer(QImage *toProcess, int alpha, Filter filter, vector<SplineVector> vects, vector<list<Triangle>> tris) {
+void DataIOHandler::renderLayer(QProgressDialog *fqpd, QProgressDialog *qpd, QImage *toProcess, int alpha, Filter filter, vector<SplineVector> vects, vector<list<Triangle>> tris) {
+    if (qpd != nullptr) {
+        qpd->setValue(0);
+        qpd->setMaximum(1 + vects.size() + (tris.size() != vects.size() ? 1 : 0));
+        qpd->show();
+        QCoreApplication::processEvents();
+    }
     int w = toProcess->width(), h = toProcess->height();
     vector <list <Triangle> *> dTris;
     if (!tris.empty()) {
@@ -78,13 +113,16 @@ void DataIOHandler::renderLayer(QImage *toProcess, int alpha, Filter filter, vec
         }
         for(auto &th : splineThreads)
             th.join();
+        if (qpd != nullptr) {
+            qpd->setValue(qpd->value() + 1);
+            QCoreApplication::processEvents();
+        }
     }
     QRgb color;
     for (size_t i = 0; i < dTris.size(); ++i) {
         Filter vf = vects[i].getFilter();
         pair <QRgb, QRgb> colors = vects[i].getColors();
         QColor ca = QColor (colors.first), cb = QColor(colors.second);
-        ca.setAlpha(alpha);
         int width = vects[i].getWidth();
         pair <QPoint, QPoint> bounds = vects[i].getBounds();
         bool flag = bounds.first.x() > width && bounds.first.y() > width && bounds.second.x() < w - width && bounds.second.y() < h - width;
@@ -96,7 +134,6 @@ void DataIOHandler::renderLayer(QImage *toProcess, int alpha, Filter filter, vec
                         fillTri(toProcess, t, color);
                 }
                 else {
-                    cb.setAlpha(alpha);
                     float ccomp = 1.0 / static_cast<float>((*dTris[i]).size());
                     float cnt = 0.0;
                     for (Triangle &t : *dTris[i]) {
@@ -104,7 +141,7 @@ void DataIOHandler::renderLayer(QImage *toProcess, int alpha, Filter filter, vec
                         int r = static_cast<int>((ccc * static_cast<float>(ca.red())) + ((1.0 - ccc) * static_cast<float>(cb.red())));
                         int g = static_cast<int>((ccc * static_cast<float>(ca.green())) + ((1.0 - ccc) * static_cast<float>(cb.green())));
                         int b = static_cast<int>((ccc * static_cast<float>(ca.blue())) + ((1.0 - ccc) * static_cast<float>(cb.blue())));
-                        color = QColor(r, g, b, alpha).rgba();
+                        color = QColor(r, g, b).rgba();
                         fillTri(toProcess, t, color);
                         cnt += 1.0;
                     }
@@ -114,48 +151,33 @@ void DataIOHandler::renderLayer(QImage *toProcess, int alpha, Filter filter, vec
                 if (colors.first == colors.second) {
                     color = ca.rgba();
                     for (Triangle &t : *dTris[i]) {
-                        unsigned char flag = 0;
                         if (t.A().x() < 0 || t.A().x() >= w || t.A().y() < 0 || t.A().y() >= h)
-                            ++flag;
-                        if (t.B().x() < 0 || t.B().x() >= w || t.B().y() < 0 || t.B().y() >= h)
-                            ++flag;
-                        if (flag > 0)
                             fillTriSafe(toProcess, t, color);
-                        if (t.C().x() < 0 || t.C().x() >= w || t.C().y() < 0 || t.C().y() >= h)
-                            ++flag;
-                        if (flag == 0)
+                        else if (t.B().x() < 0 || t.B().x() >= w || t.B().y() < 0 || t.B().y() >= h)
+                            fillTriSafe(toProcess, t, color);
+                        else if (t.C().x() < 0 || t.C().x() >= w || t.C().y() < 0 || t.C().y() >= h)
+                            fillTriSafe(toProcess, t, color);
+                        else
                             fillTri(toProcess, t, color);
-                        else if (flag != 3)
-                            fillTriSafe(toProcess, t, color);
                     }
                 }
                 else {
-                    cb.setAlpha(alpha);
                     float ccomp = 1.0 / static_cast<float>((*dTris[i]).size());
                     float cnt = 0.0;
                     for (Triangle &t : *dTris[i]) {
-                        unsigned char flag = 0;
-                        if (t.A().x() < 0 || t.A().x() >= w || t.A().y() < 0 || t.A().y() >= h)
-                            ++flag;
-                        if (t.B().x() < 0 || t.B().x() >= w || t.B().y() < 0 || t.B().y() >= h)
-                            ++flag;
-                        if (flag > 0)
-                            fillTriSafe(toProcess, t, color);
-                        if (t.C().x() < 0 || t.C().x() >= w || t.C().y() < 0 || t.C().y() >= h)
-                            ++flag;
-                        if (flag == 3) {
-                            cnt += 1.0;
-                            continue;
-                        }
                         float ccc = ccomp * cnt;
                         int r = static_cast<int>((ccc * static_cast<float>(ca.red())) + ((1.0 - ccc) * static_cast<float>(cb.red())));
                         int g = static_cast<int>((ccc * static_cast<float>(ca.green())) + ((1.0 - ccc) * static_cast<float>(cb.green())));
                         int b = static_cast<int>((ccc * static_cast<float>(ca.blue())) + ((1.0 - ccc) * static_cast<float>(cb.blue())));
-                        color = QColor(r, g, b, alpha).rgba();
-                        if (flag == 0)
-                            fillTri(toProcess, t, color);
-                        else
+                        color = QColor(r, g, b).rgba();
+                        if (t.A().x() < 0 || t.A().x() >= w || t.A().y() < 0 || t.A().y() >= h)
                             fillTriSafe(toProcess, t, color);
+                        else if (t.B().x() < 0 || t.B().x() >= w || t.B().y() < 0 || t.B().y() >= h)
+                            fillTriSafe(toProcess, t, color);
+                        else if (t.C().x() < 0 || t.C().x() >= w || t.C().y() < 0 || t.C().y() >= h)
+                            fillTriSafe(toProcess, t, color);
+                        else
+                            fillTri(toProcess, t, color);
                         cnt += 1.0;
                     }
                 }
@@ -167,27 +189,43 @@ void DataIOHandler::renderLayer(QImage *toProcess, int alpha, Filter filter, vec
                     filterTri(toProcess, t, vf);
             else  // safe draw
                 for (Triangle &t : *dTris[i]) {
-                    unsigned char flag = 0;
                     if (t.A().x() < 0 || t.A().x() >= w || t.A().y() < 0 || t.A().y() >= h)
-                        ++flag;
-                    if (t.B().x() < 0 || t.B().x() >= w || t.B().y() < 0 || t.B().y() >= h)
-                        ++flag;
-                    if (flag > 0)
                         filterTriSafe(toProcess, t, vf);
-                    if (t.C().x() < 0 || t.C().x() >= w || t.C().y() < 0 || t.C().y() >= h)
-                        ++flag;
-                    if (flag == 3)
-                        continue;
-                    if (flag == 0)
-                        filterTri(toProcess, t, vf);
+                    else if (t.B().x() < 0 || t.B().x() >= w || t.B().y() < 0 || t.B().y() >= h)
+                        filterTriSafe(toProcess, t, vf);
+                    else if (t.C().x() < 0 || t.C().x() >= w || t.C().y() < 0 || t.C().y() >= h)
+                        filterTriSafe(toProcess, t, vf);
                     else
-                        filterTriSafe(toProcess, t, vf);
+                        filterTri(toProcess, t, vf);
                 }
+        }
+        if (qpd != nullptr) {
+            qpd->setValue(qpd->value() + 1);
+            QCoreApplication::processEvents();
         }
     }
     for (size_t i = 0; i < vects.size(); ++i)
         delete dTris[i];
+    if (qpd != nullptr) {
+        qpd->setValue(qpd->value() + 1);
+        QCoreApplication::processEvents();
+    }
     filter.applyTo(toProcess);
+    *toProcess = toProcess->convertToFormat(QImage::Format_ARGB32);
+    unsigned int alphaVal = static_cast<unsigned int>(alpha) << 24;
+    int yStart = 0, yEnd = toProcess->height();
+    graphics::ImgSupport::applyAlpha(toProcess, &yStart, &yEnd, &alphaVal);
+    if (qpd != nullptr) {
+        qpd->close();
+        qpd->hide();
+    }
+    if (fqpd != nullptr) {
+        ++progressMarker;
+        locker.lock();
+        fqpd->setValue(progressMarker);
+        QCoreApplication::processEvents();
+        locker.unlock();
+    }
 }
 
 void DataIOHandler::calcLine(SplineVector sv, list<Triangle> *tris) {
@@ -534,13 +572,15 @@ void DataIOHandler::filterTTriSafe(QImage *toProcess, QPoint a, QPoint b, QPoint
 
 
 void DataIOHandler::setActiveLayer(int i, EditMode mode) {
+    if (i > getNumLayers())
+        return;
     activeLayer = static_cast<unsigned char>(i);
     getWorkingLayer()->setMode(mode);
     updated = true;
 }
 
 int DataIOHandler::getNumLayers() {
-    return frames[activeFrame].size();
+    return frame.size();
 }
 
 int DataIOHandler::getActiveLayer() {
@@ -554,62 +594,56 @@ bool DataIOHandler::wasUpdated() {
 }
 
 Layer * DataIOHandler::getWorkingLayer() {
-    if (frames.empty())
-        return nullptr;
-    return frames[activeFrame][activeLayer];
+    return frame.empty() ? nullptr : frame[activeLayer];
 }
 
 void DataIOHandler::addLayer() {
-    frames[activeFrame].push_back(new Layer(dims));
-    activeLayer = frames[activeFrame].size() - 1;
+    frame.push_back(new Layer(dims));
     updated = true;
+    activeLayer = frame.size() - 1;
+    cout << "there" << endl;
 }
 
 void DataIOHandler::copyLayer() {
-    layerCopySlot = Layer(*frames[activeFrame][activeLayer]);
-    updated = true;
+    layerCopySlot = Layer(*frame[activeLayer]);
 }
 
 void DataIOHandler::pasteLayer() {
     if (layerCopySlot.getCanvas()->isNull())
         return;
-    activeLayer = frames[activeFrame].size();
-    frames[activeFrame].push_back(new Layer(layerCopySlot));
+    frame.push_back(new Layer(layerCopySlot));
     updated = true;
+    activeLayer = frame.size() - 1;
 }
 
 void DataIOHandler::deleteLayer() {
-    delete frames[activeFrame][activeLayer];
-    frames[activeFrame].erase((frames[activeFrame].begin() + activeFrame));
-    if (activeLayer == frames[activeFrame].size()) {
-        if (frames[activeFrame].size() == 0)
-            deleteFrame();
-        else {
-            --activeLayer;
-            updated = true;
-        }
-    }
+    unsigned char temp = activeLayer;
+    if (activeLayer == frame.size() - 1)
+        --activeLayer;
+    delete frame[temp];
+    frame.erase((frame.begin() + temp));
+    updated = true;
 }
 
 void DataIOHandler::moveBackward() {
     if (activeLayer != 0) {
-        swap(frames[activeFrame][activeLayer - 1], frames[activeFrame][activeLayer]);
+        swap(frame[activeLayer - 1], frame[activeLayer]);
         --activeLayer;
     }
     updated = true;
 }
 
 void DataIOHandler::moveForward() {
-    if (activeLayer != frames[activeFrame].size() - 1) {
-        swap(frames[activeFrame][activeLayer], frames[activeFrame][activeLayer + 1]);
+    if (activeLayer != frame.size() - 1) {
+        swap(frame[activeLayer], frame[activeLayer + 1]);
         ++activeLayer;
     }
     updated = true;
 }
 
 void DataIOHandler::moveToFront() {
-    while (activeLayer != frames[activeFrame].size() - 1) {
-        swap(frames[activeFrame][activeLayer], frames[activeFrame][activeLayer + 1]);
+    while (activeLayer != frame.size() - 1) {
+        swap(frame[activeLayer], frame[activeLayer + 1]);
         ++activeLayer;
     }
     updated = true;
@@ -617,42 +651,60 @@ void DataIOHandler::moveToFront() {
 
 void DataIOHandler::moveToBack() {
     while (activeLayer != 0) {
-        swap(frames[activeFrame][activeLayer - 1], frames[activeFrame][activeLayer]);
+        swap(frame[activeLayer - 1], frame[activeLayer]);
         --activeLayer;
     }
-    updated = true;
-}
-
-void DataIOHandler::deleteFrame() {
-    // set new active layer to the new frame's number of layers - 1
-    //check if last / only frame
     updated = true;
 }
 
 QImage DataIOHandler::getBackground() {
     if (activeLayer == 0)
         return QImage();
-    vector <Layer *> layers = frames[activeFrame];
-    QImage qi = *layers[0]->getCanvas();
+    progress->setLabelText("Updating Background View");
+    progress->setMaximum(frame.size());
+    progress->show();
+    QCoreApplication::processEvents();
+    QImage qi = frame[0]->getCanvas()->copy();
+    renderLayer(nullptr, nullptr, &qi, frame[0]->getAlpha(), frame[0]->getFilter(), frame[0]->getVectors(), frame[0]->getTriangles());
+    progress->setValue(0);
+    QCoreApplication::processEvents();
     QPainter p;
     p.begin(&qi);
-    for (size_t i = 0; i < activeLayer; ++i)
-        p.drawImage(0, 0, *layers[i]->getCanvas());
+    for (size_t i = 0; i < activeLayer; ++i) {
+        QImage temp = frame[i]->getCanvas()->copy();
+        renderLayer(nullptr, nullptr, &temp, frame[i]->getAlpha(), frame[i]->getFilter(), frame[i]->getVectors(), frame[i]->getTriangles());
+        p.drawImage(0, 0, temp);
+        progress->setValue(i + 1);
+        QCoreApplication::processEvents();
+    }
     p.end();
+    if (progress->value() == static_cast<int>(frame.size() - 1)) {
+        progress->close();
+        progress->hide();
+    }
     return qi;
 }
 
 QImage DataIOHandler::getForeground() {
-    vector <Layer *> layers = frames[activeFrame];
-    if (activeLayer == layers.size() - 1)
+    progress->setLabelText("Updating Foreground View");
+    if (frame.size() == 0 || activeLayer == frame.size() - 1)
         return QImage();
-    QImage qi = *layers[activeLayer + 1]->getCanvas();
-    QPixmap qpix;
+    QImage qi = frame[activeLayer + 1]->getCanvas()->copy();
+    renderLayer(nullptr, nullptr, &qi, frame[activeLayer + 1]->getAlpha(), frame[activeLayer + 1]->getFilter(), frame[activeLayer + 1]->getVectors(), frame[activeLayer + 1]->getTriangles());
+    progress->setValue(progress->value() + 2);
+    QCoreApplication::processEvents();
     QPainter p;
     p.begin(&qi);
-    for (size_t i = activeLayer + 2; i < layers.size(); ++i)
-        p.drawImage(0, 0, *layers[i]->getCanvas());
+    for (size_t i = activeLayer + 2; i < frame.size(); ++i) {
+        QImage temp = frame[i]->getCanvas()->copy();
+        renderLayer(nullptr, nullptr, &temp, frame[i]->getAlpha(), frame[i]->getFilter(), frame[i]->getVectors(), frame[i]->getTriangles());
+        p.drawImage(0, 0, temp);
+        progress->setValue(i + 1);
+        QCoreApplication::processEvents();
+    }
     p.end();
+    progress->close();
+    progress->hide();
     return qi;
 }
 
@@ -700,31 +752,10 @@ void DataIOHandler::deleteRaster() {
     getWorkingLayer()->deleteSelected();
 }
 
-void DataIOHandler::setScreenFilter(string filterName) {
-    screenFilter.setFilter(filterName);
-    applyFilter();
-}
-
-void DataIOHandler::setFilterStrength(int strength) {
-    screenFilter.setStrength(strength);
-}
-
-int DataIOHandler::getFilterIndex() {
-    return screenFilter.getFilterIndex();
-}
-
-int DataIOHandler::getFilterStrength() {
-    return screenFilter.getStrength();
-}
-
-void DataIOHandler::applyFilter() {
-
-}
-
 bool DataIOHandler::importImage(QString fileName) {
-    importImg = QImage(fileName).convertToFormat(QImage::Format_ARGB32_Premultiplied);
+    importImg = QImage(fileName).convertToFormat(QImage::Format_ARGB32);
     importType = image;
-    bool match = importImg.width() == defaultSize.width() && importImg.height() == defaultSize.height();
+    bool match = importImg.width() == dims.width() && importImg.height() == dims.height();
     if (match)
         scale(dontScale);
     return !match;
@@ -732,51 +763,229 @@ bool DataIOHandler::importImage(QString fileName) {
 
 
 void DataIOHandler::exportImage(QString fileName) {
-    QImage *out = new QImage(defaultSize, QImage::Format_ARGB32_Premultiplied);
-    renderFrame(out, frames[activeFrame]);
+    QImage *out = new QImage(dims, QImage::Format_ARGB32);
+    progress->setLabelText("Exporting Image");
+    renderFrame(progress, out, frame);
     out->save(fileName);
 }
 
 void DataIOHandler::scale(scaleType type) {
-    QImage toLayer(defaultSize, QImage::Format_ARGB32_Premultiplied);
-    toLayer.fill(0x00000000);
-    QPainter qp;
-    qp.begin(&toLayer);
+    QImage toLayer(dims, QImage::Format_ARGB32);
+    QImage toDraw;
+    toLayer.fill(0x00FFFFFF);
     switch (type) {
     case dontScale:
-        qp.drawImage(0, 0, importImg);
+        toDraw = importImg;
         break;
     case bestFit:
-        if (toLayer.width() > toLayer.height())
-            qp.drawImage(0, 0, importImg.scaledToHeight(toLayer.height()));
+        if (importImg.scaledToHeight(toLayer.height()).width() > toLayer.width())
+            toDraw = importImg.scaledToWidth(toLayer.width());
         else
-            qp.drawImage(0, 0, importImg.scaledToWidth(toLayer.width()));
+            toDraw = importImg.scaledToHeight(toLayer.height());
         break;
     case aspectRatio:
-        qp.drawImage(0, 0, importImg.scaled(toLayer.width(), toLayer.height()));
+        toDraw = importImg.scaled(toLayer.width(), toLayer.height());
         break;
     case toWidth:
-        qp.drawImage(0,0, importImg.scaledToWidth(toLayer.width()));
+        toDraw = importImg.scaledToWidth(toLayer.width());
         break;
     case toHeight:
-        qp.drawImage(0, 0, importImg.scaledToHeight(toLayer.height()));
+        toDraw = importImg.scaledToHeight(toLayer.height());
         break;
     }
+    QPainter qp;
+    qp.begin(&toLayer);
+    qp.drawImage(0, 0, toDraw);
     qp.end();
     importImg = toLayer;
     if (importType == image) {
-        frames[activeFrame].push_back(new Layer(importImg, 255));
+        frame.push_back(new Layer(importImg, 255));
         updated = true;
-        activeLayer = frames[activeFrame].size() - 1;
+        activeLayer = frame.size() - 1;
     }
 }
 
-bool DataIOHandler::importVideo(QString fileName) {
-    file = fileName;
-    return false;
+void DataIOHandler::save(QString projectName) {
+    string backupName;
+    if (QFile::exists(projectName)) {
+        backupName = projectName.toStdString();
+        backupName = backupName.substr(0, backupName.find_last_of(".glass") - 5) + "__backup.glass";
+        QFile::rename(projectName, backupName.c_str());
+    }
+    QFile file(projectName);
+    file.open(QIODevice::WriteOnly);
+    QDataStream out(&file);
+    out << static_cast<short>(dims.width());
+    out << static_cast<short>(dims.height());
+    out << static_cast<unsigned char>(frame.size());
+    for (size_t i = 0; i < frame.size(); ++i) {
+        // Write layer alpha and image
+        unsigned char a = static_cast<unsigned char>(frame[i]->getAlpha());
+        out << a;
+        out << *(frame[i]->getCanvas());
+        out << static_cast<unsigned char>(frame[i]->getVectors().size());
+        vector <SplineVector> svs = frame[i]->getVectors();
+        for (size_t j = 0; j < svs.size(); j++) {
+            SplineVector sv = svs[j];
+            // Write vector control point details
+            unsigned char numPts = static_cast<unsigned char>(sv.getNumPts());
+            out << numPts;
+            vector <QPoint> controlPts = sv.getControls();
+            for (short h = 0; h < numPts; ++h)
+                out << controlPts[h];
+            out << static_cast<unsigned char>(sv.getFilter().getFilterIndex());
+            out << static_cast<unsigned char>(sv.getFilter().getStrength());
+            out << sv.getColors().first;
+            out << sv.getColors().second;
+            out << static_cast<unsigned char>(sv.getWidth());
+            out << static_cast<unsigned char>(sv.getTaper().first);
+            out << static_cast<unsigned char>(sv.getTaper().second);
+            out << static_cast<unsigned char>(Taper(sv.getTaperType()));
+            out << static_cast<unsigned char>(VectorMode(sv.getMode()));
+        }
+    }
+    if (QFile::exists(backupName.c_str()))
+        QFile::remove(backupName.c_str());
+    file.flush();
+    file.close();
 }
 
-void DataIOHandler::exportVideo(QString fileName) {
-
+int DataIOHandler::load(QString projectName) {
+    int retCode = 0;
+    QFile file(projectName);
+    QDataStream in(&file);
+    if (!file.open(QIODevice::ReadOnly))
+        return 2;
+    vector <Layer *> frameBackup = frame;
+    int backupLayer = activeLayer;
+    clearFrame();
+    activeLayer = 0;
+    try {
+        short size;
+        unsigned char numLayers;
+        in >> size;
+        dims.setWidth(size);
+        in >> size;
+        dims.setHeight(size);
+        in >> numLayers;
+        if (numLayers <= maxLayer) {
+            for (int i = 0; i < numLayers; ++i) {
+                unsigned char alpha;
+                in >> alpha;
+                QImage qi;
+                in >> qi;
+                unsigned char ucharTemp, numVects;
+                QRgb color;
+                // Read size of vects
+                in >> numVects;
+                if (numVects > maxVects)  {
+                    cout << "here" << endl;
+                    retCode = 1;
+                    break;
+                }
+                list <SplineVector> svs;
+                for (int j = 0; j < numVects; ++j) {
+                    SplineVector sv;
+                    // Read number of points
+                    in >> ucharTemp;
+                    if (ucharTemp > maxPoints)  {
+                        retCode = 1;
+                        break;
+                    }
+                    for (int h = 0; h < ucharTemp; h++) {
+                        QPoint point;
+                        in >> point;
+                        sv.addPt(point, h);
+                    }
+                    // Read filter
+                    in >> ucharTemp;
+                    if (ucharTemp > graphics::numFilters)  {
+                        retCode = 1;
+                        break;
+                    }
+                    sv.setFilter(graphics::filterNames[ucharTemp]);
+                    in >> ucharTemp;
+                    sv.setFilterStrength(ucharTemp);
+                    // Read colors
+                    in >> color;
+                    sv.setColor1(color);
+                    in >> color;
+                    sv.setColor2(color);
+                    // Read width
+                    in >> ucharTemp;
+                    if (ucharTemp > maxWidth)  {
+                        retCode = 1;
+                        break;
+                    }
+                    sv.setWidth(ucharTemp);
+                    // Read first taper
+                    in >> ucharTemp;
+                    if (ucharTemp > maxTaper)  {
+                        retCode = 1;
+                        break;
+                    }
+                    sv.setTaper1(ucharTemp);
+                    // Read second taper
+                    in >> ucharTemp;
+                    if (ucharTemp > maxTaper)  {
+                        retCode = 1;
+                        break;
+                    }
+                    sv.setTaper2(ucharTemp);
+                    // Read taper type
+                    in >> ucharTemp;
+                    if (ucharTemp > lastTaper)  {
+                        retCode = 1;
+                        break;
+                    }
+                    sv.setTaperType(static_cast<Taper>(ucharTemp));
+                    //Read mode (fill type)
+                    in >> ucharTemp;
+                    if (ucharTemp > lastMode)  {
+                        retCode = 1;
+                        break;
+                    }
+                    sv.setMode(static_cast<VectorMode>(ucharTemp));
+                    svs.push_back(sv);
+                }
+                if (retCode == 0) {
+                    qi.convertToFormat(QImage::Format_ARGB32);
+                    Layer *layer = new Layer(qi, alpha);
+                    if (!svs.empty()) {
+                        layer->setMode(Spline_Mode);
+                        layer->pasteVectors(svs);
+                        layer->deselect();
+                        layer->setMode(Brush_Mode);
+                    }
+                    frame.push_back(layer);
+                }
+                else
+                    break;
+            }
+        }
+        if (retCode == 0) {
+            activeLayer = frame.size() - 1;
+            updated = true;
+        }
+    }
+    catch (...) {
+        retCode = 1;
+    }
+    file.close();
+    if (retCode != 0) {
+        for (size_t i = 0; i < frame.size(); ++i)
+            delete frame[i];
+        frame = frameBackup;
+        activeLayer = backupLayer;
+    }
+    return retCode;
 }
 
+void DataIOHandler::clearFrame() {
+    frame.clear();
+}
+
+vector <Layer *> DataIOHandler::backup() {
+    vector <Layer *> compare = frame;
+    return compare;
+}

@@ -1,57 +1,40 @@
 #include <brushhandler.h>
 
-
 brushHandler::brushHandler(unsigned char str, int size, int density, string type, QColor qc) {
-    alpha = 255;
     setStrength(str);
     setDensity(density);
     setAppMethod(type);
     setBrushColor(qc);
     setFillColor(qc);
     brush.setRadius(size);
-    checkEdgeSize = size / 2;
-    size_t rad = static_cast<size_t>(2 * (checkEdgeSize + size) + 1);
-    checkMap = new unsigned char *[rad];
-    for (size_t i = 0; i < rad; ++i)
-        checkMap[i] = new unsigned char [rad];
+    size_t rad = static_cast<size_t>(3 * brush.getRadius() + 1);
     for (size_t i = 0; i < rad; ++i)
         for (size_t j = 0; j < rad; ++j)
             checkMap[i][j] = 0;
     int fullSize = brush.getFullSize();
-    radialMap = new float * [fullSize];
-    for (int i = 0; i < fullSize; ++i)
-        radialMap[i] = new float [fullSize];
     for (int i = 0; i < fullSize; ++i)
         for (int j = 0; j < fullSize; ++j)
             radialMap[i][j] = 1;
     patternInUse = false;
-    patternXDim = patternYDim = 1;
-    patternMap = new unsigned char*[patternXDim];
-    patternMap[0] = new unsigned char[patternYDim];
-    patternMap[0][0] = 0;
+    int xpsize = 20, ypsize = 20;
+    vector<vector<unsigned char>> arr(xpsize, vector<unsigned char>(ypsize));
+    for (int i = 0; i < xpsize; ++i) {
+        for (int j = 0; j < ypsize; ++j)
+            arr[i][j] = (j > i) ? 1 : 0;
+    }
+    patternMap.push_back(vector <unsigned char> ());
+    patternMap.push_back(vector <unsigned char> ());
+    patternMap[0].push_back(1);
+    patternMap[0].push_back(0);
+    patternMap[1].push_back(0);
+    patternMap[1].push_back(1);
     ipolActive = false;
     relativityPoint = QPoint(-1000,-1000);
     resetPoint();
 }
 
 brushHandler::~brushHandler() {
-    int rad = 2 * (brush.getRadius() + checkEdgeSize) + 1;
-    for (int i = 0; i < rad; ++i)
-        delete [] checkMap[i];
-    delete [] checkMap;
-    int fullSize = brush.getFullSize();
-    for (int i = 0; i < fullSize; ++i)
-         delete [] radialMap[i];
-    delete [] radialMap;
-    for (int i = 0; i < patternYDim; ++i)
-        delete [] patternMap[i];
-    delete [] patternMap;
-}
 
-void brushHandler::setAlpha(int val) {
-    alpha = static_cast<unsigned int>(val);
-    brushColor.setAlpha(alpha);
-    fillColor.setAlpha(alpha);
 }
 
 void brushHandler::setAppMethod(string type) {
@@ -70,8 +53,11 @@ void brushHandler::setFilter(string filterName) {
     brushFilter.setFilter(filterName);
 }
 
-void brushHandler::setShape(string shape) {
-    brush.setShape(shape);
+void brushHandler::setShape(string shape, vector <vector <unsigned char> > custom) {
+    if (shape == "Custom")
+        brush.setCustom(custom);
+    else
+        brush.setShape(shape);
 }
 
 int brushHandler::getMethodIndex() {
@@ -114,7 +100,7 @@ void brushHandler::setPoint(QPoint qp) {
         }
     }
     else {
-        size_t rad = static_cast<size_t>(2 * (brush.getRadius() + checkEdgeSize) + 1);
+        size_t rad = static_cast<size_t>(3 * brush.getRadius() + 1);
         for (size_t i = 0; i < rad; ++i)
             for (size_t j = 0; j < rad; ++j)
                 checkMap[i][j] = 0;
@@ -155,17 +141,17 @@ int brushHandler::getStength() {
     return strength;
 }
 
+int brushHandler::getFilterStrength() {
+    return brushFilter.getStrength();
+}
+
+void brushHandler::setFilterStrength(int val) {
+    brushFilter.setStrength(val);
+}
+
 void brushHandler::setSize(int size) {
-    size_t rad = static_cast<size_t>(2 * (brush.getRadius() + checkEdgeSize) + 1);
-    for (size_t i = 0; i < rad; ++i)
-        delete [] checkMap[i];
-    delete [] checkMap;
     brush.setRadius(size);
-    checkEdgeSize = size / 2;
-    rad = static_cast<size_t>(2 * (brush.getRadius() + checkEdgeSize) + 1);
-    checkMap = new unsigned char *[rad];
-    for (size_t i = 0; i < rad; ++i)
-        checkMap[i] = new unsigned char [rad];
+    size_t rad = static_cast<size_t>(3 * brush.getRadius() + 1);
     for (size_t i = 0; i < rad; ++i)
         for (size_t j = 0; j < rad; ++j)
             checkMap[i][j] = 0;
@@ -175,30 +161,16 @@ const unsigned char *const *const brushHandler::getBrushMap() {
     return brush.getBrushMap();
 }
 
-void brushHandler::setPattern(int xDim, int yDim, unsigned char **pattern) {
-    for (int j = 0; j < patternYDim; ++j)
-        delete [] patternMap[j];
-    delete [] patternMap;
+void brushHandler::setPattern(vector <vector <unsigned char> > pattern) {
     patternMap = pattern;
-    patternXDim = static_cast<unsigned char>(xDim);
-    patternYDim = static_cast<unsigned char>(yDim);
 }
 
 void brushHandler::setPatternInUse(int used) {
     patternInUse = static_cast<unsigned char>(used);
 }
 
-const unsigned char *const *const brushHandler::getPatternMap() {
-    const unsigned char *const *const retMap = patternMap;
+vector <vector <unsigned char> > brushHandler::getPatternMap() {
     return patternMap;
-}
-
-int brushHandler::getPatternXDim() {
-    return patternXDim;
-}
-
-int brushHandler::getPatternYDim() {
-    return patternYDim;
 }
 
 bool brushHandler::getPatternInUse() {
@@ -225,23 +197,19 @@ int brushHandler::getFilterIndex() {
 
 void brushHandler::setBrushColor(QColor qc) {
     brushColor = qc;
-    brushColor.setAlpha(alpha);
 }
 
 void brushHandler::setFillColor(QColor qc) {
     fillColor = qc;
-    fillColor.setAlpha(alpha);
 }
 
 QColor brushHandler::getBrushColor() {
     QColor toRet = brushColor;
-    toRet.setAlpha(255);
     return toRet;
 }
 
 QColor brushHandler::getFillColor() {
     QColor toRet = fillColor;
-    toRet.setAlpha(255);
     return toRet;
 }
 
@@ -297,7 +265,7 @@ void brushHandler::shift() {
 }
 
 void brushHandler::shiftLeft() {
-    int rad = 2 * (brush.getRadius() + checkEdgeSize) + 1;
+    int rad = static_cast<size_t>(3 * brush.getRadius() + 1);
     for (int i = 1; i < rad; ++i)
         for (int j = 0; j < rad; ++j)
             checkMap[i - 1][j] = checkMap[i][j];
@@ -306,7 +274,7 @@ void brushHandler::shiftLeft() {
 }
 
 void brushHandler::shiftRight() {
-    int rad = 2 * (brush.getRadius() + checkEdgeSize) + 1;
+    int rad = static_cast<size_t>(3 * brush.getRadius() + 1);
     for (int i = rad - 1; i > 0; --i)
         for (int j = 0; j < rad; ++j)
             checkMap[i][j] = checkMap[i - 1][j];
@@ -315,7 +283,7 @@ void brushHandler::shiftRight() {
 }
 
 void brushHandler::shiftUp() {
-    int rad = 2 * (brush.getRadius() + checkEdgeSize) + 1;
+    int rad = static_cast<size_t>(3 * brush.getRadius() + 1);
     for (int i = 0; i < rad; ++i)
         for (int j = 1; j < rad; ++j)
             checkMap[i][j - 1] = checkMap[i][j];
@@ -324,7 +292,7 @@ void brushHandler::shiftUp() {
 }
 
 void brushHandler::shiftDown() {
-    int rad = 2 * (brush.getRadius() + checkEdgeSize) + 1;
+    int rad = static_cast<size_t>(3 * brush.getRadius() + 1);
     for (int i = 0; i < rad; ++i)
         for (int j = rad - 1; j > 0; --j)
             checkMap[i][j] = checkMap[i][j - 1];
@@ -335,7 +303,7 @@ void brushHandler::shiftDown() {
 void brushHandler::overwrite(QImage *qi) {
     const unsigned char *const *const brushMap = brush.getBrushMap();
     int radius = brush.getRadius(), xMax = qi->width(), yMax = qi->height();
-    QRgb qc = alpha == 0 ? 0x00FFFFFF : brushColor.rgba();
+    QRgb qc = brushColor.rgba();
     while (toProcess.size() > 0) {
         QPoint p = toProcess.front();
         lastPnt = currPnt;
@@ -344,7 +312,7 @@ void brushHandler::overwrite(QImage *qi) {
         for (int i = currPnt.x() - radius; i <= currPnt.x() + radius; ++i) {
             int y = 0;
             for (int j = currPnt.y() - radius; j <= currPnt.y() + radius; ++j) {
-                if (onScreen(i, j, xMax, yMax) && brushMap[x][y] && (!sprayDensity || !(rand() % sprayDensity)) && (!patternInUse || patternMap[i % patternXDim][j % patternYDim]))
+                if (onScreen(i, j, xMax, yMax) && brushMap[x][y] && (!sprayDensity || !(rand() % sprayDensity)) && (!patternInUse || patternMap[i % patternMap.size()][j % patternMap[0].size()]))
                     qi->setPixel(i, j, qc);
                 ++y;
             }
@@ -362,15 +330,15 @@ QColor brushHandler::getAffected() {
     green /= maxStrength;
     blue *= strength;
     blue /= maxStrength;
-    return QColor(red, green, blue, alpha);
+    return QColor(red, green, blue);
 }
 
 void brushHandler::additive(QImage *qi) {
     const unsigned char *const *const brushMap = brush.getBrushMap();
     int radius = brush.getRadius(), xMax = qi->width(), yMax = qi->height();
+    int checkEdgeSize = radius / 2;
     QColor affColor = getAffected();
     QColor setColor;
-    setColor.setAlpha(alpha);
     int r = affColor.red(), g = affColor.green(), b = affColor.blue();
     while (toProcess.size() > 0) {
         QPoint p = toProcess.front();
@@ -381,12 +349,12 @@ void brushHandler::additive(QImage *qi) {
         for (int i = p.x() - radius; i <= p.x() + radius; ++i) {
             int y = 0;
             for (int j = p.y() - radius; j <= p.y() + radius; ++j) {
-                if (onScreen(i, j, xMax, yMax) && brushMap[x][y] && (!sprayDensity || !(rand() % sprayDensity)) && (!patternInUse || patternMap[i % patternXDim][j % patternYDim])) {
+                if (onScreen(i, j, xMax, yMax) && brushMap[x][y] && (!sprayDensity || !(rand() % sprayDensity)) && (!patternInUse || patternMap[i % patternMap.size()][j % patternMap[0].size()])) {
                     if (!checkMap[x + checkEdgeSize][y + checkEdgeSize]) {
                         QColor qc = qi->pixelColor(i, j);
                         setColor.setRed((qc.red() + r) & 255);
-                        setColor.setGreen((qc.green() + r) & 255);
-                        setColor.setBlue((qc.blue() + r) & 255);
+                        setColor.setGreen((qc.green() + g) & 255);
+                        setColor.setBlue((qc.blue() + b) & 255);
                         qi->setPixel(i, j, setColor.rgba());
                         checkMap[x + checkEdgeSize][y + checkEdgeSize] = 255;
                     }
@@ -402,9 +370,9 @@ void brushHandler::additive(QImage *qi) {
 void brushHandler::subractive(QImage *qi) {
     const unsigned char *const *const brushMap = brush.getBrushMap();
     int radius = brush.getRadius(), xMax = qi->width(), yMax = qi->height();
+    int checkEdgeSize = radius / 2;
     QColor affColor = getAffected();
     QColor setColor;
-    setColor.setAlpha(alpha);
     int r = affColor.red(), g = affColor.green(), b = affColor.blue();
     while (toProcess.size() > 0) {
         QPoint p = toProcess.front();
@@ -415,7 +383,7 @@ void brushHandler::subractive(QImage *qi) {
         for (int i = currPnt.x() - radius; i <= currPnt.x() + radius; ++i) {
             int y = 0;
             for (int j = currPnt.y() - radius; j <= currPnt.y() + radius; ++j) {
-                if (onScreen(i, j, xMax, yMax) && brushMap[x][y] && (!sprayDensity || !(rand() % sprayDensity)) && (!patternInUse || patternMap[i % patternXDim][j % patternYDim])) {
+                if (onScreen(i, j, xMax, yMax) && brushMap[x][y] && (!sprayDensity || !(rand() % sprayDensity)) && (!patternInUse || patternMap[i % patternMap.size()][j % patternMap[0].size()])) {
                     if (!checkMap[x + checkEdgeSize][y + checkEdgeSize]) {
                         QColor qc = qi->pixelColor(i, j);
                         setColor.setRed(max(0, qc.red() - r));
@@ -436,6 +404,7 @@ void brushHandler::subractive(QImage *qi) {
 void brushHandler::filter(QImage *qi) {
     const unsigned char *const *const brushMap = brush.getBrushMap();
     int radius = brush.getRadius(), xMax = qi->width(), yMax = qi->height();
+    int checkEdgeSize = radius / 2;
     while (toProcess.size() > 0) {
         QPoint p = toProcess.front();
         lastPnt = currPnt;
@@ -445,7 +414,7 @@ void brushHandler::filter(QImage *qi) {
         for (int i = currPnt.x() - radius; i <= currPnt.x() + radius; ++i) {
             int y = 0;
             for (int j = currPnt.y() - radius; j <= currPnt.y() + radius; ++j) {
-                if (onScreen(i, j, xMax, yMax) && brushMap[x][y] && (!sprayDensity || !(rand() % sprayDensity)) && (!patternInUse || patternMap[i % patternXDim][j % patternYDim])) {
+                if (onScreen(i, j, xMax, yMax) && brushMap[x][y] && (!sprayDensity || !(rand() % sprayDensity)) && (!patternInUse || patternMap[i % patternMap.size()][j % patternMap[0].size()])) {
                     if (!checkMap[x + checkEdgeSize][y + checkEdgeSize]) {
                         qi->setPixel(i, j, brushFilter.applyTo(qi->pixelColor(i, j)));
                         checkMap[x + checkEdgeSize][y + checkEdgeSize] = 255;
@@ -460,17 +429,8 @@ void brushHandler::filter(QImage *qi) {
 }
 
 void brushHandler::radialUpdate(int size, vector<int> pts) {
-    if (brush.getRadius() != size) {
-        int fullSize = brush.getFullSize();
-        for (int i = 0; i < fullSize; ++i)
-            delete [] radialMap[i];
-        delete [] radialMap;
+    if (brush.getRadius() != size)
         setSize(size);
-        fullSize = brush.getFullSize();
-        radialMap = new float * [fullSize];
-        for (int i = 0; i < fullSize; ++i)
-            radialMap[i] = new float [fullSize];
-    }
     radialValues = pts;
     for (size_t i = 0; i < radialValues.size(); ++i)
         radialValues[i] = 255 - radialValues[i];
@@ -486,6 +446,7 @@ void brushHandler::radialUpdate(int size, vector<int> pts) {
 void brushHandler::radial(QImage *qi) {
     const unsigned char *const *const brushMap = brush.getBrushMap();
     int radius = brush.getRadius(), xMax = qi->width(), yMax = qi->height();
+    int checkEdgeSize = radius / 2;
     QRgb qc = brushColor.rgba();
     while (toProcess.size() > 0) {
         QPoint p = toProcess.front();
@@ -497,7 +458,7 @@ void brushHandler::radial(QImage *qi) {
             int y = 0;
             int trueX = x - radius;
             for (int j = currPnt.y() - radius; j <= currPnt.y() + radius; ++j) {
-                if (onScreen(i, j, xMax, yMax) && brushMap[x][y] && (!sprayDensity || !(rand() % sprayDensity)) && (!patternInUse || patternMap[i % patternXDim][j % patternYDim])) {
+                if (onScreen(i, j, xMax, yMax) && brushMap[x][y] && (!sprayDensity || !(rand() % sprayDensity)) && (!patternInUse || patternMap[i % patternMap.size()][j % patternMap[0].size()])) {
                     int trueY = y - radius;
                     int checkStr = sqrt(trueX * trueX + trueY * trueY) + 1;
                     if (checkMap[x + checkEdgeSize][y + checkEdgeSize] > checkStr || checkMap[x + checkEdgeSize][y + checkEdgeSize] == 0) {
@@ -531,7 +492,7 @@ void brushHandler::sample(QImage *qi) {
         for (int i = -radius; i <= radius; ++i) {
             int y = 0;
             for (int j = -radius; j <= radius; ++j) {
-                if (onScreen(samplePoint.x() + i + rx, samplePoint.y() + j + ry, xMax, yMax) && onScreen(currPnt.x() + i, currPnt.y() + j, xMax, yMax) && brushMap[x][y] && (!sprayDensity || !(rand() % sprayDensity)) && (!patternInUse || patternMap[i % patternXDim][j % patternYDim]))
+                if (onScreen(samplePoint.x() + i + rx, samplePoint.y() + j + ry, xMax, yMax) && onScreen(currPnt.x() + i, currPnt.y() + j, xMax, yMax) && brushMap[x][y] && (!sprayDensity || !(rand() % sprayDensity)) && (!patternInUse || patternMap[i % patternMap.size()][j % patternMap[0].size()]))
                     qi->setPixel(currPnt.x() + i, currPnt.y() + j, qi->pixel(samplePoint.x() + i+ rx, samplePoint.y() + j + ry));
                 ++y;
             }
@@ -539,5 +500,19 @@ void brushHandler::sample(QImage *qi) {
         }
         toProcess.pop_front();
     }
+}
+
+void brushHandler::erase(QImage *qi, QPoint qp) {
+    QColor color = brushColor;
+    appMethod am = method;
+    method = appMethod::overwrite;
+    brushColor = QColor(255, 255, 255, 0);
+    applyBrush(qi, qp);
+    method = am;
+    brushColor = color;
+}
+
+Shape brushHandler::getBrushShape() {
+    return brush.getBrushShape();
 }
 

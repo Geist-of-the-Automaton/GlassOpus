@@ -4,6 +4,8 @@
 #include <iostream>
 #include <time.h>
 #include <chrono>
+#include <QPoint>
+
 using std::cout;
 using std::endl;
 using std::chrono::duration_cast;
@@ -11,8 +13,8 @@ using std::chrono::high_resolution_clock;
 using std::chrono::milliseconds;
 
 
-class stdFuncs
-{
+class stdFuncs {
+
 public:
 
     template<typename T1, typename T2, typename T3>
@@ -28,7 +30,9 @@ public:
         cout << "passed " << i << endl;
     }
 
+    static int sqrDist(QPoint a, QPoint b) {
+        return pow(a.x() - b.x(), 2) + pow(a.y() - b.y(), 2);
+    }
 };
 
 #endif // STDFUNCS_H
-
