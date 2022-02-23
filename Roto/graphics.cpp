@@ -342,6 +342,389 @@ void graphics::Filtering::applyKernal(QProgressDialog *qpd, QImage *qi, KernalDa
     }
 }
 
+void graphics::Filtering::ditherBayer(QImage *qi, int bpp, int matrixSize) {
+    float div = 1.0 / static_cast<float>(matrixSize * matrixSize - 1);
+    vector <vector <float> > arr;
+    arr.resize(matrixSize);
+    for (int i = 0; i < matrixSize; ++i)
+        arr[i].resize(matrixSize);
+    float og[2][2];
+    og[0][0] = arr[0][0] = 0;
+    og[1][0] = arr[1][0] = 3;
+    og[0][1] = arr[0][1] = 2;
+    og[1][1] = arr[1][1] = 1;
+    int size = 2;
+    while (matrixSize != size) {
+        for (int i = 1; i >= 0; --i) {
+            int I = i * size;
+            for (int j = 1; j >= 0; --j) {
+                int J = j * size;
+                for (int m = 0; m < size; ++m) {
+                    for (int n = 0; n < size; ++n)
+                        arr[m + I][n + J] = 4 * arr[m][n] + og[i][j];
+                }
+            }
+        }
+        size *= 2;
+    }
+    float BPP = static_cast<float>(bpp);
+    for (int i = 0; i < matrixSize; ++i)
+        for (int j = 0; j < matrixSize; ++j) {
+            arr[i][j] *= div;
+            arr[i][j] -= 0.5;
+            arr[i][j] *= 255.0 / BPP;
+        }
+    int bitShift = 8 - bpp;
+    for (int i = 0; i < qi->width(); ++i) {
+        int I = i % matrixSize;
+        for (int j = 0; j < qi->height(); ++j) {
+            int J = j % matrixSize;
+            QColor qp = qi->pixelColor(i, j);
+            int r = qp.red() + arr[I][J], g = qp.green() + arr[I][J], b = qp.blue() + arr[I][J];
+            r = stdFuncs::clamp(r, 0, 255);
+            g = stdFuncs::clamp(g, 0, 255);
+            b = stdFuncs::clamp(b, 0, 255);
+            r = (r >> bitShift) << bitShift;
+            g = (g >> bitShift) << bitShift;
+            b = (b >> bitShift) << bitShift;
+            qi->setPixelColor(i, j, QColor(r, g, b, qp.alpha()));
+        }
+    }
+}
+
+void graphics::Filtering::ditherRandom(QImage *qi, int bpp) {
+    int bitShift;
+    for (int i = 0; i < qi->width(); ++i)
+        for (int j = 0; j < qi->height(); ++j) {
+            bitShift = 8 - (bpp - rand() % bpp);
+            QColor qc = qi->pixelColor(i, j);
+            int r = (qc.red() >> bitShift) << bitShift;
+            int g = (qc.green() >> bitShift) << bitShift;
+            int b = (qc.blue() >> bitShift) << bitShift;
+            qi->setPixelColor(i, j, QColor(r, g, b, qc.alpha()));
+        }
+
+}
+
+void graphics::Filtering::paletteReduction(QImage *qi, int bpp) {
+    int bitShift = 8 - bpp;
+    for (int i = 0; i < qi->width(); ++i)
+        for (int j = 0; j < qi->height(); ++j) {
+            QColor qc = qi->pixelColor(i, j);
+            int r = (qc.red() >> bitShift) << bitShift;
+            int g = (qc.green() >> bitShift) << bitShift;
+            int b = (qc.blue() >> bitShift) << bitShift;
+            qi->setPixelColor(i, j, QColor(r, g, b, qc.alpha()));
+        }
+}
+
+void graphics::Filtering::ditherFloydSteinberg(QImage *qi, int bpp) {
+    int r, g, b, acc = 0;
+    bpp = 8 - bpp;
+    float rErr, gErr, bErr;
+    float A = 7.0 / 16.0, B = 3.0 / 16.0, C = 5.0 / 16.0, D = 1.0 / 16.0;
+    int w = qi->width(), h = qi->height(), size = w * h;
+    vector <int> errorR(size, 0);
+    vector <int> errorG(size, 0);
+    vector <int> errorB(size, 0);
+    for (int j = 0; j < h; ++j) {
+        for (int i = 0; i < w; ++i) {
+            QColor qc = qi->pixelColor(i, j);
+            r = ((qc.red() + errorR[acc]) >> bpp) << bpp;
+            g = ((qc.green() + errorG[acc]) >> bpp) << bpp;
+            b = ((qc.blue() + errorB[acc]) >> bpp) << bpp;
+            r = stdFuncs::clamp(r, 0, 255);
+            g = stdFuncs::clamp(g, 0, 255);
+            b = stdFuncs::clamp(b, 0, 255);
+            rErr = static_cast<float>(qc.red() - r);
+            gErr = static_cast<float>(qc.green() - g);
+            bErr = static_cast<float>(qc.blue() - b);
+            qi->setPixelColor(i, j, QColor(r, g, b, qc.alpha()));
+            int offset = acc + 1;
+            if (i + 1 < w) {
+                errorR[offset] += static_cast<int>(rErr * A);
+                errorG[offset] += static_cast<int>(gErr * A);
+                errorB[offset] += static_cast<int>(bErr * A);
+            }
+            if (j + 1 < h) {
+                offset += w - 2;
+                if (i - 1 >= 0) {
+                    errorR[offset] += static_cast<int>(rErr * B);
+                    errorG[offset] += static_cast<int>(gErr * B);
+                    errorB[offset] += static_cast<int>(bErr * B);
+                }
+                ++offset;
+                errorR[offset] += static_cast<int>(rErr * C);
+                errorG[offset] += static_cast<int>(gErr * C);
+                errorB[offset] += static_cast<int>(bErr * C);
+                ++offset;
+                if (i + 1 < w) {
+                    errorR[offset] += static_cast<int>(rErr * D);
+                    errorG[offset] += static_cast<int>(gErr * D);
+                    errorB[offset] += static_cast<int>(bErr * D);
+                }
+            }
+            ++acc;
+        }
+    }
+}
+
+void graphics::Filtering::ditherSierra(QImage *qi, int bpp) {
+    int r, g, b, acc = 0;
+    bpp = 8 - bpp;
+    float rErr, gErr, bErr;
+    float A = 2.0 / 32.0, B = 3.0 / 32.0, C = 4.0 / 32.0, D = 4.0 / 32.0;
+    int w = qi->width(), h = qi->height(), size = w * h;
+    vector <int> errorR(size, 0);
+    vector <int> errorG(size, 0);
+    vector <int> errorB(size, 0);
+    for (int j = 0; j < h; ++j) {
+        for (int i = 0; i < w; ++i) {
+            QColor qc = qi->pixelColor(i, j);
+            r = ((qc.red() + errorR[acc]) >> bpp) << bpp;
+            g = ((qc.green() + errorG[acc]) >> bpp) << bpp;
+            b = ((qc.blue() + errorB[acc]) >> bpp) << bpp;
+            r = stdFuncs::clamp(r, 0, 255);
+            g = stdFuncs::clamp(g, 0, 255);
+            b = stdFuncs::clamp(b, 0, 255);
+            rErr = static_cast<float>(qc.red() - r);
+            gErr = static_cast<float>(qc.green() - g);
+            bErr = static_cast<float>(qc.blue() - b);
+            qi->setPixelColor(i, j, QColor(r, g, b, qc.alpha()));
+            int offset = acc + 1;
+            if (i + 1 < w) {
+                errorR[offset] += static_cast<int>(rErr * D);
+                errorG[offset] += static_cast<int>(gErr * D);
+                errorB[offset] += static_cast<int>(bErr * D);
+            }
+            ++offset;
+            if (i + 2 < w) {
+                errorR[offset] += static_cast<int>(rErr * B);
+                errorG[offset] += static_cast<int>(gErr * B);
+                errorB[offset] += static_cast<int>(bErr * B);
+            }
+            if (j + 1 < h) {
+                offset += w - 4;
+                if (i - 2 >= 0) {
+                    errorR[offset] += static_cast<int>(rErr * A);
+                    errorG[offset] += static_cast<int>(gErr * A);
+                    errorB[offset] += static_cast<int>(bErr * A);
+                }
+                ++offset;
+                if (i - 1 >= 0) {
+                    errorR[offset] += static_cast<int>(rErr * C);
+                    errorG[offset] += static_cast<int>(gErr * C);
+                    errorB[offset] += static_cast<int>(bErr * C);
+                }
+                ++offset;
+                errorR[offset] += static_cast<int>(rErr * D);
+                errorG[offset] += static_cast<int>(gErr * D);
+                errorB[offset] += static_cast<int>(bErr * D);
+                ++offset;
+                if (i + 1 < w) {
+                    errorR[offset] += static_cast<int>(rErr * C);
+                    errorG[offset] += static_cast<int>(gErr * C);
+                    errorB[offset] += static_cast<int>(bErr * C);
+                }
+                ++offset;
+                if (i + 2 < w) {
+                    errorR[offset] += static_cast<int>(rErr * A);
+                    errorG[offset] += static_cast<int>(gErr * A);
+                    errorB[offset] += static_cast<int>(bErr * A);
+                }
+                if (j + 2 < h) {
+                    offset += w - 3;
+                    if (i - 1 >= 0) {
+                        errorR[offset] += static_cast<int>(rErr * A);
+                        errorG[offset] += static_cast<int>(gErr * A);
+                        errorB[offset] += static_cast<int>(bErr * A);
+                    }
+                    ++offset;
+                    errorR[offset] += static_cast<int>(rErr * B);
+                    errorG[offset] += static_cast<int>(gErr * B);
+                    errorB[offset] += static_cast<int>(bErr * B);
+                    ++offset;
+                    if (i + 1 < w) {
+                        errorR[offset] += static_cast<int>(rErr * A);
+                        errorG[offset] += static_cast<int>(gErr * A);
+                        errorB[offset] += static_cast<int>(bErr * A);
+                    }
+                }
+            }
+            ++acc;
+        }
+    }
+}
+
+void graphics::Filtering::ditherSierraLite(QImage *qi, int bpp) {
+    int r, g, b, acc = 0;
+    bpp = 8 - bpp;
+    float rErr, gErr, bErr;
+    float A = 2.0 / 4.0, B = 1.0 / 4.0;
+    int w = qi->width(), h = qi->height(), size = w * h;
+    vector <int> errorR(size, 0);
+    vector <int> errorG(size, 0);
+    vector <int> errorB(size, 0);
+    for (int j = 0; j < h; ++j) {
+        for (int i = 0; i < w; ++i) {
+            QColor qc = qi->pixelColor(i, j);
+            r = ((qc.red() + errorR[acc]) >> bpp) << bpp;
+            g = ((qc.green() + errorG[acc]) >> bpp) << bpp;
+            b = ((qc.blue() + errorB[acc]) >> bpp) << bpp;
+            r = stdFuncs::clamp(r, 0, 255);
+            g = stdFuncs::clamp(g, 0, 255);
+            b = stdFuncs::clamp(b, 0, 255);
+            rErr = static_cast<float>(qc.red() - r);
+            gErr = static_cast<float>(qc.green() - g);
+            bErr = static_cast<float>(qc.blue() - b);
+            qi->setPixelColor(i, j, QColor(r, g, b, qc.alpha()));
+            int offset = acc + 1;
+            if (i + 1 < w) {
+                errorR[offset] += static_cast<int>(rErr * A);
+                errorG[offset] += static_cast<int>(gErr * A);
+                errorB[offset] += static_cast<int>(bErr * A);
+            }
+            if (j + 1 < h) {
+                offset += w - 1;
+                errorR[offset] += static_cast<int>(rErr * B);
+                errorG[offset] += static_cast<int>(gErr * B);
+                errorB[offset] += static_cast<int>(bErr * B);
+                ++offset;
+                if (i + 1 < w) {
+                    errorR[offset] += static_cast<int>(rErr * B);
+                    errorG[offset] += static_cast<int>(gErr * B);
+                    errorB[offset] += static_cast<int>(bErr * B);
+                }
+            }
+            ++acc;
+        }
+    }
+}
+
+void graphics::Filtering::colorTransfer(QImage *to, QImage from) {
+    float RGB2LMS[3][3] = {{0.3811, 0.5783, 0.0402},
+                           {0.1967, 0.7244, 0.0782},
+                           {0.0241, 0.1288, 0.8444}};
+    float LMS2RGB[3][3] = {{ 4.4679, -3.5873,  0.1193},
+                           {-1.2186,  2.3809, -0.1624},
+                           { 0.0497, -0.2439, 1.2045}};
+    float COMMON[3][3] = {{1.0f / sqrtf(3.0), 0.0, 0.0},
+                          {0.0, 1.0f / sqrtf(6.0), 0.0},
+                          {0.0, 0.0, 1.0f / sqrtf(2.0)}};
+    // transpose for lab2lms
+    float TRANS[3][3] = {{1.0, 1.0,  1.0},
+                         {1.0, 1.0, -1.0},
+                         {1.0, -2.0, 0.0}};
+    mat4 rgb2lms(RGB2LMS);
+    mat4 lms2rgb(LMS2RGB);
+    mat4 common(COMMON);
+    mat4 trans(TRANS);
+    mat4 lms2lab = common * trans;
+    lms2lab.print();
+    trans.transpose();
+    mat4 lab2lms = trans * common;
+    vector< vector <vec4> > labImg;
+    int wt = to->width(), ht = to->height();
+    labImg.resize(wt);
+    for (int i = 0; i < wt; ++i)
+        labImg[i].resize(ht);
+    float lmt = 0.0, amt = 0.0, bmt = 0.0;
+    for (int i = 0; i < wt; ++i)
+        for (int j = 0; j < ht; ++j) {
+            QColor qc = to->pixelColor(i, j);
+            vec4 color = vec4(qc.redF(), qc.greenF(), qc.blueF());
+            color = rgb2lms * color;
+            if (color._L == 0.0)
+                color._L = 1.0 / 10000000.0;
+            if (color._A == 0.0)
+                color._A = 1.0 / 10000000.0;
+            if (color._B == 0.0)
+                color._B = 1.0 / 10000000.0;
+            color._L = log10(color._L);
+            color._A = log10(color._A);
+            color._B = log10(color._B);
+            color = lms2lab * color;
+            lmt += color._L;
+            amt += color._A;
+            bmt += color._B;
+            labImg[i][j] = color;
+        }
+    float sizet = static_cast<float>(wt * ht);
+    lmt /= sizet;
+    amt /= sizet;
+    bmt /= sizet;
+    float lsdt = 0.0, asdt = 0.0, bsdt = 0.0;
+    for (int i = 0; i < wt; ++i)
+        for (int j = 0; j < ht; ++j) {
+            lsdt += (labImg[i][j]._L - lmt) * (labImg[i][j]._L - lmt);
+            asdt += (labImg[i][j]._A - amt) * (labImg[i][j]._A - amt);
+            bsdt += (labImg[i][j]._B - bmt) * (labImg[i][j]._B - bmt);
+        }
+    lsdt = sqrt(lsdt / sizet);
+    asdt = sqrt(asdt / sizet);
+    bsdt = sqrt(bsdt / sizet);
+
+    vector< vector <vec4> > labImg2;
+    int ws = from.width(), hs = from.height();
+    labImg2.resize(ws);
+    for (int i = 0; i < ws; ++i)
+        labImg2[i].resize(hs);
+    float lms = 0.0, ams = 0.0, bms = 0.0;
+    for (int i = 0; i < ws; ++i)
+        for (int j = 0; j < hs; ++j) {
+            QColor qc = from.pixelColor(i, j);
+            vec4 color = vec4(qc.redF(), qc.greenF(), qc.blueF());
+            color = rgb2lms * color;
+            if (color._L == 0.0)
+                color._L = 1.0 / 10000000.0;
+            if (color._A == 0.0)
+                color._A = 1.0 / 10000000.0;
+            if (color._B == 0.0)
+                color._B = 1.0 / 10000000.0;
+            color._L = log10(color._L);
+            color._A = log10(color._A);
+            color._B = log10(color._B);
+            color = lms2lab * color;
+            lms += color._L;
+            ams += color._A;
+            bms += color._B;
+            labImg2[i][j] = color;
+        }
+    float sizes = static_cast<float>(ws * hs);
+    lms /= sizes;
+    ams /= sizes;
+    bms /= sizes;
+    float lsds = 0.0, asds = 0.0, bsds = 0.0;
+    for (int i = 0; i < ws; ++i)
+        for (int j = 0; j < hs; ++j) {
+            lsds += (labImg2[i][j]._L - lms) * (labImg2[i][j]._L - lms);
+            asds += (labImg2[i][j]._A - ams) * (labImg2[i][j]._A - ams);
+            bsds += (labImg2[i][j]._B - bms) * (labImg2[i][j]._B - bms);
+        }
+    lsds = sqrt(lsds / sizes);
+    asds = sqrt(asds / sizes);
+    bsds = sqrt(bsds / sizes);
+
+    double lr = lsds / lsdt, ar = asds / asdt, br = bsds / bsdt;
+    for (int i = 0; i < wt; ++i)
+        for (int j = 0; j < ht; ++j) {
+            labImg[i][j]._L = (labImg[i][j]._L - lmt) * lr + lms;
+            labImg[i][j]._A = (labImg[i][j]._A - amt) * ar + ams;
+            labImg[i][j]._B = (labImg[i][j]._B - bmt) * br + bms;
+            vec4 color = labImg[i][j];
+            color = lab2lms * color;
+            color._L = pow(10.0, color._L);
+            color._A = pow(10.0, color._A);
+            color._B = pow(10.0, color._B);
+            color = lms2rgb * color;
+            QColor qc = to->pixelColor(i, j);
+            qc.setRedF(stdFuncs::clamp(color._R, 0.0, 1.0));
+            qc.setGreenF(stdFuncs::clamp(color._G, 0.0, 1.0));
+            qc.setBlueF(stdFuncs::clamp(color._B, 0.0, 1.0));
+            to->setPixelColor(i, j, qc);
+        }
+}
+
 graphics::ImgSupport::ImgSupport() {
     zoom = 1.0;
 }
@@ -475,6 +858,77 @@ void graphics::ImgSupport::applyAlpha(QImage *qi, int *yStart, int *yEnd, unsign
             if (line[x] & 0xFF000000)
                 line[x] = a | (line[x] & 0x00FFFFFF);
         ++ys;
-        //--*yStart&=++*yStart+++!ys;      gross
+        //--*yStart&=++*yStart+++!ys;     // gross
     }
+}
+
+void graphics::ImgSupport::equalizeHistogramTo(QImage *qi, int space) {
+    vector< vector <vec4> > img;
+    int w = qi->width(), h = qi->height();
+    img.resize(w);
+    for (int i = 0; i < w; ++i)
+        img[i].resize(h);
+    mat4 rgb2rgb({{1.0, 0.0, 0.0},
+                  {0.0, 1.0, 0.0},
+                  {0.0, 0.0, 1.0}});
+    mat4 rgb2xyz({{0.5141, 0.3239, 0.1604},
+                  {0.2651, 0.6702, 0.0641},
+                  {0.0241, 0.1228, 0.8444}});
+    mat4 rgb2lms({{0.3811, 0.5783, 0.0402},
+                  {0.1967, 0.7244, 0.0782},
+                  {0.0241, 0.1228, 0.8444}});
+    mat4 lms2rgb({{ 4.4679, -3.5873,  0.1193},
+                  {-1.2186,  2.3809, -0.1624},
+                  { 0.0497, -0.2439,  1.2045}});
+    float COMMON[3][3] = {{1.0f / sqrtf(3.0), 0.0, 0.0},
+                          {0.0, 1.0f / sqrtf(6.0), 0.0},
+                          {0.0, 0.0, 1.0f / sqrtf(2.0)}};
+    // transpose for lab2lms
+    float TRANS[3][3] = {{1.0, 1.0,  1.0},
+                         {1.0, 1.0, -1.0},
+                         {1.0, -2.0, 0.0}};
+    mat4 common(COMMON);
+    mat4 trans(TRANS);
+    mat4 lms2lab = common * trans;
+    lms2lab.transpose();
+    trans.transpose();
+    mat4 lab2lms = trans * common;
+    lab2lms.transpose();
+    mat4 m(0);
+    switch(space) {
+    case 0:
+        m = rgb2rgb;
+        break;
+    case 1:
+        m = rgb2xyz;
+        break;
+    case 2:
+        m = rgb2lms;
+        break;
+    case 3:
+        m = rgb2lms;
+    }
+
+    for (int i = 0; i < w; ++i)
+        for (int j = 0; j < h; ++j) {
+            QColor qc = qi->pixelColor(i, j);
+            img[i][j] = m * vec4(qc.redF(), qc.greenF(), qc.blueF());
+            if (space == 3) {
+                vec4 color = img[i][j];
+                if (color._L == 0.0)
+                    color._L = 1.0 / 10000.0;
+                if (color._A == 0.0)
+                    color._A = 1.0 / 10000.0;
+                if (color._B == 0.0)
+                    color._B = 1.0 / 10000.0;
+                color._L = log10(color._L);
+                color._A = log10(color._A);
+                color._B = log10(color._B);
+                img[i][j] = lms2lab * color;
+            }
+        }
+    //normalize into 0-255 range
+    //bin
+    //process
+    //reconvert
 }

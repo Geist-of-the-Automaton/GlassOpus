@@ -10,6 +10,7 @@
 #include <QProgressDialog>
 #include <QCoreApplication>
 #include <stdfuncs.h>
+#include <vec_mat_maths.h>
 
 using std::max;
 using std::min;
@@ -34,6 +35,9 @@ const double minZoom = 1.0 / 4.0;
 const double maxZoom = 8.0;
 const int minColor = 0;
 const int maxColor = 255;
+
+const string eTypes[] {"RGB", "XYZ", "LMS", "LAB"};
+
 
 class Filter {
 
@@ -102,6 +106,13 @@ public:
     static QRgb greyFilmGrain (QColor qc, int strength);
     static QRgb colorFilmGrain (QColor qc, int strength);
     static void applyKernal(QProgressDialog *qpd, QImage *qi, KernalData kernalInfo);
+    static void ditherFloydSteinberg(QImage *qi, int bpp);
+    static void ditherSierra(QImage *qi, int bpp);
+    static void ditherSierraLite(QImage *qi, int bpp);
+    static void ditherBayer(QImage *qi, int bpp, int matrixSize);
+    static void ditherRandom(QImage *qi, int bpp);
+    static void paletteReduction(QImage *qi, int bpp);
+    static void colorTransfer(QImage *to, QImage from);
 
 private:
 
@@ -126,6 +137,7 @@ public:
     static list <QImage *> resize(QSize reqSize);
     static KernalData loadKernal(string fileName);
     static void applyAlpha(QImage *qi, int *yStart, int *yEnd, unsigned int *alpha);
+    void equalizeHistogramTo(QImage *qi, int space);
 
 private:
 

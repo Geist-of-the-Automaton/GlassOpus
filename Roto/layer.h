@@ -75,6 +75,10 @@ public:
     void setVectorTaperType(Taper t);
     void setVectorFilter(string s);
     void setVectorMode(VectorMode vm);
+    void setBand(int b);
+    void setGap(int g);
+    int getBand();
+    int getGap();
     void swapColors();
     void swapTapers();
     pair <char, char> getVectorTapers();

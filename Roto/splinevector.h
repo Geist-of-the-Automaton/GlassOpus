@@ -22,6 +22,8 @@ const int maxTaper = 10;
 const int minWidth = 0;
 const int maxWidth = UCHAR_MAX;
 const int maxPoints = CHAR_MAX;
+const int minStyle = 1;
+const int maxStyle = 100;
 
 class SplineVector {
 
@@ -54,6 +56,10 @@ public:
     void setFilter(string s);
     void setTaperType(Taper t);
     void setMode(VectorMode vm);
+    void setBand(int b);
+    void setGap(int g);
+    short getBand();
+    short getGap();
     void swapColors();
     void swapTapers();
     VectorMode getMode();
@@ -75,6 +81,7 @@ private:
     QPoint orig, offs;
     int minX, maxX, minY, maxY;
     unsigned char width;
+    unsigned short band, gap;
     VectorMode mode;
     unsigned char taper1, taper2;
     Taper taperType;

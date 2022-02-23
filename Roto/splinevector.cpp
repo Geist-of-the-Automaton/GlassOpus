@@ -5,6 +5,8 @@ SplineVector::SplineVector() {
     width = 0;
     color1 = color2 = 0xFF000000;
     taper1 = taper2 = 0;
+    band = 20;
+    gap = 0;
     taperType = Double;
     filter.setFilter("Greyscale");
     mode = ColorFill;
@@ -16,6 +18,8 @@ SplineVector::SplineVector(QPoint a, QPoint b, int Width) {
     width = Width;
     color1 = color2 = 0xFF000000;
     taper1 = taper2 = 0;
+    band = 20;
+    gap = 0;
     taperType = Double;
     filter.setFilter("Greyscale");
     mode = ColorFill;
@@ -41,6 +45,8 @@ SplineVector& SplineVector::operator = (const SplineVector &sv) {
     maxX = sv.maxX;
     minY = sv.minY;
     maxY = sv.maxY;
+    band = sv.band;
+    gap = sv.gap;
     return *this;
 }
 
@@ -276,6 +282,22 @@ void SplineVector::setFilter(string s) {
 
 void SplineVector::setMode(VectorMode vm) {
     mode = vm;
+}
+
+void SplineVector::setBand(int b) {
+    band = b;
+}
+
+void SplineVector::setGap(int g) {
+    gap = g;
+}
+
+short SplineVector::getBand() {
+    return band;
+}
+
+short SplineVector::getGap() {
+    return gap;
 }
 
 void SplineVector::swapColors() {

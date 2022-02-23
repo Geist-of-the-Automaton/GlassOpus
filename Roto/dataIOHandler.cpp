@@ -601,6 +601,7 @@ void DataIOHandler::addLayer() {
     frame.push_back(new Layer(dims));
     updated = true;
     activeLayer = frame.size() - 1;
+    cout << "there" << endl;
 }
 
 void DataIOHandler::copyLayer() {

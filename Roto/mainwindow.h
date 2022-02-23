@@ -25,7 +25,6 @@
 #include <QProcess>
 #include <QVBoxLayout>
 #include <QMessageBox>
-#include <QDesktopWidget>
 #include <QScreen>
 #include <QLabel>
 #include <QDropEvent>
@@ -122,14 +121,6 @@ public:
     void resizeEvent(QResizeEvent *event);
     void closeEvent(QCloseEvent *event);
     void hoverEvent(QHoverEvent *event);
-    void brushShapesTest();
-    void brushColorsTest();
-    void vectorTest();
-    void saveLoadTest();
-    void sprayDensityTest();
-    void brushMethodsTest();
-    void rasterTest();
-    void runTests();
 
 public slots:
     void changeVectorFilter(string s);
@@ -153,6 +144,7 @@ private:
     void downloadItem(QString subfolder, QString fileName, downloadAction action, QString promptTitle, QString promptText);
     void createDocImgs();
     void setMode(EditMode emode);
+    int getBPP();
 
     Ui::MainWindow *ui;
     screenRender *sr;

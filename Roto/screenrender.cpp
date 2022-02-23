@@ -36,6 +36,9 @@ void screenRender::setHoverActive(bool active) {
 }
 
 void screenRender::updateHoverMap(int r, const unsigned char const* const* arr) {
+
+    //return;
+    //fix this
     stopFlashing();
     hoverLock.lock();
     int size = 2 * radius + 1;
@@ -170,12 +173,21 @@ void screenRender::paintEvent(QPaintEvent *event) {
         int width = vects[i].getWidth();
         pair <QPoint, QPoint> bounds = vects[i].getBounds();
         bool flag = !ioh->getWorkingLayer()->isShiftActive() && bounds.first.x() - 1 > width && bounds.first.y() - 1 > width && bounds.second.x() + 1 < w - width && bounds.second.y() + 1 < h - width;
+        short band = vects[i].getBand(), gap = vects[i].getGap();
+        float totalTri = static_cast<float>(tris[i].size() / 2);
+        float offset = (totalTri / static_cast<float>(band + gap));
+        int styler = -static_cast<int>(((static_cast<float>(band + gap) * offset) - totalTri) / 2.0);
         if (vects[i].getMode() == ColorFill) {
             if (flag) { //normal draw
                 if (colors.first == colors.second) {
                     color = ca;
-                    for (Triangle &t : tris[i])
-                        fillTri(t);
+                    for (Triangle &t : tris[i]) {
+                        if (styler >= 0)
+                            fillTri(t);
+                        styler += 1;
+                        if (styler == band - 1)
+                            styler = -gap;
+                    }
                 }
                 else {
                     cb.setAlpha(alpha);
@@ -187,7 +199,11 @@ void screenRender::paintEvent(QPaintEvent *event) {
                         int g = static_cast<int>((ccc * static_cast<float>(ca.green())) + ((1.0 - ccc) * static_cast<float>(cb.green())));
                         int b = static_cast<int>((ccc * static_cast<float>(ca.blue())) + ((1.0 - ccc) * static_cast<float>(cb.blue())));
                         color = QColor(r, g, b, alpha);
-                        fillTri(t);
+                        if (styler >= 0)
+                            fillTri(t);
+                        styler += 1;
+                        if (styler == band - 1)
+                            styler = -gap;
                         cnt += 1.0;
                     }
                 }
@@ -196,14 +212,19 @@ void screenRender::paintEvent(QPaintEvent *event) {
                 if (colors.first == colors.second) {
                     color = ca;
                     for (Triangle &t : tris[i]) {
-                        if (t.A().x() < 0 || t.A().x() >= w || t.A().y() < 0 || t.A().y() >= h)
-                            fillTriSafe(t);
-                        else if (t.B().x() < 0 || t.B().x() >= w || t.B().y() < 0 || t.B().y() >= h)
-                            fillTriSafe(t);
-                        else if (t.C().x() < 0 || t.C().x() >= w || t.C().y() < 0 || t.C().y() >= h)
-                            fillTriSafe(t);
-                        else
-                            fillTri(t);
+                        if (styler >= 0) {
+                            if (t.A().x() < 0 || t.A().x() >= w || t.A().y() < 0 || t.A().y() >= h)
+                                fillTriSafe(t);
+                            else if (t.B().x() < 0 || t.B().x() >= w || t.B().y() < 0 || t.B().y() >= h)
+                                fillTriSafe(t);
+                            else if (t.C().x() < 0 || t.C().x() >= w || t.C().y() < 0 || t.C().y() >= h)
+                                fillTriSafe(t);
+                            else
+                                fillTri(t);
+                        }
+                        styler += 1;
+                        if (styler == band - 1)
+                            styler = -gap;
                     }
                 }
                 else {
@@ -216,14 +237,19 @@ void screenRender::paintEvent(QPaintEvent *event) {
                         int g = static_cast<int>((ccc * static_cast<float>(ca.green())) + ((1.0 - ccc) * static_cast<float>(cb.green())));
                         int b = static_cast<int>((ccc * static_cast<float>(ca.blue())) + ((1.0 - ccc) * static_cast<float>(cb.blue())));
                         color = QColor(r, g, b, alpha);
-                        if (t.A().x() < 0 || t.A().x() >= w || t.A().y() < 0 || t.A().y() >= h)
-                            fillTriSafe(t);
-                        else if (t.B().x() < 0 || t.B().x() >= w || t.B().y() < 0 || t.B().y() >= h)
-                            fillTriSafe(t);
-                        else if (t.C().x() < 0 || t.C().x() >= w || t.C().y() < 0 || t.C().y() >= h)
-                            fillTriSafe(t);
-                        else
-                            fillTri(t);
+                        if (styler >= 0) {
+                            if (t.A().x() < 0 || t.A().x() >= w || t.A().y() < 0 || t.A().y() >= h)
+                                fillTriSafe(t);
+                            else if (t.B().x() < 0 || t.B().x() >= w || t.B().y() < 0 || t.B().y() >= h)
+                                fillTriSafe(t);
+                            else if (t.C().x() < 0 || t.C().x() >= w || t.C().y() < 0 || t.C().y() >= h)
+                                fillTriSafe(t);
+                            else
+                                fillTri(t);
+                        }
+                        styler += 1;
+                        if (styler == band - 1)
+                            styler = -gap;
                         cnt += 1.0;
                     }
                 }
@@ -232,18 +258,28 @@ void screenRender::paintEvent(QPaintEvent *event) {
         else {
             filter = vects[i].getFilter();
             if (flag) //normal draw
-                for (Triangle &t : tris[i])
-                    filterTri(t);
+                for (Triangle &t : tris[i]) {
+                    if (styler >= 0)
+                        fillTri(t);
+                    styler += 1;
+                    if (styler == band - 1)
+                        styler = -gap;
+                }
             else  // safe draw
                 for (Triangle t : tris[i]) {
-                    if (t.A().x() < 0 || t.A().x() >= w || t.A().y() < 0 || t.A().y() >= h)
-                        filterTriSafe(t);
-                    else if (t.B().x() < 0 || t.B().x() >= w || t.B().y() < 0 || t.B().y() >= h)
-                        filterTriSafe(t);
-                    else if (t.C().x() < 0 || t.C().x() >= w || t.C().y() < 0 || t.C().y() >= h)
-                        filterTriSafe(t);
-                    else
-                        filterTri(t);
+                    if (styler >= 0) {
+                        if (t.A().x() < 0 || t.A().x() >= w || t.A().y() < 0 || t.A().y() >= h)
+                            fillTriSafe(t);
+                        else if (t.B().x() < 0 || t.B().x() >= w || t.B().y() < 0 || t.B().y() >= h)
+                            fillTriSafe(t);
+                        else if (t.C().x() < 0 || t.C().x() >= w || t.C().y() < 0 || t.C().y() >= h)
+                            fillTriSafe(t);
+                        else
+                            fillTri(t);
+                    }
+                    styler += 1;
+                    if (styler == band - 1)
+                        styler = -gap;
                 }
         }
     }

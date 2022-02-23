@@ -222,6 +222,7 @@ void Layer::setVectorTaperType(Taper t) {
     calcLine();
 }
 
+//  TODO remove static cast and test
 float Layer::getipol(float a, float b, float ipol) {
     return a + static_cast<float>(b - a) * ipol;
 }
@@ -771,6 +772,24 @@ void Layer::setVectorFilter(string s) {
 void Layer::setVectorMode(VectorMode vm) {
     if (activeVects.size() == 1)
         vects[activeVects[0]].setMode(vm);
+}
+
+void Layer::setBand(int b) {
+    if (activeVects.size() == 1)
+        vects[activeVects[0]].setBand(static_cast<short>(b));
+}
+
+void Layer::setGap(int g) {
+    if (activeVects.size() == 1)
+        vects[activeVects[0]].setGap(static_cast<short>(g));
+}
+
+int Layer::getBand() {
+    return static_cast<int>(vects[activeVects[0]].getBand());
+}
+
+int Layer::getGap() {
+    return static_cast<int>(vects[activeVects[0]].getGap());
 }
 
 void Layer::swapColors() {

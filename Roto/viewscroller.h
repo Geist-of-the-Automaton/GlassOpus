@@ -6,6 +6,9 @@
 #include <QScrollBar>
 #include <QDropEvent>
 #include <QDragEnterEvent>
+#include <iostream>
+using std::endl;
+using std::cout;
 
 class viewScroller : public QScrollArea {
 
