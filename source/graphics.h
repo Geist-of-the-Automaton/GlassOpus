@@ -7,6 +7,7 @@
 #include <vector>
 #include <fstream>
 #include <QImage>
+#include <QLabel>
 #include <QProgressDialog>
 #include <QCoreApplication>
 #include <stdfuncs.h>
@@ -21,22 +22,26 @@ using std::vector;
 using std::fstream;
 using std::ios;
 using std::pair;
+using std::to_string;
+using std::string;
 
 typedef vector<vector<float>> Kernal;
 typedef pair<bool,Kernal> KernalData;
 
 namespace graphics {
 
-const string filterNames[] =   {"Normal (rgb)", "Greyscale", "Polarize", "Negative", "Burn", "Dodge", "Enshadow", "Red Channel", "Green Channel", "Blue Channel", "Red Pass", "Green Pass", "Blue Pass", "Magenta Pass", "Yellow Pass", "Cyan Pass", "Red Filter", "Green Filter", "Blue Filter", "Burn Red", "Burn Green", "Burn Blue", "Burn Yellow", "Burn Cyan", "Burn Magenta", "Dodge Red", "Dodge Green", "Dodge Blue", "Dodge Yellow", "Dodge Cyan", "Dodge Magenta", "RBG", "GRB", "GBR", "BRG", "BGR", "Color Noise", "Grey Noise"};
-const string vectorFilters[] = {"Greyscale", "Polarize", "Red Pass", "Green Pass", "Blue Pass", "Magenta Pass", "Yellow Pass", "Cyan Pass", "Red Filter", "Green Filter", "Blue Filter", "Color Noise", "Grey Noise"};
-const int filterPresets[] =    {0             , 255        , 128        , 0         , 20    , 20     , 64,        255          , 255            , 255           , 255       , 255         , 255        , 255           , 255          , 255        , 255         , 255           , 255          , 20        , 20          , 20         , 20           , 20         , 20            , 20         , 20           , 20          , 20            , 20          , 20             , 0    , 0    , 0    , 0    , 0    , 4           , 4              };
+const string filterNames[] =   {"Normal (rgb)", "Greyscale", "Polarize", "Negative",   "Burn",      "Dodge",        "Enshadow",    "Red Channel", "Green Channel", "Blue Channel",  "Red Pass",    "Green Pass",  "Blue Pass", "Magenta Pass", "Yellow Pass", "Cyan Pass", "Red Filter", "Green Filter", "Blue Filter", "Burn Red", "Burn Green", "Burn Blue", "Burn Yellow", "Burn Cyan", "Burn Magenta", "Dodge Red", "Dodge Green", "Dodge Blue", "Dodge Yellow", "Dodge Cyan", "Dodge Magenta", "RBG", "GRB", "GBR", "BRG", "BGR", "Color Noise", "Grey Noise"};
+const string vectorFilters[] = {"Greyscale",    "Polarize",  "Red Pass", "Green Pass", "Blue Pass", "Magenta Pass", "Yellow Pass", "Cyan Pass",   "Red Filter",    "Green Filter",  "Blue Filter", "Color Noise", "Grey Noise"};
+const int filterPresets[] =    {0             , 255        ,  128      , 0           , 20          , 20           , 64           ,  255          , 255            , 255           , 255       ,    255         ,  255        , 255           , 255          , 255        , 255         , 255           , 255          , 20        , 20          , 20         , 20           , 20         , 20            , 20         , 20           , 20          , 20            , 20          , 20             , 0    , 0    , 0    , 0    , 0    , 4            , 4           };
 const int numFilters = 38;
 const double minZoom = 1.0 / 4.0;
 const double maxZoom = 8.0;
 const int minColor = 0;
 const int maxColor = 255;
+const int bins = 256;
 
-const string eTypes[] {"RGB", "XYZ", "LMS", "LAB"};
+const QStringList eTypes {"RGB", "HSV / HSB", "HSL / HSI"};
+enum eType{RGB, HSV, HSL};
 
 
 class Filter {
@@ -137,7 +142,8 @@ public:
     static list <QImage *> resize(QSize reqSize);
     static KernalData loadKernal(string fileName);
     static void applyAlpha(QImage *qi, int *yStart, int *yEnd, unsigned int *alpha);
-    void equalizeHistogramTo(QImage *qi, int space);
+    static void Histogram(QLabel *histograms, QImage *in, int layerNum, eType type);
+    static void equalizeHistogramTo(QImage *qi, eType type);
 
 private:
 

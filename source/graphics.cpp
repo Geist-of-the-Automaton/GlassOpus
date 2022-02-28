@@ -620,7 +620,6 @@ void graphics::Filtering::colorTransfer(QImage *to, QImage from) {
     mat4 common(COMMON);
     mat4 trans(TRANS);
     mat4 lms2lab = common * trans;
-    lms2lab.print();
     trans.transpose();
     mat4 lab2lms = trans * common;
     vector< vector <vec4> > labImg;
@@ -862,73 +861,173 @@ void graphics::ImgSupport::applyAlpha(QImage *qi, int *yStart, int *yEnd, unsign
     }
 }
 
-void graphics::ImgSupport::equalizeHistogramTo(QImage *qi, int space) {
+void graphics::ImgSupport::Histogram(QLabel *histograms, QImage *in, int layerNum, eType type) {
+    int hueDiv = bins / 3;
+    int h = 3 * bins;
+    QImage qi (QSize(bins * 2, h), QImage::Format_ARGB32_Premultiplied);
+    histograms->resize(qi.width(), qi.height());
+    histograms->setWindowFilePath(("Histogram of Layer " + to_string(layerNum)).c_str());
+    qi.fill(0xFF000000);
+    int histo[4][bins];
+    for (int x = 0; x < bins; ++x)
+        for (int y = 0; y < 4; ++y)
+            histo[y][x] = 0;
+    QImage image = in->copy();
+    // Fill the array(s) tht the histograms will be constructed from.
+    int total = 0;
+    for (int x = 0; x < image.width(); ++x)
+        for (int y = 0; y < image.height(); ++y) {
+            QColor qc = image.pixelColor(x, y);
+            if (qc.alpha() != 0) {
+                if (type == RGB) {
+                    int intensity = static_cast<int>(static_cast<float>(qc.red() + qc.green() + qc.blue()) / 3.0 + 0.5);
+                    ++histo[0][intensity];
+                    ++histo[1][qc.red()];
+                    ++histo[2][qc.green()];
+                    ++histo[3][qc.blue()];
+                }
+                else if (type == HSV) {
+                    ++histo[0][qc.hsvHue()];
+                    ++histo[1][qc.hsvSaturation()];
+                    ++histo[2][qc.value()];
+                }
+                else {
+                    ++histo[0][qc.hslHue()];
+                    ++histo[1][qc.hslSaturation()];
+                    ++histo[2][qc.lightness()];
+                }
+                ++total;
+            }
+        }
+    int maxI = 0, cutoff = (total) / 4;
+    for (int j = 0; j < 4; ++j)
+        for (int i = 1; i < bins - 1; ++i)
+            if (histo[j][i] < cutoff)
+                maxI = max(maxI, histo[j][i]);
+    // Draw histograms.
+    double div = static_cast<double>(h / 2 - 1) / static_cast<double>(maxI);
+    float fbins = static_cast<float>(bins - 1);
+    for (int x = 0; x < bins; ++x) {
+        QRgb value = static_cast<QRgb>(bins + x) / 2;
+        for  (int j = 0; j < 4; ++j) {
+            QRgb color = 0xFF000000;
+            if (type == RGB && j != 0)
+                color += (value << (8 * (2 - (j - 1))));
+            else if (type == HSV && j == 0) {
+                QColor qc(color);
+                qc.setHsvF(static_cast<float>(x) / fbins, 1.0, 1.0);
+                color = qc.rgba();
+            }
+            else if (type == HSL && j == 0) {
+                QColor qc(color);
+                qc.setHslF(static_cast<float>(x) / fbins, 1.0, 0.5);
+                color = qc.rgba();
+            }
+            else if (type == HSV && j == 1) {
+                QColor qc(color);
+                qc.setHsvF(0.3, static_cast<float>(x) / fbins, 1.0);
+                color = qc.rgba();
+            }
+            else if (type == HSL && j == 1) {
+                QColor qc(color);
+                qc.setHslF(0.3, static_cast<float>(x) / fbins, 0.5);
+                color = qc.rgba();
+            }
+            else if ((type == RGB && j == 0) || (type != RGB && j == 2))
+                for (unsigned char i= 0; i < 3; ++i)
+                    color += value << (8 * i);
+            int rowOffset = (h / 2) * (j / 2);
+            int colOffset = x + bins * (j % 2);
+            int stop = h / 2 + rowOffset;
+            int start = stop - static_cast<int>(static_cast<double>(histo[j][x]) * div);
+            start = max(start, rowOffset);
+            for (int y = start; y < stop; ++y)
+                qi.setPixelColor(colOffset, y, color);
+        }
+    }
+    histograms->setPixmap(QPixmap::fromImage(qi));
+    histograms->setFixedSize(histograms->size());
+}
+
+void graphics::ImgSupport::equalizeHistogramTo(QImage *qi, eType type) {
     vector< vector <vec4> > img;
     int w = qi->width(), h = qi->height();
     img.resize(w);
     for (int i = 0; i < w; ++i)
         img[i].resize(h);
-    mat4 rgb2rgb({{1.0, 0.0, 0.0},
-                  {0.0, 1.0, 0.0},
-                  {0.0, 0.0, 1.0}});
-    mat4 rgb2xyz({{0.5141, 0.3239, 0.1604},
-                  {0.2651, 0.6702, 0.0641},
-                  {0.0241, 0.1228, 0.8444}});
-    mat4 rgb2lms({{0.3811, 0.5783, 0.0402},
-                  {0.1967, 0.7244, 0.0782},
-                  {0.0241, 0.1228, 0.8444}});
-    mat4 lms2rgb({{ 4.4679, -3.5873,  0.1193},
-                  {-1.2186,  2.3809, -0.1624},
-                  { 0.0497, -0.2439,  1.2045}});
-    float COMMON[3][3] = {{1.0f / sqrtf(3.0), 0.0, 0.0},
-                          {0.0, 1.0f / sqrtf(6.0), 0.0},
-                          {0.0, 0.0, 1.0f / sqrtf(2.0)}};
-    // transpose for lab2lms
-    float TRANS[3][3] = {{1.0, 1.0,  1.0},
-                         {1.0, 1.0, -1.0},
-                         {1.0, -2.0, 0.0}};
-    mat4 common(COMMON);
-    mat4 trans(TRANS);
-    mat4 lms2lab = common * trans;
-    lms2lab.transpose();
-    trans.transpose();
-    mat4 lab2lms = trans * common;
-    lab2lms.transpose();
-    mat4 m(0);
-    switch(space) {
-    case 0:
-        m = rgb2rgb;
-        break;
-    case 1:
-        m = rgb2xyz;
-        break;
-    case 2:
-        m = rgb2lms;
-        break;
-    case 3:
-        m = rgb2lms;
-    }
-
     for (int i = 0; i < w; ++i)
         for (int j = 0; j < h; ++j) {
             QColor qc = qi->pixelColor(i, j);
-            img[i][j] = m * vec4(qc.redF(), qc.greenF(), qc.blueF());
-            if (space == 3) {
-                vec4 color = img[i][j];
-                if (color._L == 0.0)
-                    color._L = 1.0 / 10000.0;
-                if (color._A == 0.0)
-                    color._A = 1.0 / 10000.0;
-                if (color._B == 0.0)
-                    color._B = 1.0 / 10000.0;
-                color._L = log10(color._L);
-                color._A = log10(color._A);
-                color._B = log10(color._B);
-                img[i][j] = lms2lab * color;
-            }
+            if (type == HSV)
+                img[i][j] = vec4(qc.hsvHueF(), qc.hsvSaturationF(), qc.valueF());
+            else if (type == HSL)
+                img[i][j] = vec4(qc.hslHueF(), qc.hslSaturationF(), qc.lightnessF());
+            else
+                img[i][j] = vec4(qc.redF(), qc.greenF(), qc.blueF());
         }
     //normalize into 0-255 range
-    //bin
-    //process
-    //reconvert
+    int histo[bins];
+    for (int i = 0; i < bins; ++i)
+        histo[i] = 0;
+    // Fill the array(s) tht the histograms will be constructed from.
+    int value;
+    int total = 0;
+    for (int x = 0; x < w; ++x)
+        for (int y = 0; y < h; ++y) {
+            if (qi->pixelColor(x, y).alpha() != 0) {
+                float vf;
+                if (type == RGB)
+                    vf = (img[x][y][0] + img[x][y][1] + img[x][y][2]) / 3.0;
+                else
+                    vf = img[x][y][2];
+                value = static_cast<int>(vf * static_cast<int>(bins - 1) + 0.4);
+                stdFuncs::clamp(value, 0, bins - 1);
+                ++total;
+                ++histo[value];
+            }
+        }
+    int i = 0;
+    while (i < bins && histo[i] == 0)
+        ++i;
+    if (i == bins || histo[i] == total)
+        return;
+    float scale = static_cast<double>(bins - 1) / static_cast<double>(total - histo[i]);
+    int lut[bins];
+    for (int j = 0; j < bins; ++j)
+        lut[j] = 0;
+    int sum = 0;
+    for (++i; i < bins; ++i) {
+        sum += histo[i];
+        lut[i] = stdFuncs::clamp(static_cast<int>(static_cast<float>(sum) * scale), 0, 255);
+    }
+    for (int x = 0; x < w; ++x)
+        for (int y = 0; y < h; ++y) {
+            if (qi->pixelColor(x, y).alpha() != 0) {
+                float vf;
+                if (type == HSV || type == HSL) {
+                    float vf = img[x][y][2];
+                    value = static_cast<int>(vf * static_cast<float>(bins - 1) + 0.4);
+                    stdFuncs::clamp(value, 0, bins - 1);
+                    vf = static_cast<float>(lut[value]) / 255.0;
+                    img[x][y].xyzw[2] = vf;
+                }
+                if (type == RGB) {
+                    int c1 = static_cast<int>(img[x][y][0] * 255.0);
+                    int c2 = static_cast<int>(img[x][y][1] * 255.0);
+                    int c3 = static_cast<int>(img[x][y][2] * 255.0);
+                    img[x][y].set(0, static_cast<float>(lut[c1]) / 255.0);
+                    img[x][y].set(1, static_cast<float>(lut[c2]) / 255.0);
+                    img[x][y].set(2, static_cast<float>(lut[c3]) / 255.0);
+                }
+                QColor qc = qi->pixelColor(x, y);
+                float a = qc.alphaF();
+                if (type == HSV)
+                    qc.setHsvF(img[x][y][0], img[x][y][1], img[x][y][2], a);
+                else if (type == HSL)
+                    qc.setHslF(img[x][y][0], img[x][y][1], img[x][y][2], a);
+                else
+                    qc.setRgbF(img[x][y][0], img[x][y][1], img[x][y][2], a);
+                qi->setPixelColor(x, y, qc);
+            }
+        }
 }
