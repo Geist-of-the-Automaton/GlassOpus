@@ -32,7 +32,7 @@ void DataIOHandler::compileFrame() {
         frame.pop_back();
     }
     frame.pop_back();
-    for (int i = frame.size() - 1; i >= 0; --i) {
+    for (int i = static_cast<int>(frame.size() - 1); i >= 0; --i) {
         delete frame[i];
         frame.pop_back();
     }
@@ -60,7 +60,7 @@ void DataIOHandler::compileLayer() {
 void DataIOHandler::renderFrame(QProgressDialog *fqpd, QImage *ret, vector <Layer *> layers) {
     progressMarker = 0;
     fqpd->setValue(0);
-    fqpd->setMaximum(layers.size() + 2);
+    fqpd->setMaximum(static_cast<int>(layers.size() + 2));
     fqpd->show();
     QCoreApplication::processEvents();
     ret->fill(0xFFFFFFFF);
@@ -93,7 +93,7 @@ void DataIOHandler::renderFrame(QProgressDialog *fqpd, QImage *ret, vector <Laye
 void DataIOHandler::renderLayer(QProgressDialog *fqpd, QProgressDialog *qpd, QImage *toProcess, int alpha, Filter filter, vector<SplineVector> vects, vector<list<Triangle>> tris) {
     if (qpd != nullptr) {
         qpd->setValue(0);
-        qpd->setMaximum(1 + vects.size() + (tris.size() != vects.size() ? 1 : 0));
+        qpd->setMaximum(static_cast<int>(1 + vects.size() + (tris.size() != vects.size() ? 1 : 0)));
         qpd->show();
         QCoreApplication::processEvents();
     }
@@ -580,7 +580,7 @@ void DataIOHandler::setActiveLayer(int i, EditMode mode) {
 }
 
 int DataIOHandler::getNumLayers() {
-    return frame.size();
+    return static_cast<int>(frame.size());
 }
 
 int DataIOHandler::getActiveLayer() {
@@ -600,8 +600,7 @@ Layer * DataIOHandler::getWorkingLayer() {
 void DataIOHandler::addLayer() {
     frame.push_back(new Layer(dims));
     updated = true;
-    activeLayer = frame.size() - 1;
-    cout << "there" << endl;
+    activeLayer = static_cast<unsigned char>(frame.size() - 1);
 }
 
 void DataIOHandler::copyLayer() {
@@ -613,7 +612,7 @@ void DataIOHandler::pasteLayer() {
         return;
     frame.push_back(new Layer(layerCopySlot));
     updated = true;
-    activeLayer = frame.size() - 1;
+    activeLayer = static_cast<unsigned char>(frame.size() - 1);
 }
 
 void DataIOHandler::deleteLayer() {
@@ -661,7 +660,7 @@ QImage DataIOHandler::getBackground() {
     if (activeLayer == 0)
         return QImage();
     progress->setLabelText("Updating Background View");
-    progress->setMaximum(frame.size());
+    progress->setMaximum(static_cast<int>(frame.size()));
     progress->show();
     QCoreApplication::processEvents();
     QImage qi = frame[0]->getCanvas()->copy();
@@ -674,7 +673,7 @@ QImage DataIOHandler::getBackground() {
         QImage temp = frame[i]->getCanvas()->copy();
         renderLayer(nullptr, nullptr, &temp, frame[i]->getAlpha(), frame[i]->getFilter(), frame[i]->getVectors(), frame[i]->getTriangles());
         p.drawImage(0, 0, temp);
-        progress->setValue(i + 1);
+        progress->setValue(static_cast<int>(i + 1));
         QCoreApplication::processEvents();
     }
     p.end();
@@ -699,7 +698,7 @@ QImage DataIOHandler::getForeground() {
         QImage temp = frame[i]->getCanvas()->copy();
         renderLayer(nullptr, nullptr, &temp, frame[i]->getAlpha(), frame[i]->getFilter(), frame[i]->getVectors(), frame[i]->getTriangles());
         p.drawImage(0, 0, temp);
-        progress->setValue(i + 1);
+        progress->setValue(static_cast<int>(i + 1));
         QCoreApplication::processEvents();
     }
     p.end();
@@ -801,7 +800,7 @@ void DataIOHandler::scale(scaleType type) {
     if (importType == image) {
         frame.push_back(new Layer(importImg, 255));
         updated = true;
-        activeLayer = frame.size() - 1;
+        activeLayer = static_cast<unsigned char>(frame.size() - 1);
     }
 }
 
@@ -949,7 +948,7 @@ int DataIOHandler::load(QString projectName) {
                     svs.push_back(sv);
                 }
                 if (retCode == 0) {
-                    qi.convertToFormat(QImage::Format_ARGB32);
+                    qi = qi.convertToFormat(QImage::Format_ARGB32);
                     Layer *layer = new Layer(qi, alpha);
                     if (!svs.empty()) {
                         layer->setMode(Spline_Mode);
@@ -964,7 +963,7 @@ int DataIOHandler::load(QString projectName) {
             }
         }
         if (retCode == 0) {
-            activeLayer = frame.size() - 1;
+            activeLayer = static_cast<unsigned char>(frame.size() - 1);
             updated = true;
         }
     }
@@ -988,4 +987,19 @@ void DataIOHandler::clearFrame() {
 vector <Layer *> DataIOHandler::backup() {
     vector <Layer *> compare = frame;
     return compare;
+}
+
+void DataIOHandler::setSymDiv(int div) {
+    for (size_t i = 0; i < frame.size(); ++i)
+        frame[i]->setSymDiv(div);
+}
+
+void DataIOHandler::setDivType(int type) {
+    for (size_t i = 0; i < frame.size(); ++i)
+        frame[i]->setSymDivType(type);
+}
+
+void DataIOHandler::setSymPt(QPoint qp) {
+    for (size_t i = 0; i < frame.size(); ++i)
+        frame[i]->setSymDivPt(qp);
 }

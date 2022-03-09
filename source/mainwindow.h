@@ -76,6 +76,7 @@ using Qt::Key_Y;
 using Qt::Key_Z;
 using Qt::Key_D;
 using Qt::Key_F7;
+using Qt::Key_Alt;
 
 using graphics::vectorFilters;
 using graphics::filterNames;
@@ -148,7 +149,7 @@ private:
     screenRender *sr;
     viewScroller *vs;
     EditMode mode;
-    bool shiftFlag, ctrlFlag, onePress;
+    bool shiftFlag, ctrlFlag, onePress, altFlag;
     MouseButton lastButton;
     DataIOHandler *ioh;
     brushHandler bh;

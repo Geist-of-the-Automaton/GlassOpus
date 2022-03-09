@@ -31,6 +31,7 @@ brushHandler::brushHandler(unsigned char str, int size, int density, string type
     ipolActive = false;
     relativityPoint = QPoint(-1000,-1000);
     resetPoint();
+    symDiv = 20;
 }
 
 brushHandler::~brushHandler() {
@@ -309,14 +310,48 @@ void brushHandler::overwrite(QImage *qi) {
         lastPnt = currPnt;
         currPnt = p;
         int x = 0;
-        for (int i = currPnt.x() - radius; i <= currPnt.x() + radius; ++i) {
-            int y = 0;
-            for (int j = currPnt.y() - radius; j <= currPnt.y() + radius; ++j) {
-                if (onScreen(i, j, xMax, yMax) && brushMap[x][y] && (!sprayDensity || !(rand() % sprayDensity)) && (!patternInUse || patternMap[i % patternMap.size()][j % patternMap[0].size()]))
-                    qi->setPixel(i, j, qc);
-                ++y;
+        if (symDiv == 1) {
+            for (int i = currPnt.x() - radius; i <= currPnt.x() + radius; ++i) {
+                int y = 0;
+                for (int j = currPnt.y() - radius; j <= currPnt.y() + radius; ++j) {
+                    if (onScreen(i, j, xMax, yMax) && brushMap[x][y] && (!sprayDensity || !(rand() % sprayDensity)) && (!patternInUse || patternMap[i % patternMap.size()][j % patternMap[0].size()]))
+                        qi->setPixel(i, j, qc);
+                    ++y;
+                }
+                ++x;
             }
-            ++x;
+        }
+        else {
+            float offset = 2 * pi / static_cast<float>(symDiv);
+            for (float mult = 0.0; mult < symDiv; mult += 1.0) {
+                if (static_cast<int>(mult) % 5 < 2)
+                    continue;
+                float angle = offset * mult;
+                float x = currPnt.x();
+                float y = currPnt.y();
+                float s = sin(angle);
+                float c = cos(angle);
+                x -= symPt.x();
+                y -= symPt.y();
+
+                // rotate point
+                float xnew = x * c - y * s;
+                float ynew = x * s + y * c;
+
+                // translate point back:
+                x = xnew + symPt.x();
+                y = ynew + symPt.y();
+                int X = 0;
+                for (int i = x - radius; i <= x + radius; ++i) {
+                    int Y = 0;
+                    for (int j = y - radius; j <= y + radius; ++j) {
+                        if (onScreen(i, j, xMax, yMax) && brushMap[X][Y] && (!sprayDensity || !(rand() % sprayDensity)) && (!patternInUse || patternMap[i % patternMap.size()][j % patternMap[0].size()]))
+                            qi->setPixel(i, j, qc);
+                        ++Y;
+                    }
+                    ++X;
+                }
+            }
         }
         toProcess.pop_front();
     }
@@ -514,5 +549,21 @@ void brushHandler::erase(QImage *qi, QPoint qp) {
 
 Shape brushHandler::getBrushShape() {
     return brush.getBrushShape();
+}
+
+int brushHandler::getSymDiv() {
+    return symDiv;
+}
+
+void brushHandler::setSymDiv(int div) {
+    symDiv = div;
+}
+
+void brushHandler::setSymDivPt(QPoint qp) {
+    symPt = qp;
+}
+
+void brushHandler::setSymDivType(int type) {
+    divType = sym2DivType(type);
 }
 

@@ -70,7 +70,7 @@ Layer& Layer::operator=(const Layer &layer) {
 
 void Layer::pasteVectors(list<SplineVector> svs) {
     deselect();
-    unsigned char i = vects.size();
+    unsigned char i = static_cast<unsigned char>(vects.size());
     vects.insert(vects.end(), svs.begin(), svs.end());
     while (tris.size() < vects.size())
         tris.push_back(list <Triangle> ());
@@ -113,7 +113,7 @@ QImage * Layer::getCanvas() {
 QImage Layer::getRenderCanvas() {
     QImage img = qi->copy();
     if (selectOgActive)
-        drawRasterSelection(&img);
+        drawRasterSelection(&img, FastTransformation);
     return img.convertToFormat(QImage::Format_ARGB32);
 }
 
@@ -438,7 +438,7 @@ void Layer::pressLeft(QPoint qp) {
                 vector <QPoint> controlPts = vects[activeVects[0]].getControls();
                 for (size_t i = 0; i < controlPts.size(); ++i)
                     if (abs(qp.x() - controlPts[i].x()) + abs(qp.y() - controlPts[i].y()) < ptSize + 2) {
-                        activePt = i;
+                        activePt = static_cast<unsigned char>(i);
                         break;
                     }
                 if (activePt == -1)
@@ -542,7 +542,7 @@ MouseButton Layer::pressRight(QPoint qp) {
             if (vects.size() < CHAR_MAX - 1) {
                 vects.push_back(SplineVector(qp, QPoint(qp.x() + 1, qp.y())));
                 tris.push_back(list <Triangle> ());
-                activeVects.push_back(vects.size() - 1);
+                activeVects.push_back(static_cast<unsigned char>(vects.size() - 1));
                 activePt = 1;
                 response = LeftButton;
                 calcLine();
@@ -603,7 +603,7 @@ MouseButton Layer::pressRight(QPoint qp) {
                 if (index != 0 && index != controlPts.size() - 1 && stdFuncs::sqrDist(qp, controlPts[index - 1]) > stdFuncs::sqrDist(qp, controlPts[index + 1]) && stdFuncs::sqrDist(qp, controlPts[0]) > stdFuncs::sqrDist(qp, controlPts[controlPts.size() - 1]))
                         index = index + 1;
                 vects[activeVects[0]].addPt(qp, index);
-                activePt = index;
+                activePt = static_cast<unsigned char>(index);
                 response = LeftButton;
             }
             calcLine();
@@ -835,7 +835,7 @@ void Layer::cleanUp() {
 void Layer::deleteSelected() {
     if (mode == Spline_Mode && activeVects.size() != 0) {
         sort(activeVects.begin(), activeVects.end());
-        for (int i = activeVects.size() - 1; i >= 0; --i) {
+        for (int i = static_cast<int>(activeVects.size() - 1); i >= 0; --i) {
             unsigned char activeVect = activeVects[i];
             vects.erase(vects.begin() + activeVect);
             tris.erase(tris.begin() + activeVect);
@@ -848,10 +848,10 @@ void Layer::deleteSelected() {
     deselect();
 }
 
-void Layer::drawRasterSelection(QImage *img) {
+void Layer::drawRasterSelection(QImage *img, Qt::TransformationMode tm) {
     if (rasterselectOg.isNull())
         return;
-    QImage rasterEdit = rasterselectOg.scaled(1 + boundPt2.x() - boundPt1.x(), 1 + boundPt2.y() - boundPt1.y());
+    QImage rasterEdit = rasterselectOg.scaled(1 + boundPt2.x() - boundPt1.x(), 1 + boundPt2.y() - boundPt1.y(), Qt::IgnoreAspectRatio, tm);
     int ox = (boundPt1.x() + boundPt2.x()) / 2, oy = (boundPt1.y() + boundPt2.y()) / 2;
     float angle = atan2(rotateAnchor.y() - oy, rotateAnchor.x() - ox) - atan2(deltaMove.y() - oy, deltaMove.x() - ox);
     angle += postAngle;
@@ -897,7 +897,7 @@ void Layer::deselect() {
         activePt = -1;
     }
     else if (mode == Raster_Mode) {
-        drawRasterSelection(qi);
+        drawRasterSelection(qi, SmoothTransformation);
         rasterselectOg = QImage();
         selection = NoSelect;
         selectOgActive = false;
@@ -943,4 +943,20 @@ void Layer::applyKernalToSelection(QProgressDialog *qpd, string fileName) {
         KernalData kernalInfo = graphics::ImgSupport::loadKernal(fileName);
         graphics::Filtering::applyKernal(qpd, &rasterselectOg, kernalInfo);
     }
+}
+
+int Layer::getSymDiv() {
+    return symDiv;
+}
+
+void Layer::setSymDiv(int div) {
+    symDiv = div;
+}
+
+void Layer::setSymDivPt(QPoint qp) {
+    symPt = qp;
+}
+
+void Layer::setSymDivType(int type) {
+    divType = sym2DivType(type);
 }

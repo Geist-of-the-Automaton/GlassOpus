@@ -116,7 +116,7 @@ void RadialProfiler::mousePressEvent(QMouseEvent *event) {
     qp = QPoint(static_cast<int>(static_cast<float>(qp.x()) / xZoom), qp.y() / 2);
     for (size_t i = 0; i < numpts; ++i)
         if (abs(qp.x() - controlPts[i].x()) + abs(qp.y() - controlPts[i].y()) < 4) {
-            activePt = i;
+            activePt = static_cast<unsigned char>(i);
             break;
         }
 }

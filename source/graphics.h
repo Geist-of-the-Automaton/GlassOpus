@@ -12,6 +12,7 @@
 #include <QCoreApplication>
 #include <stdfuncs.h>
 #include <vec_mat_maths.h>
+#include <cmath>
 
 using std::max;
 using std::min;
@@ -24,6 +25,7 @@ using std::ios;
 using std::pair;
 using std::to_string;
 using std::string;
+using std::atan;
 
 typedef vector<vector<float>> Kernal;
 typedef pair<bool,Kernal> KernalData;
@@ -39,6 +41,7 @@ const double maxZoom = 8.0;
 const int minColor = 0;
 const int maxColor = 255;
 const int bins = 256;
+const double pi = 3.14159265359;
 
 const QStringList eTypes {"RGB", "HSV / HSB", "HSL / HSI"};
 enum eType{RGB, HSV, HSL};
@@ -144,6 +147,7 @@ public:
     static void applyAlpha(QImage *qi, int *yStart, int *yEnd, unsigned int *alpha);
     static void Histogram(QLabel *histograms, QImage *in, int layerNum, eType type);
     static void equalizeHistogramTo(QImage *qi, eType type);
+    static void claheTo(QImage *qi, eType type, int divisonX = 0, int divisionY = 0);
 
 private:
 

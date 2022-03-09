@@ -102,6 +102,10 @@ public:
     vector<int> findPoints(QImage *qi);
     void vectorCheck(SplineVector sv);
 
+    void setSymDiv(int div);
+    void setDivType(int type);
+    void setSymPt(QPoint qp);
+
 private:
 
     QSize dims;

@@ -31,6 +31,7 @@ MainWindow::MainWindow(string startPath, string projectFile, QWidget *parent)
     qme = new QErrorMessage(this);
     shiftFlag = false;
     ctrlFlag = false;
+    altFlag = false;
     lastButton = NoButton;
     vs = new viewScroller(this);
     vs->setWidgetResizable(true);
@@ -148,6 +149,11 @@ void MainWindow::mouseMoveEvent(QMouseEvent *event) {
     if (takeFlag)
         return;
     QPoint qp = sr->getZoomCorrected(vs->getScrollCorrected(event->pos()));
+    if (altFlag) {
+        ioh->setSymPt(qp);
+        bh.setSymDivPt(qp);
+        return;
+    }
     statusBar()->showMessage((to_string(qp.x()) + "," + to_string(qp.y())).c_str(), 1000);
     if (mode == Brush_Mode) {
         if (lastButton == LeftButton)
@@ -185,6 +191,10 @@ void MainWindow::mousePressEvent(QMouseEvent *event) {
     }
     lastButton = event->button();
     QPoint qp = sr->getZoomCorrected(vs->getScrollCorrected(event->pos()));
+    if (altFlag) {
+        ioh->getWorkingLayer()->setSymDivPt(qp);
+        return;
+    }
     if (mode == Raster_Mode && event->button() == RightButton && !shiftFlag && !ioh->getWorkingLayer()->isRotating())
         ioh->getWorkingLayer()->fillColor(qp, bh.getFillColor());
     else if (mode == Brush_Mode) {
@@ -413,12 +423,12 @@ void MainWindow::doSomething(string btnPress) {
         string formats = "";
         for (string s : acceptedImportImageFormats)
             formats += " *." + s;
-        formats = "Media Files (" + formats.substr(1) + ")";
+        formats = "Image Files (" + formats.substr(1) + ")";
         QString fileName = QFileDialog::getOpenFileName(this, tr("Import"), "/", tr(formats.c_str()));
         if (fileName == "")
             return;
         string fn = fileName.toStdString();
-        int index = fn.find_last_of('.');
+        size_t index = fn.find_last_of('.');
         string fileType = fn.substr(index + 1);
         if (std::find(acceptedImportImageFormats.begin(), acceptedImportImageFormats.end(), fileType) != acceptedImportImageFormats.end()) {
             bool flag = ioh->importImage(fileName);
@@ -494,7 +504,7 @@ void MainWindow::doSomething(string btnPress) {
         if (fileName == "")
             return;
         string fn = fileName.toStdString();
-        int index = fn.find_last_of('.');
+        size_t index = fn.find_last_of('.');
         string fileType = fn.substr(index + 1);
         if (std::find(acceptedExportImageFormats.begin(), acceptedExportImageFormats.end(), fileType) != acceptedExportImageFormats.end())
             ioh->exportImage(fileName);
@@ -1007,7 +1017,7 @@ void MainWindow::applyRasterFilter(string s) {
     bool ok = false;
     int ret = QInputDialog::getInt(this, "Glass Opus", "Please enter a strength", defaultStr, graphics::minColor, graphics::maxColor, 1, &ok);
     if (ok)
-        ioh->getWorkingLayer()->applyFilterToRaster(Filter(defaultStr, s));
+        ioh->getWorkingLayer()->applyFilterToRaster(Filter(ret, s));
 }
 
 void MainWindow::log(string title, QObject *obj) {
@@ -1072,6 +1082,9 @@ void MainWindow::keyPressEvent(QKeyEvent *event) {
             setShiftFlag(true);
         }
         break;
+    case Key_Alt:
+        altFlag = true;
+        break;
     case Key_Escape:
         ioh->getWorkingLayer()->deselect();
         break;
@@ -1122,6 +1135,9 @@ void MainWindow::keyReleaseEvent(QKeyEvent *event) {
     case Key_Control:
         ctrlFlag = false;
         break;
+    case Key_Alt:
+        altFlag = false;
+        break;
     }
 }
 
@@ -1146,7 +1162,7 @@ void MainWindow::dropEvent(QDropEvent *event) {
         for (int i = 0; i < urlList.size(); ++i) {
             QString fileName = urlList.at(i).toLocalFile();
             string fn = fileName.toStdString();
-            int index = fn.find_last_of('.');
+            size_t index = fn.find_last_of('.');
             string fileType = fn.substr(index + 1);
             if (std::find(acceptedImportImageFormats.begin(), acceptedImportImageFormats.end(), fileType) != acceptedImportImageFormats.end()) {
                 bool flag = ioh->importImage(fileName);

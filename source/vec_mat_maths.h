@@ -19,6 +19,8 @@ using std::sqrtf;
 #define _L xyzw[0]
 #define _A xyzw[1]
 
+enum matInitType {Zeros, Ones, Diagonal};
+
 struct vec4 {
     float xyzw[4];
 
@@ -29,6 +31,17 @@ struct vec4 {
 
     vec4(float f) {
         _X = _Y = _Z = _W = f;
+    }
+
+    vec4(double f) {
+        _X = _Y = _Z = _W = static_cast<float>(f);
+    }
+
+    vec4(double x, double y, double z = 0.0, double w = 0.0) {
+        _X = static_cast<float>(x);
+        _Y = static_cast<float>(y);
+        _Z = static_cast<float>(z);
+        _W = static_cast<float>(w);
     }
 
     vec4(float x, float y, float z = 0.0, float w = 0.0) {
@@ -45,9 +58,11 @@ struct vec4 {
         _W = v[3];
     }
 
-    vec4(vector<float> v) {
-        for (int i = 0; i < 4; ++i)
-            xyzw[i] = v[i];
+    vec4(double v[4]) {
+        _X = static_cast<float>(v[0]);
+        _Y = static_cast<float>(v[1]);
+        _Z = static_cast<float>(v[2]);
+        _W = static_cast<float>(v[3]);
     }
 
     vec4(vec4 *v) {
@@ -57,24 +72,81 @@ struct vec4 {
         _W = v->_W;
     }
 
+    void operator = (const double d) {
+        _X = static_cast<float>(d);
+        _Y = static_cast<float>(d);
+        _Z = static_cast<float>(d);
+        _W = static_cast<float>(d);
+    }
+
+    void operator = (float arr[4]) {
+        _X = arr[0];
+        _Y = arr[1];
+        _Z = arr[2];
+        _W = arr[3];
+    }
+
+    void operator = (double arr[4]) {
+        _X = static_cast<float>(arr[0]);
+        _Y = static_cast<float>(arr[1]);
+        _Z = static_cast<float>(arr[2]);
+        _W = static_cast<float>(arr[3]);
+    }
+
     float operator * (const vec4 &v) {
         return _X * v._X + _Y * v._Y + _Z * v._Z + _W * v._W;
     }
 
-    vec4 operator += (vec4 &v) {
-        return *this + v;
+    vec4 operator * (const double d) {
+        float f = static_cast<float>(d);
+        return vec4(_X * f, _Y * f, _Z * f, _W * f);
     }
 
-    vec4 operator -= (vec4 &v) {
-        return *this - v;
+    vec4 operator / (const double d) {
+        float f = static_cast<float>(d);
+        return vec4(_X / f, _Y / f, _Z / f, _W / f);
     }
 
     vec4 operator + (const vec4 &v) {
         return vec4(_X + v._X, _Y + v._Y, _Z + v._Z, _W + v._W);
     }
 
+    vec4 operator + (const double d) {
+        float f = static_cast<float>(d);
+        return vec4(_X + f, _Y + f, _Z + f, _W + f);
+    }
+
     vec4 operator - (const vec4 &v) {
         return vec4(_X - v._X, _Y - v._Y, _Z - v._Z, _W - v._W);
+    }
+
+    vec4 operator - (const double d) {
+        float f = static_cast<float>(d);
+        return vec4(_X - f, _Y - f, _Z - f, _W - f);
+    }
+
+    void operator += (vec4 &v) {
+        *this = *this + v;
+    }
+
+    void operator += (double d) {
+        *this = *this + d;
+    }
+
+    void operator -= (vec4 &v) {
+        *this = *this - v;
+    }
+
+    void operator -= (double d) {
+        *this = *this - d;
+    }
+
+    void operator *= (double d) {
+        *this = *this * d;
+    }
+
+    void operator /= (double d) {
+        *this = *this / d;
     }
 
     float operator [] (const int i) {
@@ -137,10 +209,10 @@ struct vec4 {
 struct mat4 {
     vec4 m[4];
 
-    mat4(int initType) {
+    mat4(matInitType initType) {
         float n = static_cast<float>(initType);
         for (int i = 0; i < 4; ++i) {
-            if (initType == 2) {
+            if (initType == Diagonal) {
                 m[i] = vec4(0.0);
                 m[i].xyzw[i] = 1.0;
             }
@@ -154,16 +226,21 @@ struct mat4 {
             m[i] = M->m[i];
     }
 
+    mat4(float f) {
+        for (int i = 0; i < 4; ++i)
+            m[i] = vec4(f);
+    }
+
+    mat4(double d) {
+        for (int i = 0; i < 4; ++i)
+            m[i] = vec4(d);
+    }
+
     mat4(vec4 col1, vec4 col2, vec4 col3, vec4 col4) {
         m[0] = col1;
         m[1] = col2;
         m[2] = col3;
         m[3] = col4;
-    }
-
-    mat4(vector<vec4> v) {
-        for (int i = 0; i < 4; ++i)
-            m[i] = v[i];
     }
 
     mat4(vec4 v[4]) {
@@ -178,7 +255,7 @@ struct mat4 {
 
     mat4(float M[3][3]) {
         for (int i = 0; i < 3; ++i)
-            m[i] = vec4(M[i][0], M[i][1], M[i][2], 0.0);
+            m[i] = vec4(M[i][0], M[i][1], M[i][2], 0.0f);
         m[3] = vec4(0.0);
     }
 
@@ -192,21 +269,69 @@ struct mat4 {
     }
 
     mat4 operator * (mat4 &M) {
-        mat4 ret(0);
+        mat4 ret(Zeros);
         for (int i = 0; i < 4; ++i) {
             vec4 temp(m[0][i], m[1][i], m[2][i], m[3][i]);
-            ret.setCol(i, M * temp);
+            ret.m[i] = M * temp;
         }
         ret.transpose();
         return ret;
+    }
+
+    mat4 operator * (double d) {
+        mat4 ret = *this;
+        for (int i = 0; i < 4; ++i)
+            ret.m[i] = ret[i] * d;
+        return &ret;
+    }
+
+    mat4 operator + (double d) {
+        mat4 ret = *this;
+        for (int i = 0; i < 4; ++i)
+            ret.m[i] = ret[i] + d;
+        return ret;
+    }
+
+    mat4 operator - (double d) {
+        mat4 ret = *this;
+        for (int i = 0; i < 4; ++i)
+            ret.m[i] = ret[i] - d;
+        return ret;
+    }
+
+    mat4 operator / (double d) {
+        mat4 ret = *this;
+        for (int i = 0; i < 4; ++i)
+            ret.m[i] = ret[i] / d;
+        return &ret;
     }
 
     void operator *= (mat4 &M) {
         *this = *this * M;
     }
 
+    void operator *= (double d) {
+        *this = *this * d;
+    }
+
     void operator += (mat4 &M) {
         *this = *this + M;
+    }
+
+    void operator += (double d) {
+        *this = *this + d;
+    }
+
+    void operator /= (double d) {
+        *this = *this / d;
+    }
+
+    void operator -= (double d) {
+        *this = *this - d;
+    }
+
+    void operator -= (mat4 &M) {
+        *this = *this - M;
     }
 
     mat4 operator + (mat4 &M) {
@@ -253,7 +378,7 @@ struct mat4 {
     }
 
     mat4 mult(mat4 M) {
-        mat4 ret(0);
+        mat4 ret(Zeros);
         for (int i = 0; i < 4; ++i) {
             vec4 temp(m[0][i], m[1][i], m[2][i], m[3][i]);
             ret.setCol(i, M * temp);
@@ -262,8 +387,179 @@ struct mat4 {
         return ret;
     }
 
-    mat4 inverse() {
-        return mat4(2);
+    float det3() {
+        return m[0][0] * (m[1][1] * m[2][2] - m[2][1] * m[1][2]) -
+               m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0]) +
+               m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]);
+    }
+
+    mat4 inverse3() {
+        float det = det3();
+        if (det == 0.0)
+            return mat4(Diagonal);
+        float invdet = 1 / det;
+        float arr[3][3];
+        arr[0][0] = (m[1][1] * m[2][2] - m[2][1] * m[1][2]) * invdet;
+        arr[0][1] = (m[0][2] * m[2][1] - m[0][1] * m[2][2]) * invdet;
+        arr[0][2] = (m[0][1] * m[1][2] - m[0][2] * m[1][1]) * invdet;
+        arr[1][0] = (m[1][2] * m[2][0] - m[1][0] * m[2][2]) * invdet;
+        arr[1][1] = (m[0][0] * m[2][2] - m[0][2] * m[2][0]) * invdet;
+        arr[1][2] = (m[1][0] * m[0][2] - m[0][0] * m[1][2]) * invdet;
+        arr[2][0] = (m[1][0] * m[2][1] - m[2][0] * m[1][1]) * invdet;
+        arr[2][1] = (m[2][0] * m[0][1] - m[0][0] * m[2][1]) * invdet;
+        arr[2][2] = (m[0][0] * m[1][1] - m[1][0] * m[0][1]) * invdet;
+        return mat4(arr) + 0.0;
+    }
+
+    float det4() {
+        float a = m[1][1]  * m[2][2] * m[3][3] -
+                  m[1][1]  * m[3][2] * m[2][3] -
+                  m[1][2]  * m[2][1]  * m[3][3] +
+                  m[1][2]  * m[3][1]  * m[2][3] +
+                  m[1][3] * m[2][1]  * m[3][2] -
+                  m[1][3] * m[3][1]  * m[2][2];
+
+        float b = -m[0][1]  * m[2][2] * m[3][3] +
+                   m[0][1]  * m[3][2] * m[2][3] +
+                   m[0][2]  * m[2][1]  * m[3][3] -
+                   m[0][2]  * m[3][1]  * m[2][3] -
+                   m[0][3] * m[2][1]  * m[3][2] +
+                   m[0][3] * m[3][1]  * m[2][2];
+
+        float c = m[0][1]  * m[1][2] * m[3][3] -
+                  m[0][1]  * m[3][2] * m[1][3] -
+                  m[0][2]  * m[1][1] * m[3][3] +
+                  m[0][2]  * m[3][1] * m[1][3] +
+                  m[0][3] * m[1][1] * m[3][2] -
+                  m[0][3] * m[3][1] * m[1][2];
+
+        float d = -m[0][1]  * m[1][2] * m[2][3] +
+                   m[0][1]  * m[2][2] * m[1][3] +
+                   m[0][2]  * m[1][1] * m[2][3] -
+                   m[0][2]  * m[2][1] * m[1][3] -
+                   m[0][3] * m[1][1] * m[2][2] +
+                   m[0][3] * m[2][1] * m[1][2];
+        return m[0][0] * a + m[1][0] * b + m[2][0] * c + m[3][0] * d;
+    }
+
+    mat4 inverse4() {
+        float a = m[1][1]  * m[2][2] * m[3][3] -
+                  m[1][1]  * m[3][2] * m[2][3] -
+                  m[1][2]  * m[2][1]  * m[3][3] +
+                  m[1][2]  * m[3][1]  * m[2][3] +
+                  m[1][3] * m[2][1]  * m[3][2] -
+                  m[1][3] * m[3][1]  * m[2][2];
+
+        float b = -m[0][1]  * m[2][2] * m[3][3] +
+                   m[0][1]  * m[3][2] * m[2][3] +
+                   m[0][2]  * m[2][1]  * m[3][3] -
+                   m[0][2]  * m[3][1]  * m[2][3] -
+                   m[0][3] * m[2][1]  * m[3][2] +
+                   m[0][3] * m[3][1]  * m[2][2];
+
+        float c = m[0][1]  * m[1][2] * m[3][3] -
+                  m[0][1]  * m[3][2] * m[1][3] -
+                  m[0][2]  * m[1][1] * m[3][3] +
+                  m[0][2]  * m[3][1] * m[1][3] +
+                  m[0][3] * m[1][1] * m[3][2] -
+                  m[0][3] * m[3][1] * m[1][2];
+
+        float d = -m[0][1]  * m[1][2] * m[2][3] +
+                   m[0][1]  * m[2][2] * m[1][3] +
+                   m[0][2]  * m[1][1] * m[2][3] -
+                   m[0][2]  * m[2][1] * m[1][3] -
+                   m[0][3] * m[1][1] * m[2][2] +
+                   m[0][3] * m[2][1] * m[1][2];
+        float det = m[0][0] * a + m[1][0] * b + m[2][0] * c + m[3][0] * d;
+        if (det == 0.0)
+            return mat4(Diagonal);
+        float a1 = -m[1][0]  * m[2][2] * m[3][3] +
+                  m[1][0]  * m[3][2] * m[2][3] +
+                  m[1][2]  * m[2][0] * m[3][3] -
+                  m[1][2]  * m[3][0] * m[2][3] -
+                  m[1][3] * m[2][0] * m[3][2] +
+                  m[1][3] * m[3][0] * m[2][2];
+
+        float b1 = m[0][0]  * m[2][2] * m[3][3] -
+                 m[0][0]  * m[3][2] * m[2][3] -
+                 m[0][2]  * m[2][0] * m[3][3] +
+                 m[0][2]  * m[3][0] * m[2][3] +
+                 m[0][3] * m[2][0] * m[3][2] -
+                 m[0][3] * m[3][0] * m[2][2];
+
+        float c1 = -m[0][0]  * m[1][2] * m[3][3] +
+                  m[0][0]  * m[3][2] * m[1][3] +
+                  m[0][2]  * m[1][0] * m[3][3] -
+                  m[0][2]  * m[3][0] * m[1][3] -
+                  m[0][3] * m[1][0] * m[3][2] +
+                  m[0][3] * m[3][0] * m[1][2];
+
+        float d1 = m[0][0]  * m[1][2] * m[2][3] -
+                  m[0][0]  * m[2][2] * m[1][3] -
+                  m[0][2]  * m[1][0] * m[2][3] +
+                  m[0][2]  * m[2][0] * m[1][3] +
+                  m[0][3] * m[1][0] * m[2][2] -
+                  m[0][3] * m[2][0] * m[1][2];
+
+        float a2  = m[1][0]  * m[2][1] * m[3][3] -
+                 m[1][0]  * m[3][1] * m[2][3] -
+                 m[1][1]  * m[2][0] * m[3][3] +
+                 m[1][1]  * m[3][0] * m[2][3] +
+                 m[1][3] * m[2][0] * m[3][1] -
+                 m[1][3] * m[3][0] * m[2][1];
+
+        float b2 = -m[0][0]  * m[2][1] * m[3][3] +
+                  m[0][0]  * m[3][1] * m[2][3] +
+                  m[0][1]  * m[2][0] * m[3][3] -
+                  m[0][1]  * m[3][0] * m[2][3] -
+                  m[0][3] * m[2][0] * m[3][1] +
+                  m[0][3] * m[3][0] * m[2][1];
+
+        float c2 = m[0][0]  * m[1][1] * m[3][3] -
+                  m[0][0]  * m[3][1] * m[1][3] -
+                  m[0][1]  * m[1][0] * m[3][3] +
+                  m[0][1]  * m[3][0] * m[1][3] +
+                  m[0][3] * m[1][0] * m[3][1] -
+                  m[0][3] * m[3][0] * m[1][1];
+
+        float d2 = -m[0][0]  * m[1][1] * m[2][3] +
+                   m[0][0]  * m[2][1] * m[1][3] +
+                   m[0][1]  * m[1][0] * m[2][3] -
+                   m[0][1]  * m[2][0] * m[1][3] -
+                   m[0][3] * m[1][0] * m[2][1] +
+                   m[0][3] * m[2][0] * m[1][1];
+
+        float a3 = -m[1][0] * m[2][1] * m[3][2] +
+                  m[1][0] * m[3][1] * m[2][2] +
+                  m[1][1] * m[2][0] * m[3][2] -
+                  m[1][1] * m[3][0] * m[2][2] -
+                  m[1][2] * m[2][0] * m[3][1] +
+                  m[1][2] * m[3][0] * m[2][1];
+
+        float b3 = m[0][0] * m[2][1] * m[3][2] -
+                 m[0][0] * m[3][1] * m[2][2] -
+                 m[0][1] * m[2][0] * m[3][2] +
+                 m[0][1] * m[3][0] * m[2][2] +
+                 m[0][2] * m[2][0] * m[3][1] -
+                 m[0][2] * m[3][0] * m[2][1];
+
+        float c3 = -m[0][0] * m[1][1] * m[3][2] +
+                   m[0][0] * m[3][1] * m[1][2] +
+                   m[0][1] * m[1][0] * m[3][2] -
+                   m[0][1] * m[3][0] * m[1][2] -
+                   m[0][2] * m[1][0] * m[3][1] +
+                   m[0][2] * m[3][0] * m[1][1];
+
+        float d3 = m[0][0] * m[1][1] * m[2][2] -
+                  m[0][0] * m[2][1] * m[1][2] -
+                  m[0][1] * m[1][0] * m[2][2] +
+                  m[0][1] * m[2][0] * m[1][2] +
+                  m[0][2] * m[1][0] * m[2][1] -
+                  m[0][2] * m[2][0] * m[1][1];
+        mat4 inv(vec4(a, b, c, d), vec4(a1, b1, c1, d1), vec4(a2, b2, c2, d2), vec4(a3, b3, c3, d3));
+        inv /= det;
+        inv += 0.0;
+        return inv;
     }
 
     void print() {

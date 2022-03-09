@@ -633,6 +633,7 @@ void graphics::Filtering::colorTransfer(QImage *to, QImage from) {
             QColor qc = to->pixelColor(i, j);
             vec4 color = vec4(qc.redF(), qc.greenF(), qc.blueF());
             color = rgb2lms * color;
+
             if (color._L == 0.0)
                 color._L = 1.0 / 10000000.0;
             if (color._A == 0.0)
@@ -674,6 +675,7 @@ void graphics::Filtering::colorTransfer(QImage *to, QImage from) {
             QColor qc = from.pixelColor(i, j);
             vec4 color = vec4(qc.redF(), qc.greenF(), qc.blueF());
             color = rgb2lms * color;
+
             if (color._L == 0.0)
                 color._L = 1.0 / 10000000.0;
             if (color._A == 0.0)
@@ -711,10 +713,12 @@ void graphics::Filtering::colorTransfer(QImage *to, QImage from) {
             labImg[i][j]._A = (labImg[i][j]._A - amt) * ar + ams;
             labImg[i][j]._B = (labImg[i][j]._B - bmt) * br + bms;
             vec4 color = labImg[i][j];
+
             color = lab2lms * color;
             color._L = pow(10.0, color._L);
             color._A = pow(10.0, color._A);
             color._B = pow(10.0, color._B);
+
             color = lms2rgb * color;
             QColor qc = to->pixelColor(i, j);
             qc.setRedF(stdFuncs::clamp(color._R, 0.0, 1.0));
@@ -980,8 +984,8 @@ void graphics::ImgSupport::equalizeHistogramTo(QImage *qi, eType type) {
                     vf = (img[x][y][0] + img[x][y][1] + img[x][y][2]) / 3.0;
                 else
                     vf = img[x][y][2];
-                value = static_cast<int>(vf * static_cast<int>(bins - 1) + 0.4);
-                stdFuncs::clamp(value, 0, bins - 1);
+                value = static_cast<int>(vf * static_cast<float>(bins - 1) + 0.4);
+                value = stdFuncs::clamp(value, 0, bins - 1);
                 ++total;
                 ++histo[value];
             }
@@ -1003,7 +1007,6 @@ void graphics::ImgSupport::equalizeHistogramTo(QImage *qi, eType type) {
     for (int x = 0; x < w; ++x)
         for (int y = 0; y < h; ++y) {
             if (qi->pixelColor(x, y).alpha() != 0) {
-                float vf;
                 if (type == HSV || type == HSL) {
                     float vf = img[x][y][2];
                     value = static_cast<int>(vf * static_cast<float>(bins - 1) + 0.4);
@@ -1030,4 +1033,8 @@ void graphics::ImgSupport::equalizeHistogramTo(QImage *qi, eType type) {
                 qi->setPixelColor(x, y, qc);
             }
         }
+}
+
+void graphics::ImgSupport::claheTo(QImage *qi, eType type, int divisonX, int divisionY) {
+
 }

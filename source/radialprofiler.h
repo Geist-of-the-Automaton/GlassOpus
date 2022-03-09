@@ -59,7 +59,7 @@ private:
     int activePt;
     bool form;
     QTimer *timer;
-    float ipolPts = 0.00001;
+    float ipolPts = 0.00001f;
     int radius;
     vector <int> pts;
     brushHandler *bh;

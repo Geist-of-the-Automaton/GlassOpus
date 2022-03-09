@@ -8,6 +8,7 @@
 #include <brush.h>
 #include <graphics.h>
 #include <stdfuncs.h>
+#include <layer.h>
 
 using std::vector;
 using std::list;
@@ -65,6 +66,10 @@ public:
     void setInterpolationActive(bool flag);
     void setSize(int size);
     Shape getBrushShape();
+    void setSymDivPt(QPoint qp);
+    void setSymDiv(int div);
+    void setSymDivType(int type);
+    int getSymDiv();
 
 private:
 
@@ -96,6 +101,9 @@ private:
     float radialMap[2 * maxRadius + 1][2 * maxRadius + 1];
     vector <int> radialValues;
     vector <vector <unsigned char> > patternMap;
+    QPoint symPt;
+    int symDiv;
+    sym2DivType divType;
 };
 
 #endif // brushHANDLER_H

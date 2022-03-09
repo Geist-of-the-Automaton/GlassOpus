@@ -13,15 +13,21 @@ using std::list;
 using Qt::MouseButton;
 using Qt::LeftButton;
 using Qt::RightButton;
+using Qt::TransformationMode::FastTransformation;
+using Qt::TransformationMode::SmoothTransformation;
 
 enum EditMode {Brush_Mode, Spline_Mode, Raster_Mode};
 enum Selection {TopLeft, Top, TopRight, Right, BottomRight, Bottom, BottomLeft, Left, BodySelect, NoSelect};
 
-const float ipolMin = 0.001;
-const float ipolMax = 0.1;
+const float ipolMin = 0.001f;
+const float ipolMax = 0.1f;
 const unsigned char ptSize = 5;
-const float pi = 3.14159;
+const double pi = 3.14159265359;
 const unsigned char maxVects = UCHAR_MAX;
+const int maxSymDiv = 36;
+const int minSymDiv = 1;
+
+enum sym2DivType {Rotate, Reflect};
 
 class Layer {
 
@@ -96,11 +102,17 @@ public:
     void setFilter(string filterName);
     static float getipol(float a, float b, float ipol);
     void applyKernalToSelection(QProgressDialog *qpd, string fileName);
+    void setSymDivPt(QPoint qp);
+    void setSymDiv(int div);
+    void setSymDivType(int type);
+    int getSymDiv();
+    Filter filter;
+
 
 private:
 
     void calcLine();
-    void drawRasterSelection(QImage *img);
+    void drawRasterSelection(QImage *img, Qt::TransformationMode tm);
     void findSelection(QPoint qp);
 
     EditMode mode;
@@ -114,7 +126,10 @@ private:
     int alpha;
     bool shiftFlag, selectOgActive, selecting;
     QPoint deltaMove, boundPt1, boundPt2, rotateAnchor;
-    Filter filter;
+    QPoint symPt;
+    int symDiv;
+    sym2DivType divType;
+
 };
 
 #endif // LAYER_H

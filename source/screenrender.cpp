@@ -8,7 +8,7 @@ screenRender::screenRender(DataIOHandler *dioh, QWidget *parent) : QWidget(paren
     flasher = new QTimer(this);
     connect(flasher, SIGNAL(timeout()), this, SLOT(toggleFlasher()));
     fgVisible = true;
-    adder = 0.1;
+    adder = 0.1f;
     samplePoint = QPoint(-1000, -1000);
     ioh = dioh;
     filter.setFilter("Greyscale");
@@ -151,6 +151,7 @@ void screenRender::updateViews() {
 }
 
 void screenRender::paintEvent(QPaintEvent *event) {
+    long long time = stdFuncs::getTime();
     if (ioh->wasUpdated())
         updateViews();
     if (workLayer == nullptr)
@@ -306,8 +307,11 @@ void screenRender::paintEvent(QPaintEvent *event) {
         for (int i = stdFuncs::clamp(qp.x() - ptSize, 0, w); i < stdFuncs::clamp(qp.x() + ptSize + 1, 0, w); ++i)
             for (int j = stdFuncs::clamp(qp.y() - ptSize, 0, h); j < stdFuncs::clamp(qp.y() + ptSize + 1, 0, h); ++j) {
                 int dist = abs(i - qp.x()) + abs(j - qp.y());
-                if ((flashFlag || dist >= ptSize - 1) && dist <= ptSize)
-                    qi.setPixel(i, j, Filtering::negative(qi.pixelColor(i, j), 255));
+                if ((flashFlag || dist >= ptSize - 1) && dist <= ptSize) {
+                    QColor qc = qi.pixelColor(i, j);
+                    qc.setAlpha(255);
+                    qi.setPixel(i, j, Filtering::negative(qc, 255));
+                }
             }
     }
     if (underMouse() && hoverActive && mode == Brush_Mode && hoverLock.try_lock()) {
@@ -327,9 +331,8 @@ void screenRender::paintEvent(QPaintEvent *event) {
     qp.drawImage(0, 0, screenZoom.zoomImg(qi));
     if (fgVisible && !fgLayers.isNull())
         qp.drawPixmap(0, 0, fgLayers);
-    //long long t = stdFuncs::getTime(time);
-    //time = stdFuncs::getTime();
-    //cout << t << endl;
+    long long t = stdFuncs::getTime(time);
+    cout << t << endl;
 }
 
 void screenRender::setSamplePt(QPoint qp) {
