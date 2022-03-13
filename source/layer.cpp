@@ -12,6 +12,7 @@ Layer::Layer() {
     postAngle = 0.0;
     selectOgActive = false;
     deltaMove =  boundPt1 = boundPt2 = rotateAnchor = QPoint(-1000, -1000);
+    symDiv = 20;
 }
 
 Layer::Layer(QSize qs) {
@@ -26,6 +27,7 @@ Layer::Layer(QSize qs) {
     postAngle = 0.0;
     selectOgActive = false;
     deltaMove =  boundPt1 = boundPt2 = rotateAnchor = QPoint(-1000, -1000);
+    symDiv = 20;
 }
 
 Layer::Layer(QImage in, int alphaValue) {
@@ -40,6 +42,7 @@ Layer::Layer(QImage in, int alphaValue) {
     postAngle = 0.0;
     selectOgActive = false;
     deltaMove =  boundPt1 = boundPt2 = rotateAnchor = QPoint(-1000, -1000);
+    symDiv = 20;
 }
 
 Layer::Layer(const Layer &layer) {
@@ -65,6 +68,7 @@ Layer& Layer::operator=(const Layer &layer) {
     selecting = false;
     deltaMove =  boundPt1 = boundPt2 = rotateAnchor = QPoint(-1000, -1000);
     filter = layer.filter;
+    symDiv = layer.symDiv;
     return *this;
 }
 
@@ -92,6 +96,10 @@ void Layer::pasteRaster(QImage rasterIn, double angleIn, pair<QPoint, QPoint> bo
 
 QImage Layer::getRaster() {
     return rasterselectOg;
+}
+
+QImage * Layer::getRasterPtr() {
+    return &rasterselectOg;
 }
 
 double Layer::getAngle() {
@@ -216,9 +224,10 @@ vector <unsigned char> Layer::getActiveVectors() {
 }
 
 void Layer::setVectorTaperType(Taper t) {
-    if (activeVects.size() != 1)
+    if (activeVects.size() != 1 && !symCreate)
         return;
-    vects[activeVects[0]].setTaperType(t);
+    for (unsigned char i : activeVects)
+        vects[i].setTaperType(t);
     calcLine();
 }
 
@@ -364,15 +373,41 @@ void Layer::moveLeft(QPoint qp) {
                 for (unsigned char i : activeVects)
                     vects[i].scale(qp);
             else {
-                for (unsigned char activeVect : activeVects) {
-                    int dx = qp.x() - deltaMove.x(), dy = qp.y() - deltaMove.y();
+                int dx = qp.x() - deltaMove.x(), dy = qp.y() - deltaMove.y();
+                for (unsigned char activeVect : activeVects)
                     vects[activeVect].translate(dx, dy);
-                }
+                if (symCreate)
+                    symPt = QPoint(symPt.x() + dx, symPt.y() + dy);
                 deltaMove = qp;
             }
         }
         else if (activeVects.size() == 1)
             vects[activeVects[0]].movePt(qp, activePt);
+        else if (symCreate) {
+            int vIndex = 0;
+            float offset = 2 * pi / static_cast<float>(symDiv);
+            for (float mult = 0.0; mult < symDiv; mult += 1.0) {
+                if (static_cast<int>(mult) % 5 > 3)
+                    continue;
+                float angle = offset * mult;
+                float x = qp.x();
+                float y = qp.y();
+                float s = sin(angle);
+                float c = cos(angle);
+                x -= symPt.x();
+                y -= symPt.y();
+
+                // rotate point
+                float xnew = x * c - y * s;
+                float ynew = x * s + y * c;
+
+                // translate point back:
+                x = xnew + symPt.x();
+                y = ynew + symPt.y();
+                vects[activeVects[vIndex]].movePt(QPoint(x, y), activePt);
+                ++vIndex;
+            }
+        }
         calcLine();
     }
     else if (mode == Raster_Mode) {
@@ -539,10 +574,35 @@ MouseButton Layer::pressRight(QPoint qp) {
     MouseButton response = RightButton;
     if (mode == Spline_Mode) {
         if (activeVects.size() == 0) {
-            if (vects.size() < CHAR_MAX - 1) {
-                vects.push_back(SplineVector(qp, QPoint(qp.x() + 1, qp.y())));
-                tris.push_back(list <Triangle> ());
-                activeVects.push_back(static_cast<unsigned char>(vects.size() - 1));
+            if (vects.size() + symDiv < CHAR_MAX - 1) {
+                if (symDiv == 1)
+                    vects.push_back(SplineVector(qp, QPoint(qp.x() + 1, qp.y())));
+                else {
+                    symCreate = true;
+                    float offset = 2 * pi / static_cast<float>(symDiv);
+                    for (float mult = 0.0; mult < symDiv; mult += 1.0) {
+                        if (static_cast<int>(mult) % 5 > 3)
+                            continue;
+                        float angle = offset * mult;
+                        float x = qp.x();
+                        float y = qp.y();
+                        float s = sin(angle);
+                        float c = cos(angle);
+                        x -= symPt.x();
+                        y -= symPt.y();
+
+                        // rotate point
+                        float xnew = x * c - y * s;
+                        float ynew = x * s + y * c;
+
+                        // translate point back:
+                        x = xnew + symPt.x();
+                        y = ynew + symPt.y();
+                        vects.push_back(SplineVector(QPoint(x, y), QPoint(x + 1, y)));
+                        tris.push_back(list <Triangle> ());
+                        activeVects.push_back(static_cast<unsigned char>(vects.size() - 1));
+                    }
+                }
                 activePt = 1;
                 response = LeftButton;
                 calcLine();
@@ -568,7 +628,7 @@ MouseButton Layer::pressRight(QPoint qp) {
                     vects[i].rotateSpec(minX, minY, maxX, maxY);
             }
         }
-        else if (activeVects.size() == 1) {
+        else if (activeVects.size() == 1 || symCreate) {
             vector <QPoint> controlPts = vects[activeVects[0]].getControls();
             bool flag = true;
             size_t index;
@@ -580,13 +640,16 @@ MouseButton Layer::pressRight(QPoint qp) {
                 }
             if (!flag) {
                 if (controlPts.size() == 2) {
-                    unsigned char activeVect = activeVects[0];
-                    vects.erase(vects.begin() + activeVect);
-                    tris.erase(tris.begin() + activeVect);
-                    activeVects.pop_back();
+                    for (int i = activeVects.size() - 1; i >= 0; --i) {
+                        unsigned char activeVect = activeVects[i];
+                        vects.erase(vects.begin() + activeVect);
+                        tris.erase(tris.begin() + activeVect);
+                    }
+                    activeVects.clear();
                 }
                 else
-                    vects[activeVects[0]].removePt(index);
+                    for (int i = activeVects.size() - 1; i >= 0; --i)
+                        vects[activeVects[i]].removePt(index);
             }
             else if (flag) {
                 size_t minDist1 = INT_MAX, dist;
@@ -602,7 +665,33 @@ MouseButton Layer::pressRight(QPoint qp) {
                     index = 1;
                 if (index != 0 && index != controlPts.size() - 1 && stdFuncs::sqrDist(qp, controlPts[index - 1]) > stdFuncs::sqrDist(qp, controlPts[index + 1]) && stdFuncs::sqrDist(qp, controlPts[0]) > stdFuncs::sqrDist(qp, controlPts[controlPts.size() - 1]))
                         index = index + 1;
-                vects[activeVects[0]].addPt(qp, index);
+                if (symCreate) {
+                    int vIndex = 0;
+                    float offset = 2 * pi / static_cast<float>(symDiv);
+                    for (float mult = 0.0; mult < symDiv; mult += 1.0) {
+                        if (static_cast<int>(mult) % 5 > 3)
+                            continue;
+                        float angle = offset * mult;
+                        float x = qp.x();
+                        float y = qp.y();
+                        float s = sin(angle);
+                        float c = cos(angle);
+                        x -= symPt.x();
+                        y -= symPt.y();
+
+                        // rotate point
+                        float xnew = x * c - y * s;
+                        float ynew = x * s + y * c;
+
+                        // translate point back:
+                        x = xnew + symPt.x();
+                        y = ynew + symPt.y();
+                        vects[activeVects[vIndex]].addPt(QPoint(x, y), index);
+                        ++vIndex;
+                    }
+                }
+                else
+                    vects[activeVects[0]].addPt(qp, index);
                 activePt = static_cast<unsigned char>(index);
                 response = LeftButton;
             }
@@ -622,6 +711,7 @@ void Layer::doubleClickLeft(QPoint qp, bool ctrlFlag) {
             if (!ctrlFlag)
                 deselect();
             else {
+                symCreate = false;
                 int dist = INT_MAX;
                 char index = -1, size = static_cast<char>(vects.size());
                 for (char i = 0; i < size; ++i) {
@@ -686,6 +776,8 @@ void Layer::doubleClickRight(QPoint qp) {
             }
         }
         activeVects.erase(activeVects.begin() + index);
+        if (activeVects.size() <= 1 && symCreate)
+            symCreate = false;
     }
 }
 
@@ -710,14 +802,13 @@ int Layer::getAlpha() {
 }
 
 int Layer::getWidth() {
-    return activeVects.size() == 1 ? vects[activeVects[0]].getWidth() : -1;
+    return activeVects.size() == 1 || symCreate ? vects[activeVects[0]].getWidth() : -1;
 }
 
 void Layer::setWidth(int w) {
-    if (activeVects.size() == 1) {
-        unsigned char i = activeVects[0];
-        vects[i].setWidth(w);
-    }
+    if (activeVects.size() == 1 || symCreate)
+        for (unsigned char i : activeVects)
+            vects[i].setWidth(w);
     calcLine();
 }
 
@@ -732,97 +823,108 @@ void Layer::widthDown() {
 }
 
 void Layer::setVectorColor1(QRgb a) {
-    if (activeVects.size() != 1)
+    if (activeVects.size() == 1 && !symCreate)
         return;
-    vects[activeVects[0]].setColor1(a);
+    for (unsigned char i : activeVects)
+        vects[i].setColor1(a);
     calcLine();
 }
 
 void Layer::setVectorColor2(QRgb b) {
-    if (activeVects.size() != 1)
+    if (activeVects.size() == 1 && !symCreate)
         return;
-    vects[activeVects[0]].setColor2(b);
+    for (unsigned char i : activeVects)
+        vects[i].setColor2(b);
     calcLine();
 }
 
 pair <QRgb, QRgb> Layer::getVectorColors() {
-    if (activeVects.size() == 1)
+    if (activeVects.size() == 1 || symCreate)
         return vects[activeVects[0]].getColors();
     return pair <QRgb, QRgb> (0x00000000, 0x00000000);
 }
 
 void Layer::setVectorTaper1(int a) {
-    if (activeVects.size() != 1)
+    if (activeVects.size() != 1 && !symCreate)
         return;
-    vects[activeVects[0]].setTaper1(a);
+    for (unsigned char i : activeVects)
+        vects[i].setTaper1(a);
     calcLine();
 }
 
 void Layer::setVectorTaper2(int b) {
-    if (activeVects.size() != 1)
+    if (activeVects.size() != 1 && !symCreate)
         return;
-    vects[activeVects[0]].setTaper2(b);
+    for (unsigned char i : activeVects)
+        vects[i].setTaper2(b);
     calcLine();
 }
 
 void Layer::setVectorFilter(string s) {
-    vects[activeVects[0]].setFilter(s);
+    if (activeVects.size() == 1 || symCreate)
+        for (unsigned char i : activeVects)
+            vects[i].setFilter(s);
 }
 
 void Layer::setVectorMode(VectorMode vm) {
-    if (activeVects.size() == 1)
-        vects[activeVects[0]].setMode(vm);
+    if (activeVects.size() == 1 || symCreate)
+        for (unsigned char i : activeVects)
+            vects[i].setMode(vm);
 }
 
 void Layer::setBand(int b) {
-    if (activeVects.size() == 1)
-        vects[activeVects[0]].setBand(static_cast<short>(b));
+    if (activeVects.size() == 1 || symCreate)
+        for (unsigned char i : activeVects)
+            vects[i].setBand(static_cast<short>(b));
 }
 
 void Layer::setGap(int g) {
-    if (activeVects.size() == 1)
-        vects[activeVects[0]].setGap(static_cast<short>(g));
+    if (activeVects.size() == 1 || symCreate)
+        for (unsigned char i : activeVects)
+            vects[i].setGap(static_cast<short>(g));
 }
 
 int Layer::getBand() {
-    return static_cast<int>(vects[activeVects[0]].getBand());
+    return activeVects.size() == 0 ? -1 : static_cast<int>(vects[activeVects[0]].getBand());
 }
 
 int Layer::getGap() {
-    return static_cast<int>(vects[activeVects[0]].getGap());
+    return activeVects.size() == 0 ? -1 : static_cast<int>(vects[activeVects[0]].getGap());
 }
 
 void Layer::swapColors() {
-    if (activeVects.size() == 1)
-        vects[activeVects[0]].swapColors();
+    if (activeVects.size() == 1 || symCreate)
+        for (unsigned char i : activeVects)
+            vects[i].swapColors();
 }
 
 void Layer::swapTapers() {
-    if (activeVects.size() == 1)
-        vects[activeVects[0]].swapTapers();
+    if (activeVects.size() == 1 || symCreate)
+        for (unsigned char i : activeVects)
+            vects[i].swapTapers();
     calcLine();
 }
 
 pair <char, char> Layer::getVectorTapers() {
-    if (activeVects.size() != 1)
+    if (activeVects.size() != 1 && !symCreate)
         return pair <char, char> (11, 11);
     return vects[activeVects[0]].getTaper();
 }
 
 unsigned char Layer::getVectorTaperType() {
-    if (activeVects.size() != 1)
+    if (activeVects.size() != 1 && !symCreate)
         return 0;
     return vects[activeVects[0]].getTaperType();
 }
 
 int Layer::getVectorFilterStrength() {
-    if (activeVects.size() != 1)
+    if (activeVects.size() != 1 && !symCreate)
         return -1;
     return vects[activeVects[0]].getFilter().getStrength();
 }
 
 void Layer::setVectorFilterStrength(int str) {
-    if (activeVects.size() != 1)
+    if (activeVects.size() != 1 && !symCreate)
         return;
     return vects[activeVects[0]].setFilterStrength(str);
 }
@@ -841,10 +943,8 @@ void Layer::deleteSelected() {
             tris.erase(tris.begin() + activeVect);
         }
     }
-    else {
-
+    else
         rasterselectOg = QImage();
-    }
     deselect();
 }
 
@@ -895,6 +995,7 @@ void Layer::deselect() {
             vects[i].cleanup();
         activeVects.clear();
         activePt = -1;
+        symCreate = false;
     }
     else if (mode == Raster_Mode) {
         drawRasterSelection(qi, SmoothTransformation);
@@ -959,4 +1060,8 @@ void Layer::setSymDivPt(QPoint qp) {
 
 void Layer::setSymDivType(int type) {
     divType = sym2DivType(type);
+}
+
+int Layer::symActive() {
+    return symCreate;
 }

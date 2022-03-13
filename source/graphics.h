@@ -114,6 +114,20 @@ public:
     static QRgb greyFilmGrain (QColor qc, int strength);
     static QRgb colorFilmGrain (QColor qc, int strength);
     static void applyKernal(QProgressDialog *qpd, QImage *qi, KernalData kernalInfo);
+
+private:
+
+    static int Burn(int color, int strength);
+    static int Dodge(int color, int strength);
+};
+
+class Color {
+public:
+    static void brightnessAdjust(QImage *qi, double val, eType type);
+    static void contrastAdjust(QImage *qi, double val);
+    static void gammaAdjust(QImage *qi, double val);
+    static void saturationAdjust(QImage *qi, double val, eType type);
+    static void hueShift(QImage *qi, int val);
     static void ditherFloydSteinberg(QImage *qi, int bpp);
     static void ditherSierra(QImage *qi, int bpp);
     static void ditherSierraLite(QImage *qi, int bpp);
@@ -121,11 +135,9 @@ public:
     static void ditherRandom(QImage *qi, int bpp);
     static void paletteReduction(QImage *qi, int bpp);
     static void colorTransfer(QImage *to, QImage from);
-
-private:
-
-    static int Burn(int color, int strength);
-    static int Dodge(int color, int strength);
+    static void Histogram(QLabel *histograms, QImage *in, int layerNum, eType type);
+    static void equalizeHistogramTo(QImage *qi, eType type);
+    static void claheTo(QImage *qi, eType type, float clipLimit = 0.5, int divisonX = 0, int divisionY = 0);
 };
 
 class ImgSupport {
@@ -145,9 +157,6 @@ public:
     static list <QImage *> resize(QSize reqSize);
     static KernalData loadKernal(string fileName);
     static void applyAlpha(QImage *qi, int *yStart, int *yEnd, unsigned int *alpha);
-    static void Histogram(QLabel *histograms, QImage *in, int layerNum, eType type);
-    static void equalizeHistogramTo(QImage *qi, eType type);
-    static void claheTo(QImage *qi, eType type, int divisonX = 0, int divisionY = 0);
 
 private:
 

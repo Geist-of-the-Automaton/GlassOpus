@@ -89,6 +89,11 @@ MainWindow::MainWindow(string startPath, string projectFile, QWidget *parent)
     ui->menubar->setCornerWidget(dynamic_cast<QMenuBar *>(objFetch.at(UI_FileName.toStdString())), Qt::TopLeftCorner);
     resizeCheck = new resizeWindow(this, ioh);
     radialProfiler = new RadialProfiler(&bh, this);
+    badj = new BrightnessAdj(this);
+    cadj = new ContrastAdj(this);
+    gadj = new GammaAdj(this);
+    sadj = new SaturationAdj(this);
+    hadj = new HueShift(this);
     onePress = false;
     vs->setWidget(sr);
     file.setFileName(QDir::currentPath() + UI_Loc + Icon_Loc + WinIco_FileName);
@@ -193,6 +198,7 @@ void MainWindow::mousePressEvent(QMouseEvent *event) {
     QPoint qp = sr->getZoomCorrected(vs->getScrollCorrected(event->pos()));
     if (altFlag) {
         ioh->getWorkingLayer()->setSymDivPt(qp);
+        bh.setSymDivPt(qp);
         return;
     }
     if (mode == Raster_Mode && event->button() == RightButton && !shiftFlag && !ioh->getWorkingLayer()->isRotating())
@@ -306,14 +312,14 @@ void MainWindow::wheelEvent(QWheelEvent *event) {
     else if (mode == Spline_Mode) {
         if (shiftFlag) {
             vector <unsigned char> activeVects = ioh->getWorkingLayer()->getActiveVectors();
-            if (activeVects.size() != 1)
+            if (activeVects.size() != 1 && !ioh->getWorkingLayer()->symActive())
                 return;
             ioh->getWorkingLayer()->setVectorTaper1(ioh->getWorkingLayer()->getVectorTapers().first + dy);
             statusBar()->showMessage(("Vector Taper 1: " + to_string(ioh->getWorkingLayer()->getVectorTapers().first)).c_str(), 1000);
         }
         else if (ctrlFlag) {
             vector <unsigned char> activeVects = ioh->getWorkingLayer()->getActiveVectors();
-            if (activeVects.size() != 1)
+            if (activeVects.size() != 1 && !ioh->getWorkingLayer()->symActive())
                 return;
             ioh->getWorkingLayer()->setVectorTaper2(ioh->getWorkingLayer()->getVectorTapers().second + dy);
             statusBar()->showMessage(("Vector Taper 2: " + to_string(ioh->getWorkingLayer()->getVectorTapers().second)).c_str(), 1000);
@@ -575,7 +581,7 @@ void MainWindow::doSomething(string btnPress) {
     }
     else if (btnPress == "Vector Width") {
         vector <unsigned char> activeVects = ioh->getWorkingLayer()->getActiveVectors();
-        if (activeVects.size() != 1)
+        if (activeVects.size() != 1 && !ioh->getWorkingLayer()->symActive())
             return;
         bool ok = false;
         int ret = QInputDialog::getInt(this, "Glass Opus", "Please enter a vector width", ioh->getWorkingLayer()->getWidth(), minWidth, maxWidth, 1, &ok );
@@ -593,7 +599,7 @@ void MainWindow::doSomething(string btnPress) {
     }
     else if (btnPress == "Taper 1") {
         vector <unsigned char> activeVects = ioh->getWorkingLayer()->getActiveVectors();
-        if (activeVects.size() != 1)
+        if (activeVects.size() != 1 && !ioh->getWorkingLayer()->symActive())
             return;
         bool ok = false;
         int ret = QInputDialog::getInt(this, "Glass Opus", "Please enter a first taper degree", ioh->getWorkingLayer()->getVectorTapers().first, minTaper, maxTaper, 1, &ok);
@@ -602,7 +608,7 @@ void MainWindow::doSomething(string btnPress) {
     }
     else if (btnPress == "Taper 2") {
         vector <unsigned char> activeVects = ioh->getWorkingLayer()->getActiveVectors();
-        if (activeVects.size() != 1)
+        if (activeVects.size() != 1 && !ioh->getWorkingLayer()->symActive())
             return;
         bool ok = false;
         int ret = QInputDialog::getInt(this, "Glass Opus", "Please enter a second taper degree", ioh->getWorkingLayer()->getVectorTapers().second, minTaper, maxTaper, 1, &ok);
@@ -611,14 +617,14 @@ void MainWindow::doSomething(string btnPress) {
     }
     else if (btnPress == "Vector Color 1") {
         vector <unsigned char> activeVects = ioh->getWorkingLayer()->getActiveVectors();
-        if (activeVects.size() != 1)
+        if (activeVects.size() != 1 && !ioh->getWorkingLayer()->symActive())
             return;
         QColor color = QColorDialog::getColor(ioh->getWorkingLayer()->getVectorColors().second, this);
         ioh->getWorkingLayer()->setVectorColor2(color.rgba());
     }
     else if (btnPress == "Vector Color 2") {
         vector <unsigned char> activeVects = ioh->getWorkingLayer()->getActiveVectors();
-        if (activeVects.size() != 1)
+        if (activeVects.size() != 1 && !ioh->getWorkingLayer()->symActive())
             return;
         QColor color = QColorDialog::getColor(ioh->getWorkingLayer()->getVectorColors().first, this);
         ioh->getWorkingLayer()->setVectorColor1(color.rgba());
@@ -631,7 +637,7 @@ void MainWindow::doSomething(string btnPress) {
     }
     else if (btnPress == "Band Size") {
         vector <unsigned char> activeVects = ioh->getWorkingLayer()->getActiveVectors();
-        if (activeVects.size() != 1)
+        if (activeVects.size() != 1 && !ioh->getWorkingLayer()->symActive())
             return;
         bool ok = false;
         int ret = QInputDialog::getInt(this, "Glass Opus", "Please enter a banding width", ioh->getWorkingLayer()->getBand(), minStyle, maxStyle, 1, &ok);
@@ -640,7 +646,7 @@ void MainWindow::doSomething(string btnPress) {
     }
     else if (btnPress == "Gap Size") {
         vector <unsigned char> activeVects = ioh->getWorkingLayer()->getActiveVectors();
-        if (activeVects.size() != 1)
+        if (activeVects.size() != 1 && !ioh->getWorkingLayer()->symActive())
             return;
         bool ok = false;
         int ret = QInputDialog::getInt(this, "Glass Opus", "Please enter a gap width", ioh->getWorkingLayer()->getGap(), 0, maxStyle, 1, &ok);
@@ -659,6 +665,36 @@ void MainWindow::doSomething(string btnPress) {
     else if (btnPress == "Filter Vector") {
         ioh->getWorkingLayer()->setVectorMode(Filtered);
     }
+    else if (btnPress == "Brightness Adjustment") {
+        Layer *l = ioh->getWorkingLayer();
+        QImage *img = l->getRaster().isNull() ? l->getCanvas() : l->getRasterPtr();
+        badj->setWork(img);
+        badj->exec();
+    }
+    else if (btnPress == "Contrast Adjustment") {
+        Layer *l = ioh->getWorkingLayer();
+        QImage *img = l->getRaster().isNull() ? l->getCanvas() : l->getRasterPtr();
+        cadj->setWork(img);
+        cadj->exec();
+    }
+    else if (btnPress == "Gamma Adjustment") {
+        Layer *l = ioh->getWorkingLayer();
+        QImage *img = l->getRaster().isNull() ? l->getCanvas() : l->getRasterPtr();
+        gadj->setWork(img);
+        gadj->exec();
+    }
+    else if (btnPress == "Saturation Adjustment") {
+        Layer *l = ioh->getWorkingLayer();
+        QImage *img = l->getRaster().isNull() ? l->getCanvas() : l->getRasterPtr();
+        sadj->setWork(img);
+        sadj->exec();
+    }
+    else if (btnPress == "Hue Shift") {
+        Layer *l = ioh->getWorkingLayer();
+        QImage *img = l->getRaster().isNull() ? l->getCanvas() : l->getRasterPtr();
+        hadj->setWork(img);
+        hadj->exec();
+    }
     else if (btnPress == "Bayer") {
         int bpp = getBPP();
         if (bpp == -1)
@@ -671,42 +707,42 @@ void MainWindow::doSomething(string btnPress) {
         QString item = QInputDialog::getItem(this, "Glass Opus", "Matrix Size", strs, 3, false, &ok);
         if (ok) {
             QImage *qi = ioh->getWorkingLayer()->getCanvas();
-            graphics::Filtering::ditherBayer(qi, bpp, matSizes[strs.indexOf(item)]);
+            graphics::Color::ditherBayer(qi, bpp, matSizes[strs.indexOf(item)]);
         }
     }
     else if (btnPress == "Random") {
         int bpp = getBPP();
         if (bpp != -1) {
             QImage *qi = ioh->getWorkingLayer()->getCanvas();
-            graphics::Filtering::ditherRandom(qi, bpp);
+            graphics::Color::ditherRandom(qi, bpp);
         }
     }
     else if (btnPress == "Floyd Steinberg") {
         int bpp = getBPP();
         if (bpp != -1) {
             QImage *qi = ioh->getWorkingLayer()->getCanvas();
-            graphics::Filtering::ditherFloydSteinberg(qi, bpp);
+            graphics::Color::ditherFloydSteinberg(qi, bpp);
         }
     }
     else if (btnPress == "Sierra") {
         int bpp = getBPP();
         if (bpp != -1) {
             QImage *qi = ioh->getWorkingLayer()->getCanvas();
-            graphics::Filtering::ditherSierra(qi, bpp);
+            graphics::Color::ditherSierra(qi, bpp);
         }
     }
     else if (btnPress == "Sierra Lite") {
         int bpp = getBPP();
         if (bpp != -1) {
             QImage *qi = ioh->getWorkingLayer()->getCanvas();
-            graphics::Filtering::ditherSierraLite(qi, bpp);
+            graphics::Color::ditherSierraLite(qi, bpp);
         }
     }
     else if (btnPress == "Palette Reduction") {
         int bpp = getBPP();
         if (bpp != -1) {
             QImage *qi = ioh->getWorkingLayer()->getCanvas();
-            graphics::Filtering::paletteReduction(qi, bpp);
+            graphics::Color::paletteReduction(qi, bpp);
         }
     }
     else if (btnPress == "Color Transfer To Selection") {
@@ -721,7 +757,7 @@ void MainWindow::doSomething(string btnPress) {
         QString fileName = QFileDialog::getOpenFileName(this, tr("Import"), "/", tr(formats.c_str()));
         if (fileName == "")
             return;
-        graphics::Filtering::colorTransfer(l->getCanvas(), QImage(fileName));
+        graphics::Color::colorTransfer(l->getCanvas(), QImage(fileName));
     }
     else if (btnPress == "Fill Color") {
         QColor color = QColorDialog::getColor(bh.getFillColor(), this);
@@ -885,7 +921,7 @@ void MainWindow::doSomething(string btnPress) {
         if (execCode == 0)
             return;
         int index = graphics::eTypes.indexOf(kerPrompt.textValue());
-        graphics::ImgSupport::equalizeHistogramTo(layer->getCanvas(), graphics::eType(index));
+        graphics::Color::equalizeHistogramTo(layer->getCanvas(), graphics::eType(index));
     }
     else if (btnPress == "Histograms") {
         Layer *layer= ioh->getWorkingLayer();
@@ -900,7 +936,7 @@ void MainWindow::doSomething(string btnPress) {
         if (execCode == 0)
             return;
         int index = graphics::eTypes.indexOf(kerPrompt.textValue());
-        graphics::ImgSupport::Histogram(histograms, layer->getCanvas(), ioh->getActiveLayer(), graphics::eType(index));
+        graphics::Color::Histogram(histograms, layer->getCanvas(), ioh->getActiveLayer(), graphics::eType(index));
         histograms->setWindowModality(Qt::ApplicationModal);
         histograms->show();
     }

@@ -43,6 +43,11 @@
 #include <algorithm>
 #include <brushshape.h>
 #include <patternprofiler.h>
+#include <brightnessadj.h>
+#include <contrastadj.h>
+#include <gammaadj.h>
+#include <saturationadj.h>
+#include <hueshift.h>
 #include <Windows.h>
 
 using std::string;
@@ -171,6 +176,12 @@ private:
     patternProfiler *pp;
     bool lock;
     QLabel *histograms;
+    BrightnessAdj *badj;
+    ContrastAdj *cadj;
+    GammaAdj *gadj;
+    SaturationAdj *sadj;
+    HueShift *hadj;
+
 };
 
 #endif // MAINWINDOW_H

@@ -48,6 +48,7 @@ public:
     void pasteVectors(list <SplineVector> svs);
     void pasteRaster(QImage rasterIn, double angleIn, pair <QPoint, QPoint> bounds);
     QImage getRaster();
+    QImage* getRasterPtr();
     double getAngle();
     bool isRotating();
     pair <QPoint, QPoint> getBounds();
@@ -106,6 +107,7 @@ public:
     void setSymDiv(int div);
     void setSymDivType(int type);
     int getSymDiv();
+    int symActive();
     Filter filter;
 
 
@@ -124,7 +126,7 @@ private:
     QImage *qi, alphaLayer, rasterselectOg;
     float ipolPts, limiter = ipolMin, limitCnt = 2.0, postAngle;
     int alpha;
-    bool shiftFlag, selectOgActive, selecting;
+    bool shiftFlag, selectOgActive, selecting, symCreate;
     QPoint deltaMove, boundPt1, boundPt2, rotateAnchor;
     QPoint symPt;
     int symDiv;

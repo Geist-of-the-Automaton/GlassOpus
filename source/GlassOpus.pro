@@ -27,6 +27,16 @@ HEADERS = \
     $$PWD/ui_patternprofiler.h\
     $$PWD/brushShape.h\
     $$PWD/patternprofiler.h \
+    brightnessadj.h \
+    contrastadj.h \
+    gammaadj.h \
+    hueshift.h \
+    saturationadj.h \
+    ui_brightnessadj.h \
+    ui_contrastadj.h \
+    ui_gammaadj.h \
+    ui_hueshift.h \
+    ui_saturationadj.h \
     vec_mat_maths.h
 
 SOURCES = \
@@ -47,7 +57,12 @@ SOURCES = \
     $$PWD/triangle.cpp \
     $$PWD/viewscroller.cpp\
     $$PWD/brushShape.cpp\
-    $$PWD/patternprofiler.cpp
+    $$PWD/patternprofiler.cpp \
+    brightnessadj.cpp \
+    contrastadj.cpp \
+    gammaadj.cpp \
+    hueshift.cpp \
+    saturationadj.cpp
 
 # Default rules for deployment
 qnx: target.path = /tmp/$${TARGET}/bin

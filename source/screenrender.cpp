@@ -284,6 +284,7 @@ void screenRender::paintEvent(QPaintEvent *event) {
                 }
         }
     }
+    int symCreate = workLayer->symActive();
     for (unsigned char activeVect : activeVects) {
         vector <QPoint> controlPts = vects[activeVect].getControls();
         for (QPoint qp : controlPts) {
@@ -296,6 +297,8 @@ void screenRender::paintEvent(QPaintEvent *event) {
                 }
             }
         }
+        if (symCreate)
+            break;
     }
     for (int i = stdFuncs::clamp(samplePoint.x() - ptSize, 0, w); i < stdFuncs::clamp(samplePoint.x() + ptSize + 1, 0, w); ++i)
         for (int j = stdFuncs::clamp(samplePoint.y() - ptSize, 0, h); j < stdFuncs::clamp(samplePoint.y() + ptSize + 1, 0, h); ++j) {
@@ -332,7 +335,7 @@ void screenRender::paintEvent(QPaintEvent *event) {
     if (fgVisible && !fgLayers.isNull())
         qp.drawPixmap(0, 0, fgLayers);
     long long t = stdFuncs::getTime(time);
-    cout << t << endl;
+    //cout << t << endl;
 }
 
 void screenRender::setSamplePt(QPoint qp) {

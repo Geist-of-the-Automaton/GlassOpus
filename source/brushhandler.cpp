@@ -324,7 +324,7 @@ void brushHandler::overwrite(QImage *qi) {
         else {
             float offset = 2 * pi / static_cast<float>(symDiv);
             for (float mult = 0.0; mult < symDiv; mult += 1.0) {
-                if (static_cast<int>(mult) % 5 < 2)
+                if (static_cast<int>(mult) % 5 > 3)
                     continue;
                 float angle = offset * mult;
                 float x = currPnt.x();
