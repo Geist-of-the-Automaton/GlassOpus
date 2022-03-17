@@ -1,5 +1,5 @@
-#ifndef UI_SATURATIONADJ_H
-#define UI_SATURATIONADJ_H
+#ifndef UI_TRANSFER_H
+#define UI_TRANSFER_H
 
 #include <QtCore/QVariant>
 #include <QtWidgets/QApplication>
@@ -7,15 +7,13 @@
 #include <QtWidgets/QHBoxLayout>
 #include <QtWidgets/QLabel>
 #include <QtWidgets/QSpacerItem>
-#include <QtWidgets/QSlider>
+#include <QtWidgets/QComboBox>
 #include <QtWidgets/QVBoxLayout>
 #include <QtWidgets/QWidget>
-#include <QtWidgets/QDoubleSpinBox>
-#include <QtWidgets/QComboBox>
 
 QT_BEGIN_NAMESPACE
 
-class Ui_SaturationAdj
+class Ui_TransferDialog
 {
 public:
     QVBoxLayout *verticalLayout_3;
@@ -26,24 +24,21 @@ public:
     QSpacerItem *horizontalSpacer;
     QHBoxLayout *horizontalLayout_3;
     QVBoxLayout *verticalLayout_5;
-    QDoubleSpinBox *spinbox;
+    QComboBox *qcb;
     QVBoxLayout *verticalLayout_4;
-    QVBoxLayout *verticalLayout_1;
-    QSlider *slider;
     QVBoxLayout *verticalLayout;
     QDialogButtonBox *buttonBox;
-    QComboBox *qcb;
 
-    void setupUi(QWidget *saturationAdj)
+    void setupUi(QWidget *transferDialog)
     {
-        if (saturationAdj->objectName().isEmpty())
-            saturationAdj->setObjectName(QString::fromUtf8("saturationAdj"));
-        saturationAdj->resize(282, 244);
-        verticalLayout_3 = new QVBoxLayout(saturationAdj);
+        if (transferDialog->objectName().isEmpty())
+            transferDialog->setObjectName(QString::fromUtf8("transferDialog"));
+        transferDialog->resize(282, 244);
+        verticalLayout_3 = new QVBoxLayout(transferDialog);
         verticalLayout_3->setObjectName(QString::fromUtf8("verticalLayout_3"));
         verticalLayout_6 = new QVBoxLayout();
         verticalLayout_6->setObjectName(QString::fromUtf8("verticalLayout_6"));
-        label = new QLabel(saturationAdj);
+        label = new QLabel(transferDialog);
         label->setObjectName(QString::fromUtf8("label"));
         label->setEnabled(true);
         label->setCursor(QCursor(Qt::CrossCursor));
@@ -63,47 +58,17 @@ public:
 
         horizontalLayout_3 = new QHBoxLayout();
         horizontalLayout_3->setObjectName(QString::fromUtf8("horizontalLayout_3"));
-
-        verticalLayout_1 = new QVBoxLayout();
-        verticalLayout_1->setObjectName(QString::fromUtf8("verticalLayout_1"));
-
-        qcb = new QComboBox(saturationAdj);
-        qcb->setObjectName(QString::fromUtf8("combo"));
-        qcb->addItems(QStringList({"HSV", "HSL"}));
-        qcb->setCurrentIndex(0);
-
-        verticalLayout_1->addWidget(qcb);
-
-        horizontalLayout_3->addLayout(verticalLayout_1);
-
         verticalLayout_5 = new QVBoxLayout();
         verticalLayout_5->setObjectName(QString::fromUtf8("verticalLayout_5"));
 
-        spinbox = new QDoubleSpinBox(saturationAdj);
-        spinbox->setObjectName(QString::fromUtf8("spinbox"));
-        spinbox->setAlignment(Qt::AlignCenter);
-        spinbox->setRange(-1.0, 1.0);
-        spinbox->setDecimals(3);
-        spinbox->setValue(0.0);
-        spinbox->setSingleStep(0.01);
+        qcb = new QComboBox(transferDialog);
+        qcb->addItem("RGB");
+        qcb->addItem("LAB");
 
-        verticalLayout_5->addWidget(spinbox);
+        verticalLayout_5->addWidget(qcb);
 
         horizontalLayout_3->addLayout(verticalLayout_5);
 
-        verticalLayout_4 = new QVBoxLayout();
-        verticalLayout_4->setObjectName(QString::fromUtf8("verticalLayout_4"));
-
-        slider = new QSlider(saturationAdj);
-        slider->setObjectName(QString::fromUtf8("slider"));
-        slider->setMinimum(-255);
-        slider->setMaximum(255);
-        slider->setValue(0);
-        slider->setOrientation(Qt::Orientation::Horizontal);
-
-        verticalLayout_4->addWidget(slider);
-
-        horizontalLayout_3->addLayout(verticalLayout_4);
 
         verticalLayout_2->addLayout(horizontalLayout_3);
 
@@ -111,7 +76,7 @@ public:
 
         verticalLayout = new QVBoxLayout();
         verticalLayout->setObjectName(QString::fromUtf8("verticalLayout"));
-        buttonBox = new QDialogButtonBox(saturationAdj);
+        buttonBox = new QDialogButtonBox(transferDialog);
         buttonBox->setObjectName(QString::fromUtf8("buttonBox"));
         buttonBox->setStandardButtons(QDialogButtonBox::Cancel|QDialogButtonBox::Ok);
 
@@ -121,22 +86,22 @@ public:
 
         verticalLayout_3->addLayout(horizontalLayout);
 
-        retranslateUi(saturationAdj);
+        retranslateUi(transferDialog);
 
-        QMetaObject::connectSlotsByName(saturationAdj);
+        QMetaObject::connectSlotsByName(transferDialog);
     } // setupUi
 
-    void retranslateUi(QWidget *saturationAdj)
+    void retranslateUi(QWidget *transferDialog)
     {
-        saturationAdj->setWindowTitle(QCoreApplication::translate("SaturationAdj", "Form", nullptr));
+        transferDialog->setWindowTitle(QCoreApplication::translate("TransferDialog", "Form", nullptr));
     } // retranslateUi
 
 };
 
 namespace Ui {
-    class SaturationAdj: public Ui_SaturationAdj {};
+    class TransferDialog: public Ui_TransferDialog {};
 } // namespace Ui
 
 QT_END_NAMESPACE
 
-#endif // UI_SATURATIONADJ_H
+#endif // UI_TRANSFER_H

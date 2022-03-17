@@ -68,7 +68,7 @@ public:
         verticalLayout_1->setObjectName(QString::fromUtf8("verticalLayout_1"));
 
         qcb = new QComboBox(brightnessAdj);
-        qcb->setObjectName(QString::fromUtf8("spinbox"));
+        qcb->setObjectName(QString::fromUtf8("combo"));
         qcb->addItems(QStringList({"RGB", "HSV", "HSL"}));
         qcb->setCurrentIndex(1);
 
@@ -128,7 +128,7 @@ public:
 
     void retranslateUi(QWidget *brightnessAdj)
     {
-        brightnessAdj->setWindowTitle(QCoreApplication::translate("brightnessAdj", "Form", nullptr));
+        brightnessAdj->setWindowTitle(QCoreApplication::translate("Brightness Adjustment", "Form", nullptr));
     } // retranslateUi
 
 };

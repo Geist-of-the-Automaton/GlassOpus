@@ -5,9 +5,8 @@ GammaAdj::GammaAdj(QWidget *parent) :
     QDialog(parent),
     ui(new Ui::GammaAdj)
 {
-    this->setWindowFlag(Qt::WindowStaysOnTopHint, true);
     ui->setupUi(this);
-    setWindowTitle("Contrast Adjustment");
+    setWindowTitle("Gamma Adjustment");
 }
 
 GammaAdj::~GammaAdj() {
@@ -19,6 +18,8 @@ void GammaAdj::setWork(QImage *toProcess) {
     processed = qi->scaled(qi->width() / 3, qi->height() / 3, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
     proDisp = processed.copy();
     ui->label->setPixmap(QPixmap::fromImage(proDisp));
+    ui->slider->setValue(0);
+    ui->spinbox->setValue(0.0);
 }
 
 void GammaAdj::on_spinbox_valueChanged(double value) {

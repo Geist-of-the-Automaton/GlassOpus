@@ -12,7 +12,9 @@ Layer::Layer() {
     postAngle = 0.0;
     selectOgActive = false;
     deltaMove =  boundPt1 = boundPt2 = rotateAnchor = QPoint(-1000, -1000);
-    symDiv = 20;
+    symDiv = 1;
+    symOfEvery = 1;
+    symSkip = 0;
 }
 
 Layer::Layer(QSize qs) {
@@ -27,7 +29,9 @@ Layer::Layer(QSize qs) {
     postAngle = 0.0;
     selectOgActive = false;
     deltaMove =  boundPt1 = boundPt2 = rotateAnchor = QPoint(-1000, -1000);
-    symDiv = 20;
+    symDiv = 1;
+    symOfEvery = 1;
+    symSkip = 0;
 }
 
 Layer::Layer(QImage in, int alphaValue) {
@@ -42,7 +46,9 @@ Layer::Layer(QImage in, int alphaValue) {
     postAngle = 0.0;
     selectOgActive = false;
     deltaMove =  boundPt1 = boundPt2 = rotateAnchor = QPoint(-1000, -1000);
-    symDiv = 20;
+    symDiv = 1;
+    symOfEvery = 1;
+    symSkip = 0;
 }
 
 Layer::Layer(const Layer &layer) {
@@ -69,6 +75,9 @@ Layer& Layer::operator=(const Layer &layer) {
     deltaMove =  boundPt1 = boundPt2 = rotateAnchor = QPoint(-1000, -1000);
     filter = layer.filter;
     symDiv = layer.symDiv;
+    symSkip = layer.symSkip;
+    symOfEvery = layer.symOfEvery;
+    symPt = layer.symPt;
     return *this;
 }
 
@@ -387,7 +396,7 @@ void Layer::moveLeft(QPoint qp) {
             int vIndex = 0;
             float offset = 2 * pi / static_cast<float>(symDiv);
             for (float mult = 0.0; mult < symDiv; mult += 1.0) {
-                if (static_cast<int>(mult) % 5 > 3)
+                if (static_cast<int>(mult) % symOfEvery >= (symOfEvery - symSkip))
                     continue;
                 float angle = offset * mult;
                 float x = qp.x();
@@ -574,14 +583,17 @@ MouseButton Layer::pressRight(QPoint qp) {
     MouseButton response = RightButton;
     if (mode == Spline_Mode) {
         if (activeVects.size() == 0) {
-            if (vects.size() + symDiv < CHAR_MAX - 1) {
-                if (symDiv == 1)
+            if ((vects.size() + symDiv) < CHAR_MAX - 1) {
+                if (symDiv == 1) {
                     vects.push_back(SplineVector(qp, QPoint(qp.x() + 1, qp.y())));
+                    tris.push_back(list <Triangle> ());
+                    activeVects.push_back(static_cast<unsigned char>(vects.size() - 1));
+                }
                 else {
                     symCreate = true;
                     float offset = 2 * pi / static_cast<float>(symDiv);
                     for (float mult = 0.0; mult < symDiv; mult += 1.0) {
-                        if (static_cast<int>(mult) % 5 > 3)
+                        if (static_cast<int>(mult) % symOfEvery >= (symOfEvery - symSkip))
                             continue;
                         float angle = offset * mult;
                         float x = qp.x();
@@ -669,7 +681,7 @@ MouseButton Layer::pressRight(QPoint qp) {
                     int vIndex = 0;
                     float offset = 2 * pi / static_cast<float>(symDiv);
                     for (float mult = 0.0; mult < symDiv; mult += 1.0) {
-                        if (static_cast<int>(mult) % 5 > 3)
+                        if (static_cast<int>(mult) % symOfEvery >= (symOfEvery - symSkip))
                             continue;
                         float angle = offset * mult;
                         float x = qp.x();
@@ -1041,25 +1053,16 @@ void Layer::applyFilterToRaster(Filter f) {
 
 void Layer::applyKernalToSelection(QProgressDialog *qpd, string fileName) {
     if (!rasterselectOg.isNull()) {
-        KernalData kernalInfo = graphics::ImgSupport::loadKernal(fileName);
-        graphics::Filtering::applyKernal(qpd, &rasterselectOg, kernalInfo);
+        KernelData kernalInfo = graphics::ImgSupport::loadKernel(fileName);
+        graphics::Filtering::applyKernel(qpd, &rasterselectOg, kernalInfo);
     }
 }
 
-int Layer::getSymDiv() {
-    return symDiv;
-}
-
-void Layer::setSymDiv(int div) {
-    symDiv = div;
-}
-
-void Layer::setSymDivPt(QPoint qp) {
+void Layer::setSym(QPoint qp, int div, int ofEvery, int skip) {
     symPt = qp;
-}
-
-void Layer::setSymDivType(int type) {
-    divType = sym2DivType(type);
+    symDiv = div;
+    symOfEvery = ofEvery;
+    symSkip = skip;
 }
 
 int Layer::symActive() {

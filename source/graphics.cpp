@@ -106,61 +106,168 @@ QRgb graphics::Filtering::blueChannel(QColor qc, int strength) {
     return toRGB(qc.alpha(), qc.blue(), qc.blue(), qc.blue());
 }
 
+QRgb graphics::Filtering::yellowChannel(QColor qc, int strength) {
+    return toRGB(qc.alpha(), qc.yellow(), qc.yellow(), qc.yellow());
+}
+
+QRgb graphics::Filtering::cyanChannel(QColor qc, int strength) {
+    return toRGB(qc.alpha(), qc.cyan(), qc.cyan(), qc.cyan());
+}
+
+QRgb graphics::Filtering::magentaChannel(QColor qc, int strength) {
+    return toRGB(qc.alpha(), qc.magenta(), qc.magenta(), qc.magenta());
+}
+
+QRgb graphics::Filtering::hueChannel(QColor qc, int strength) {
+    int hue = static_cast<int>(255.0 * qc.hueF());
+    return toRGB(qc.alpha(), hue, hue, hue);
+}
+
+QRgb graphics::Filtering::satChannel(QColor qc, int strength) {
+    int sat = static_cast<int>(255.0 * qc.hslSaturationF());
+    return toRGB(qc.alpha(), sat, sat, sat);
+}
+
+QRgb graphics::Filtering::valChannel(QColor qc, int strength) {
+    int val = static_cast<int>(255.0 * qc.valueF());
+    return toRGB(qc.alpha(), val, val, val);
+}
+
+QRgb graphics::Filtering::litChannel(QColor qc, int strength) {
+    int val = static_cast<int>(255.0 * qc.lightnessF());
+    return toRGB(qc.alpha(), val, val, val);
+}
+
 QRgb graphics::Filtering::redPass(QColor qc, int strength) {
-    if (qc.red() > qc.blue() && qc.red() > qc.green() && qc.red() - max(qc.green(), qc.blue()) > abs(qc.green() - qc.blue()))
+    int hue = qc.hslHue();
+    int str = strength / 4;
+    if (hue < 0 + str && hue > 360 - str)
         return qc.rgba();
-    int grey = (qc.red() + qc.green() + qc.blue()) / 3;
-    return toRGB(qc.alpha(), grey, grey, grey);
+    else {
+        int grey = (qc.red() + qc.green() + qc.blue()) / 3;
+        return toRGB(qc.alpha(), grey, grey, grey);
+    }
 }
 
 QRgb graphics::Filtering::greenPass(QColor qc, int strength) {
-    if (qc.green() > qc.blue() && qc.green() > qc.red() && qc.green() - max(qc.red(), qc.blue()) > abs(qc.red() - qc.blue()))
+    int hue = qc.hslHue();
+    int str = strength / 4;
+    if (hue < 120 + str && hue > 120 - str)
         return qc.rgba();
-    int grey = (qc.red() + qc.green() + qc.blue()) / 3;
-    return toRGB(qc.alpha(), grey, grey, grey);
+    else {
+        int grey = (qc.red() + qc.green() + qc.blue()) / 3;
+        return toRGB(qc.alpha(), grey, grey, grey);
+    }
 }
 
 QRgb graphics::Filtering::bluePass(QColor qc, int strength) {
-    if (qc.blue() > qc.red() && qc.blue() > qc.green() && qc.blue() - max(qc.red(), qc.green()) > abs(qc.green() - qc.red()))
+    int hue = qc.hslHue();
+    int str = strength / 4;
+    if (hue < 240 + str && hue > 240 - str)
         return qc.rgba();
-    int grey = (qc.red() + qc.green() + qc.blue()) / 3;
-    return toRGB(qc.alpha(), grey, grey, grey);
+    else {
+        int grey = (qc.red() + qc.green() + qc.blue()) / 3;
+        return toRGB(qc.alpha(), grey, grey, grey);
+    }
 }
 
 QRgb graphics::Filtering::magentaPass(QColor qc, int strength) {
-    if (max(qc.red(), qc.blue()) - min(qc.red(), qc.blue()) < min(qc.red(), qc.blue()) - qc.green())
+    int hue = qc.hslHue();
+    int str = strength / 8;
+    if (hue < 300 + str && hue > 300 - str)
         return qc.rgba();
-    int grey = (qc.red() + qc.green() + qc.blue()) / 3;
-    return toRGB(qc.alpha(), grey, grey, grey);
+    else {
+        int grey = (qc.red() + qc.green() + qc.blue()) / 3;
+        return toRGB(qc.alpha(), grey, grey, grey);
+    }
 }
 
 QRgb graphics::Filtering::yellowPass(QColor qc, int strength) {
-    if (max(qc.red(), qc.green()) - min(qc.red(), qc.green()) < min(qc.red(), qc.green()) - qc.blue())
+    int hue = qc.hslHue();
+    int str = strength / 8;
+    if (hue < 60 + str && hue > 60 - str)
         return qc.rgba();
-    int grey = (qc.red() + qc.green() + qc.blue()) / 3;
-    return toRGB(qc.alpha(), grey, grey, grey);
+    else {
+        int grey = (qc.red() + qc.green() + qc.blue()) / 3;
+        return toRGB(qc.alpha(), grey, grey, grey);
+    }
 }
 
 QRgb graphics::Filtering::cyanPass(QColor qc, int strength) {
-    if (max(qc.green(), qc.blue()) - min(qc.green(), qc.blue()) < min(qc.green(), qc.blue()) - qc.red())
+    int hue = qc.hslHue();
+    int str = strength / 8;
+    if (hue < 180 + str && hue > 180 - str)
         return qc.rgba();
-    int grey = (qc.red() + qc.green() + qc.blue()) / 3;
-    return toRGB(qc.alpha(), grey, grey, grey);
+    else {
+        int grey = (qc.red() + qc.green() + qc.blue()) / 3;
+        return toRGB(qc.alpha(), grey, grey, grey);
+    }
 }
 
 QRgb graphics::Filtering::redFilter(QColor qc, int strength) {
-    int combined = (qc.red() + qc.green() + qc.blue()) / 3;
-    return (qc.red() > qc.green() && qc.red() > qc.blue()) ? toRGB(qc.alpha(), combined, combined, combined) : toRGB(qc.alpha(), qc.red(), qc.green(), qc.blue());
+    int hue = qc.hslHue();
+    int str = strength / 4;
+    if (hue < 0 + str && hue > 360 - str) {
+        int grey = (qc.red() + qc.green() + qc.blue()) / 3;
+        return toRGB(qc.alpha(), grey, grey, grey);
+    }
+    else
+        return qc.rgba();
 }
 
 QRgb graphics::Filtering::greenFilter(QColor qc, int strength) {
-    int combined = (qc.red() + qc.green() + qc.blue()) / 3;
-    return (qc.green() > qc.blue() && qc.green() > qc.blue()) ? toRGB(qc.alpha(), combined, combined, combined) : toRGB(qc.alpha(), qc.red(), qc.green(), qc.blue());
+    int hue = qc.hslHue();
+    int str = strength / 4;
+    if (hue < 120 + str && hue > 120 - str) {
+        int grey = (qc.red() + qc.green() + qc.blue()) / 3;
+        return toRGB(qc.alpha(), grey, grey, grey);
+    }
+    else
+        return qc.rgba();
 }
 
 QRgb graphics::Filtering::blueFilter(QColor qc, int strength) {
-    int combined = (qc.red() + qc.green() + qc.blue()) / 3;
-    return (qc.blue() > qc.red() && qc.blue() > qc.green())  ? toRGB(qc.alpha(), combined, combined, combined) : toRGB(qc.alpha(), qc.red(), qc.green(), qc.blue());
+    int hue = qc.hslHue();
+    int str = strength / 4;
+    if (hue < 240 + str && hue > 240 - str) {
+        int grey = (qc.red() + qc.green() + qc.blue()) / 3;
+        return toRGB(qc.alpha(), grey, grey, grey);
+    }
+    else
+        return qc.rgba();
+}
+
+QRgb graphics::Filtering::yellowFilter(QColor qc, int strength) {
+    int hue = qc.hslHue();
+    int str = strength / 8;
+    if (hue < 60 + str && hue > 60 - str) {
+        int grey = (qc.red() + qc.green() + qc.blue()) / 3;
+        return toRGB(qc.alpha(), grey, grey, grey);
+    }
+    else
+        return qc.rgba();
+}
+
+QRgb graphics::Filtering::cyanFilter(QColor qc, int strength) {
+    int hue = qc.hslHue();
+    int str = strength / 8;
+    if (hue < 180 + str && hue > 180 - str) {
+        int grey = (qc.red() + qc.green() + qc.blue()) / 3;
+        return toRGB(qc.alpha(), grey, grey, grey);
+    }
+    else
+        return qc.rgba();
+}
+
+QRgb graphics::Filtering::magentaFilter(QColor qc, int strength) {
+    int hue = qc.hslHue();
+    int str = strength / 8;
+    if (hue < 300 + str && hue > 300 - str) {
+        int grey = (qc.red() + qc.green() + qc.blue()) / 3;
+        return toRGB(qc.alpha(), grey, grey, grey);
+    }
+    else
+        return qc.rgba();
 }
 
 QRgb graphics::Filtering::rgb(QColor qc, int strength) {
@@ -274,8 +381,12 @@ QRgb graphics::Filtering::colorFilmGrain (QColor qc, int strength) {
     return toRGB(qc.alpha(), red, green, blue);
 }
 
-void graphics::Filtering::applyKernal(QProgressDialog *qpd, QImage *qi, KernalData kernalInfo) {
+void graphics::Filtering::applyKernel(QProgressDialog *qpd, QImage *qi, KernelData kernalInfo) {
     bool needGreyscale = kernalInfo.first;
+    Kernel kernal = kernalInfo.second;
+    int kernalSize = kernal.size();
+    if (kernalSize == 0)
+        return;
     if (qpd != nullptr) {
         qpd->setValue(0);
         qpd->setLabelText("Applying Kernal");
@@ -292,8 +403,6 @@ void graphics::Filtering::applyKernal(QProgressDialog *qpd, QImage *qi, KernalDa
         }
     }
     int boost = 1;
-    Kernal kernal = kernalInfo.second;
-    int kernalSize = kernal.size();
     int offset = kernalSize / 2;
     QImage image = qi->copy();
     // Apply kernal to the image.
@@ -601,7 +710,7 @@ void graphics::Color::ditherSierraLite(QImage *qi, int bpp) {
     }
 }
 
-void graphics::Color::colorTransfer(QImage *to, QImage from) {
+void graphics::Color::colorTransfer(QImage *to, QImage from, tType type) {
     float RGB2LMS[3][3] = {{0.3811, 0.5783, 0.0402},
                            {0.1967, 0.7244, 0.0782},
                            {0.0241, 0.1288, 0.8444}};
@@ -632,18 +741,19 @@ void graphics::Color::colorTransfer(QImage *to, QImage from) {
         for (int j = 0; j < ht; ++j) {
             QColor qc = to->pixelColor(i, j);
             vec4 color = vec4(qc.redF(), qc.greenF(), qc.blueF());
-            color = rgb2lms * color;
-
-            if (color._L == 0.0)
-                color._L = 1.0 / 10000000.0;
-            if (color._A == 0.0)
-                color._A = 1.0 / 10000000.0;
-            if (color._B == 0.0)
-                color._B = 1.0 / 10000000.0;
-            color._L = log10(color._L);
-            color._A = log10(color._A);
-            color._B = log10(color._B);
-            color = lms2lab * color;
+            if (type == LAB) {
+                color = rgb2lms * color;
+                if (color._L == 0.0)
+                    color._L = 1.0 / 10000000.0;
+                if (color._A == 0.0)
+                    color._A = 1.0 / 10000000.0;
+                if (color._B == 0.0)
+                    color._B = 1.0 / 10000000.0;
+                color._L = log10(color._L);
+                color._A = log10(color._A);
+                color._B = log10(color._B);
+                color = lms2lab * color;
+            }
             lmt += color._L;
             amt += color._A;
             bmt += color._B;
@@ -663,7 +773,6 @@ void graphics::Color::colorTransfer(QImage *to, QImage from) {
     lsdt = sqrt(lsdt / sizet);
     asdt = sqrt(asdt / sizet);
     bsdt = sqrt(bsdt / sizet);
-
     vector< vector <vec4> > labImg2;
     int ws = from.width(), hs = from.height();
     labImg2.resize(ws);
@@ -674,18 +783,19 @@ void graphics::Color::colorTransfer(QImage *to, QImage from) {
         for (int j = 0; j < hs; ++j) {
             QColor qc = from.pixelColor(i, j);
             vec4 color = vec4(qc.redF(), qc.greenF(), qc.blueF());
-            color = rgb2lms * color;
-
-            if (color._L == 0.0)
-                color._L = 1.0 / 10000000.0;
-            if (color._A == 0.0)
-                color._A = 1.0 / 10000000.0;
-            if (color._B == 0.0)
-                color._B = 1.0 / 10000000.0;
-            color._L = log10(color._L);
-            color._A = log10(color._A);
-            color._B = log10(color._B);
-            color = lms2lab * color;
+            if (type == LAB) {
+                color = rgb2lms * color;
+                if (color._L == 0.0)
+                    color._L = 1.0 / 10000000.0;
+                if (color._A == 0.0)
+                    color._A = 1.0 / 10000000.0;
+                if (color._B == 0.0)
+                    color._B = 1.0 / 10000000.0;
+                color._L = log10(color._L);
+                color._A = log10(color._A);
+                color._B = log10(color._B);
+                color = lms2lab * color;
+            }
             lms += color._L;
             ams += color._A;
             bms += color._B;
@@ -705,7 +815,6 @@ void graphics::Color::colorTransfer(QImage *to, QImage from) {
     lsds = sqrt(lsds / sizes);
     asds = sqrt(asds / sizes);
     bsds = sqrt(bsds / sizes);
-
     double lr = lsds / lsdt, ar = asds / asdt, br = bsds / bsdt;
     for (int i = 0; i < wt; ++i)
         for (int j = 0; j < ht; ++j) {
@@ -713,13 +822,13 @@ void graphics::Color::colorTransfer(QImage *to, QImage from) {
             labImg[i][j]._A = (labImg[i][j]._A - amt) * ar + ams;
             labImg[i][j]._B = (labImg[i][j]._B - bmt) * br + bms;
             vec4 color = labImg[i][j];
-
-            color = lab2lms * color;
-            color._L = pow(10.0, color._L);
-            color._A = pow(10.0, color._A);
-            color._B = pow(10.0, color._B);
-
-            color = lms2rgb * color;
+            if (type == LAB) {
+                color = lab2lms * color;
+                color._L = pow(10.0, color._L);
+                color._A = pow(10.0, color._A);
+                color._B = pow(10.0, color._B);
+                color = lms2rgb * color;
+            }
             QColor qc = to->pixelColor(i, j);
             qc.setRedF(stdFuncs::clamp(color._R, 0.0, 1.0));
             qc.setGreenF(stdFuncs::clamp(color._G, 0.0, 1.0));
@@ -759,8 +868,8 @@ QImage graphics::ImgSupport::zoomImg(QImage qi) {
 }
 
 QPoint graphics::ImgSupport::getZoomCorrected(QPoint qp) {
-    qp.setX(static_cast<int>(0.5 + static_cast<double>(qp.x()) / zoom));
-    qp.setY(static_cast<int>(0.5 + static_cast<double>(qp.y()) / zoom));
+    qp.setX(static_cast<int>(0.5 + static_cast<double>(qp.x()) / zoom) - 1);
+    qp.setY(static_cast<int>(0.5 + static_cast<double>(qp.y()) / zoom) - 6);
     return qp;
 }
 
@@ -792,11 +901,11 @@ void graphics::ImgSupport::flipHorizontal(QImage *qi) {
         }
 }
 
-KernalData graphics::ImgSupport::loadKernal(string fileName) {
-    Kernal kernal, identity;
+KernelData graphics::ImgSupport::loadKernel(string fileName) {
+    Kernel kernal, identity;
     identity.push_back(vector <float> ());
     identity[0].push_back(1.0);
-    KernalData ret = KernalData (false, identity);
+    KernelData ret = KernelData (false, identity);
     if (fileName != "") {
         int tKernalSize;
         fstream file;
@@ -865,11 +974,9 @@ void graphics::ImgSupport::applyAlpha(QImage *qi, int *yStart, int *yEnd, unsign
     }
 }
 
-void graphics::Color::Histogram(QLabel *histograms, QImage *in, int layerNum, eType type) {
+QImage graphics::Color::Histogram(QImage *in, eType type) {
     int h = 3 * bins;
     QImage qi (QSize(bins * 2, h), QImage::Format_ARGB32_Premultiplied);
-    histograms->resize(qi.width(), qi.height());
-    histograms->setWindowFilePath(("Histogram of Layer " + to_string(layerNum)).c_str());
     qi.fill(0xFF000000);
     int histo[4][bins];
     for (int x = 0; x < bins; ++x)
@@ -948,8 +1055,7 @@ void graphics::Color::Histogram(QLabel *histograms, QImage *in, int layerNum, eT
                 qi.setPixelColor(colOffset, y, color);
         }
     }
-    histograms->setPixmap(QPixmap::fromImage(qi));
-    histograms->setFixedSize(histograms->size());
+    return qi;
 }
 
 void graphics::Color::equalizeHistogramTo(QImage *qi, eType type) {
@@ -1178,13 +1284,15 @@ void graphics::Color::brightnessAdjust(QImage *qi, double val, eType type) {
     if (val != 0.0) {
         QImage processed = qi->copy();
         int w = processed.width(), h = processed.height();
+        if (type == RGB)
+            val += 1.0;
         for (int i = 0; i < w; ++i)
             for (int j = 0; j < h; ++j) {
                 QColor qc = processed.pixelColor(i, j);
                 if (type == RGB) {
-                    qc.setRedF(stdFuncs::clamp(qc.redF() - val, 0.0, 1.0));
-                    qc.setGreenF(stdFuncs::clamp(qc.greenF() - val, 0.0, 1.0));
-                    qc.setBlueF(stdFuncs::clamp(qc.blueF() - val, 0.0, 1.0));
+                    qc.setRedF(stdFuncs::clamp(qc.redF() * val, 0.0, 1.0));
+                    qc.setGreenF(stdFuncs::clamp(qc.greenF() * val, 0.0, 1.0));
+                    qc.setBlueF(stdFuncs::clamp(qc.blueF() * val, 0.0, 1.0));
                 }
                 else if (type == HSV)
                     qc.setHsvF(qc.hsvHueF(), qc.hsvSaturationF(), stdFuncs::clamp(qc.valueF() + val, 0.0, 1.0), qc.alphaF());
@@ -1218,13 +1326,14 @@ void graphics::Color::saturationAdjust(QImage *qi, double val, eType type) {
     if (val != 0.0) {
         QImage processed = qi->copy();
         int w = processed.width(), h = processed.height();
+        val += 1.0;
         for (int i = 0; i < w; ++i)
             for (int j = 0; j < h; ++j) {
                 QColor qc = processed.pixelColor(i, j);
                 if (type == HSV)
-                    qc.setHsvF(qc.hsvHueF(), stdFuncs::clamp(qc.hsvSaturationF() + val, 0.0, 1.0), qc.valueF(), qc.alphaF());
+                    qc.setHsvF(qc.hsvHueF(), stdFuncs::clamp(qc.hsvSaturationF() * val, 0.0, 1.0), qc.valueF(), qc.alphaF());
                 else if (type == HSL)
-                    qc.setHslF(qc.hslHueF(), stdFuncs::clamp(qc.hslSaturationF() + val, 0.0, 1.0), qc.lightnessF(), qc.alphaF());
+                    qc.setHslF(qc.hslHueF(), stdFuncs::clamp(qc.hslSaturationF() * val, 0.0, 1.0), qc.lightnessF(), qc.alphaF());
                 processed.setPixelColor(i, j, qc);
             }
         *qi = processed.copy();
@@ -1265,4 +1374,174 @@ void graphics::Color::hueShift(QImage *qi, int val) {
     }
 }
 
+Kernel graphics::Filtering::getBoxBlur(int radius) {
+    int width = radius * 2 + 1;
+    float w = static_cast<float>(width * width);
+    return Kernel (width, vector<float>(width, 1.0 / w));
+}
 
+Kernel graphics::Filtering::getConeBlur(int radius) {
+    int width = radius * 2 + 1;
+    float r = static_cast<float>(width) / 2.0;
+    Kernel vec(width, vector<float>(width, 0.0));
+    float cnt = 0.0;
+    for (int i = 0; i < width; ++i) {
+        int I = i - static_cast<int>(r);
+        for (int j = 0; j < width; ++j) {
+            int J = j - static_cast<int>(r);
+            float dist = sqrt(static_cast<float>(I * I + J * J));
+            if (dist <= r) {
+                vec[i][j] = (r - dist);
+                cnt += vec[i][j];
+            }
+        }
+    }
+    for (int i = 0; i < width; ++i)
+        for (int j = 0; j < width; ++j)
+            vec[i][j] /= cnt;
+    return vec;
+}
+
+void graphics::Color::matchHistogram(QImage *qi, QImage toMatch, mType type) {
+    QImage ret(qi->size(), QImage::Format_ARGB32_Premultiplied);
+    double intensities[256] = {0};
+    double intensities2[256] = {0};
+    double intensities3[256] = {-1};
+    ret.fill(0xFF000000);
+    int w1 = qi->width(), w2 = toMatch.width(), h1 = qi->height(), h2 = toMatch.height();
+    int size = w1 * h1;
+    int size2 = w2 * h2;
+    int max1 = 0, min1 = 255, max2 = 0, min2 = 255;
+    int offset1 = 0, offset2 = 0;
+    for (int r = 0; r < h1; r++) {
+        for (int c = 0; c < w1; c++) {
+            int n;
+            QColor qc = qi->pixelColor(c, r);
+            if (qc.alpha() == 0) {
+                offset1++;
+                continue;
+            }
+            switch (type) {
+            case RGB_I:
+                n = (qc.red() + qc.green() + qc.blue()) / 3;
+                break;
+            case HUE:
+                n = static_cast<int>(255.0 * qc.hslHueF());
+                break;
+            case SAT:
+                n = static_cast<int>(255.0 * qc.hslSaturationF());
+                break;
+            case HSV_V:
+                n = static_cast<int>(255.0 * qc.valueF());
+                break;
+            case HSL_L:
+                n = static_cast<int>(255.0 * qc.lightnessF());
+                break;
+            }
+            intensities[n] += 1.0;
+            max2 = max(max2, n);
+            min2 = min(min2, n);
+        }
+    }
+    for (int r = 0; r < h2; r++) {
+        for (int c = 0; c < w2; c++) {
+            int n;
+            QColor qc = toMatch.pixelColor(c, r);
+            if (qc.alpha() == 0) {
+                offset2++;
+                continue;
+            }
+            switch (type) {
+            case RGB_I:
+                n = (qc.red() + qc.green() + qc.blue()) / 3;
+                break;
+            case HUE:
+                n = static_cast<int>(255.0 * qc.hslHueF());
+                break;
+            case SAT:
+                n = static_cast<int>(255.0 * qc.hslSaturationF());
+                break;
+            case HSV_V:
+                n = static_cast<int>(255.0 * qc.valueF());
+                break;
+            case HSL_L:
+                n = static_cast<int>(255.0 * qc.lightnessF());
+                break;
+            }
+            intensities2[n] += 1.0;
+        }
+    }
+    for (int i = 1; i < 256; i++) {
+        intensities[i] += intensities[i - 1];
+        intensities2[i] += intensities2[i - 1];
+    }
+    for (int i = 0; i < 256; i++) {
+        intensities[i] = min(255.0, round(intensities[i] * 255.0 / static_cast<double>(size - offset1)));
+        intensities2[i] = min(255.0, round(intensities2[i] * 255.0 / static_cast<double>(size2 - offset2)));
+    }
+    for(int i = 0; i < 256; i++) {
+        int j = 0;
+        do {
+            intensities3[i] = j;
+            j++;
+        }
+        while(intensities[i] > intensities2[j]);
+    }
+    for (int i = 0; i < 256; i++) {
+        max1 = max(max1, static_cast<int>(intensities3[i]));
+        if (intensities3[i] != -1)
+            min1 = min(min1, static_cast<int>(intensities3[i]));
+    }
+    for (int r = 0; r < h1; r++){
+        for (int c = 0; c < w1; c++){int n;
+            QColor qc = qi->pixelColor(c, r);
+            if (qc.alpha() == 0)
+                continue;
+            switch (type) {
+            case RGB_I:
+                n = (qc.red() + qc.green() + qc.blue()) / 3;
+                break;
+            case HUE:
+                n = static_cast<int>(255.0 * qc.hslHueF());
+                break;
+            case SAT:
+                n = static_cast<int>(255.0 * qc.hslSaturationF());
+                break;
+            case HSV_V:
+                n = static_cast<int>(255.0 * qc.valueF());
+                break;
+            case HSL_L:
+                n = static_cast<int>(255.0 * qc.lightnessF());
+                break;
+            }
+            int tmp = intensities3[n];
+            if (tmp == -1)
+                tmp = 0;
+//			tmp=((tmp-min1)*(max2-min2)/(max1-min1));
+
+            switch (type) {
+            case RGB_I:
+                qc.setRed(intensities3[qc.red()]);
+                qc.setGreen(intensities3[qc.green()]);
+                qc.setBlue(intensities3[qc.blue()]);
+                break;
+            case HUE:
+                qc.setHslF(intensities3[n] / 255.0, qc.hslSaturationF(), qc.lightnessF(), qc.alphaF());
+                break;
+            case SAT:
+                qc.setHslF(qc.hslHueF(), intensities3[n] / 255.0, qc.lightnessF(), qc.alphaF());
+                break;
+            case HSV_V:
+                qc.setHsvF(qc.hsvHueF(), qc.hsvSaturationF(), stdFuncs::clamp(intensities3[n] / 255.0, 0.0, 1.0), qc.alphaF());
+                break;
+            case HSL_L:
+                qc.setHslF(qc.hslHueF(), qc.hslSaturationF(), intensities3[n] / 255.0, qc.alphaF());
+                break;
+            }
+            qi->setPixelColor(c, r, qc);
+            //sum+=min((int)tmp,(int)intensities2[(int)image.at<uint8_t>(r,c)]);
+//			sum+=tmp;
+        }
+    }
+
+}

@@ -6,8 +6,6 @@ resizeWindow::resizeWindow(QWidget *parent, DataIOHandler *ioh)
     : QMainWindow(parent)
     , ui(new Ui::resizeWindow)
 {
-    Qt::WindowFlags flags = windowFlags();
-    setWindowFlags(flags | Qt::WindowStaysOnTopHint);
     ui->setupUi(this);
     connect(ui->pushButton, SIGNAL(clicked()), this, SLOT(finish()));
     setFixedSize(size());

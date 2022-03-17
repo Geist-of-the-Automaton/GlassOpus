@@ -1,5 +1,5 @@
-#ifndef UI_SATURATIONADJ_H
-#define UI_SATURATIONADJ_H
+#ifndef UI_HISTODIALOG_H
+#define UI_HISTODIALOG_H
 
 #include <QtCore/QVariant>
 #include <QtWidgets/QApplication>
@@ -12,10 +12,14 @@
 #include <QtWidgets/QWidget>
 #include <QtWidgets/QDoubleSpinBox>
 #include <QtWidgets/QComboBox>
+#include <string>
+using std::to_string;
+
+#include <graphics.h>
 
 QT_BEGIN_NAMESPACE
 
-class Ui_SaturationAdj
+class Ui_HistoDialog
 {
 public:
     QVBoxLayout *verticalLayout_3;
@@ -26,24 +30,22 @@ public:
     QSpacerItem *horizontalSpacer;
     QHBoxLayout *horizontalLayout_3;
     QVBoxLayout *verticalLayout_5;
-    QDoubleSpinBox *spinbox;
     QVBoxLayout *verticalLayout_4;
     QVBoxLayout *verticalLayout_1;
-    QSlider *slider;
     QVBoxLayout *verticalLayout;
     QDialogButtonBox *buttonBox;
-    QComboBox *qcb;
+    QComboBox *qcb1, *qcb2, *qcb3;
 
-    void setupUi(QWidget *saturationAdj)
+    void setupUi(QWidget *histoDialog)
     {
-        if (saturationAdj->objectName().isEmpty())
-            saturationAdj->setObjectName(QString::fromUtf8("saturationAdj"));
-        saturationAdj->resize(282, 244);
-        verticalLayout_3 = new QVBoxLayout(saturationAdj);
+        if (histoDialog->objectName().isEmpty())
+            histoDialog->setObjectName(QString::fromUtf8("histoDialog"));
+        histoDialog->resize(300, 244);
+        verticalLayout_3 = new QVBoxLayout(histoDialog);
         verticalLayout_3->setObjectName(QString::fromUtf8("verticalLayout_3"));
         verticalLayout_6 = new QVBoxLayout();
         verticalLayout_6->setObjectName(QString::fromUtf8("verticalLayout_6"));
-        label = new QLabel(saturationAdj);
+        label = new QLabel(histoDialog);
         label->setObjectName(QString::fromUtf8("label"));
         label->setEnabled(true);
         label->setCursor(QCursor(Qt::CrossCursor));
@@ -67,41 +69,36 @@ public:
         verticalLayout_1 = new QVBoxLayout();
         verticalLayout_1->setObjectName(QString::fromUtf8("verticalLayout_1"));
 
-        qcb = new QComboBox(saturationAdj);
-        qcb->setObjectName(QString::fromUtf8("combo"));
-        qcb->addItems(QStringList({"HSV", "HSL"}));
-        qcb->setCurrentIndex(0);
+        qcb1 = new QComboBox(histoDialog);
+        qcb1->setObjectName(QString::fromUtf8("combo1"));
+        qcb1->addItems(graphics::eTypes);
+        qcb1->setCurrentIndex(0);
 
-        verticalLayout_1->addWidget(qcb);
+        verticalLayout_1->addWidget(qcb1);
 
         horizontalLayout_3->addLayout(verticalLayout_1);
 
         verticalLayout_5 = new QVBoxLayout();
         verticalLayout_5->setObjectName(QString::fromUtf8("verticalLayout_5"));
 
-        spinbox = new QDoubleSpinBox(saturationAdj);
-        spinbox->setObjectName(QString::fromUtf8("spinbox"));
-        spinbox->setAlignment(Qt::AlignCenter);
-        spinbox->setRange(-1.0, 1.0);
-        spinbox->setDecimals(3);
-        spinbox->setValue(0.0);
-        spinbox->setSingleStep(0.01);
+        qcb2 = new QComboBox(histoDialog);
+        qcb2->setObjectName(QString::fromUtf8("combo2"));
+        qcb2->addItems(QStringList({"View Histogram", "Match Histogram", "Equalize Histogram", "CLAHE"}));
+        qcb2->setCurrentIndex(0);
 
-        verticalLayout_5->addWidget(spinbox);
+        verticalLayout_5->addWidget(qcb2);
 
         horizontalLayout_3->addLayout(verticalLayout_5);
 
         verticalLayout_4 = new QVBoxLayout();
         verticalLayout_4->setObjectName(QString::fromUtf8("verticalLayout_4"));
 
-        slider = new QSlider(saturationAdj);
-        slider->setObjectName(QString::fromUtf8("slider"));
-        slider->setMinimum(-255);
-        slider->setMaximum(255);
-        slider->setValue(0);
-        slider->setOrientation(Qt::Orientation::Horizontal);
+        qcb3 = new QComboBox(histoDialog);
+        qcb3->setObjectName(QString::fromUtf8("combo3"));
+        qcb3->addItems(graphics::mTypes);
+        qcb3->setCurrentIndex(0);
 
-        verticalLayout_4->addWidget(slider);
+        verticalLayout_4->addWidget(qcb3);
 
         horizontalLayout_3->addLayout(verticalLayout_4);
 
@@ -111,7 +108,7 @@ public:
 
         verticalLayout = new QVBoxLayout();
         verticalLayout->setObjectName(QString::fromUtf8("verticalLayout"));
-        buttonBox = new QDialogButtonBox(saturationAdj);
+        buttonBox = new QDialogButtonBox(histoDialog);
         buttonBox->setObjectName(QString::fromUtf8("buttonBox"));
         buttonBox->setStandardButtons(QDialogButtonBox::Cancel|QDialogButtonBox::Ok);
 
@@ -121,22 +118,22 @@ public:
 
         verticalLayout_3->addLayout(horizontalLayout);
 
-        retranslateUi(saturationAdj);
+        retranslateUi(histoDialog);
 
-        QMetaObject::connectSlotsByName(saturationAdj);
+        QMetaObject::connectSlotsByName(histoDialog);
     } // setupUi
 
-    void retranslateUi(QWidget *saturationAdj)
+    void retranslateUi(QWidget *histoDialog)
     {
-        saturationAdj->setWindowTitle(QCoreApplication::translate("SaturationAdj", "Form", nullptr));
+        histoDialog->setWindowTitle(QCoreApplication::translate("histoDialog", "Form", nullptr));
     } // retranslateUi
 
 };
 
 namespace Ui {
-    class SaturationAdj: public Ui_SaturationAdj {};
+    class HistoDialog: public Ui_HistoDialog {};
 } // namespace Ui
 
 QT_END_NAMESPACE
 
-#endif // UI_SATURATIONADJ_H
+#endif // UI_HISTODIALOG_H

@@ -6,8 +6,6 @@ RadialProfiler::RadialProfiler(brushHandler *bHandler, QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::RadialProfiler)
 {
-    Qt::WindowFlags flags = windowFlags();
-    setWindowFlags(flags | Qt::WindowStaysOnTopHint);
     ui->setupUi(this);
     ui->statusbar->hide();
     hide();

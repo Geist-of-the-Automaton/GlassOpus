@@ -5,9 +5,8 @@ HueShift::HueShift(QWidget *parent) :
     QDialog(parent),
     ui(new Ui::HueShift)
 {
-    this->setWindowFlag(Qt::WindowStaysOnTopHint, true);
     ui->setupUi(this);
-    setWindowTitle("Contrast Adjustment");
+    setWindowTitle("Hue Shift");
 }
 
 HueShift::~HueShift() {
@@ -19,6 +18,8 @@ void HueShift::setWork(QImage *toProcess) {
     processed = qi->scaled(qi->width() / 3, qi->height() / 3, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
     proDisp = processed.copy();
     ui->label->setPixmap(QPixmap::fromImage(proDisp));
+    ui->slider->setValue(0);
+    ui->spinbox->setValue(0.0);
 }
 
 void HueShift::on_spinbox_valueChanged(int value) {

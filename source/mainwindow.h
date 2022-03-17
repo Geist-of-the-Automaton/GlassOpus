@@ -48,6 +48,12 @@
 #include <gammaadj.h>
 #include <saturationadj.h>
 #include <hueshift.h>
+#include <ditherdialog.h>
+#include <transferdialog.h>
+#include <symdialog.h>
+#include <filterdialog.h>
+#include <kerneldialog.h>
+#include <histodialog.h>
 #include <Windows.h>
 
 using std::string;
@@ -94,7 +100,6 @@ const QString Logo_FileName = "Logo.png";
 const QString UI_Loc = "/Menus/";
 const QString Icon_Loc = UI_Loc + "Icons/";
 const QString Doc_Loc = "/Documentation/";
-const QString Kernal_Loc = "/Kernals/";
 const QString FetchLink = "https://github.com/SCCapstone/SnakyBusiness/raw/master";
 const vector <string> acceptedImportImageFormats = {"bmp", "jpg", "jpeg", "png", "ppm", "xbm", "xpm", "gif", "pbm", "pgm"};
 const vector <string> acceptedExportImageFormats = {"bmp", "jpg", "jpeg", "png", "ppm", "xbm", "xpm"};
@@ -132,7 +137,6 @@ public slots:
     void changeBrushFilter(string s);
     void changeBrushMethod(string s);
     void changeBrushShape(string s);
-    void applyRasterFilter(string s);
     void doSomething(string btnPress);
     void downloadFinished();
     void downloadTimeout();
@@ -148,7 +152,6 @@ private:
     void downloadItem(QString subfolder, QString fileName, downloadAction action, QString promptTitle, QString promptText);
     void createDocImgs();
     void setMode(EditMode emode);
-    int getBPP();
 
     Ui::MainWindow *ui;
     screenRender *sr;
@@ -176,11 +179,7 @@ private:
     patternProfiler *pp;
     bool lock;
     QLabel *histograms;
-    BrightnessAdj *badj;
-    ContrastAdj *cadj;
-    GammaAdj *gadj;
-    SaturationAdj *sadj;
-    HueShift *hadj;
+    SymDialog *symDialog;
 
 };
 

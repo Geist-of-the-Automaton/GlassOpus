@@ -44,7 +44,7 @@ public:
     void setupUi(QMainWindow *resizeWindow) {
         if (resizeWindow->objectName().isEmpty())
             resizeWindow->setObjectName(QString::fromUtf8("resizeWindow"));
-        resizeWindow->resize(322, 191);
+        resizeWindow->resize(322, 200);
         centralwidget = new QWidget(resizeWindow);
         centralwidget->setObjectName(QString::fromUtf8("centralwidget"));
         label_3 = new QLabel(centralwidget);

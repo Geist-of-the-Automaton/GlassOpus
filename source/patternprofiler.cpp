@@ -5,7 +5,6 @@ patternProfiler::patternProfiler(QWidget *parent) :
     QDialog(parent),
     ui(new Ui::patternProfiler)
 {
-    this->setWindowFlag(Qt::WindowStaysOnTopHint, true);
     ui->setupUi(this);
     setWindowTitle("Pattern Profiler");
     qb = QImage(maxRadius, maxRadius, QImage::Format_ARGB32_Premultiplied);

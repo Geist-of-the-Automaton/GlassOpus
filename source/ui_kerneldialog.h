@@ -1,5 +1,5 @@
-#ifndef UI_SATURATIONADJ_H
-#define UI_SATURATIONADJ_H
+#ifndef UI_KERNELDIALOG_H
+#define UI_KERNELDIALOG_H
 
 #include <QtCore/QVariant>
 #include <QtWidgets/QApplication>
@@ -10,12 +10,17 @@
 #include <QtWidgets/QSlider>
 #include <QtWidgets/QVBoxLayout>
 #include <QtWidgets/QWidget>
-#include <QtWidgets/QDoubleSpinBox>
+#include <QtWidgets/QSpinBox>
 #include <QtWidgets/QComboBox>
+#include <QtWidgets/QSlider>
+#include <string>
+using std::to_string;
+
+#include <graphics.h>
 
 QT_BEGIN_NAMESPACE
 
-class Ui_SaturationAdj
+class Ui_KernelDialog
 {
 public:
     QVBoxLayout *verticalLayout_3;
@@ -26,24 +31,22 @@ public:
     QSpacerItem *horizontalSpacer;
     QHBoxLayout *horizontalLayout_3;
     QVBoxLayout *verticalLayout_5;
-    QDoubleSpinBox *spinbox;
-    QVBoxLayout *verticalLayout_4;
     QVBoxLayout *verticalLayout_1;
-    QSlider *slider;
     QVBoxLayout *verticalLayout;
     QDialogButtonBox *buttonBox;
-    QComboBox *qcb;
+    QComboBox *qcb1;
+    QSpinBox *spinbox;
 
-    void setupUi(QWidget *saturationAdj)
+    void setupUi(QWidget *kernelDialog)
     {
-        if (saturationAdj->objectName().isEmpty())
-            saturationAdj->setObjectName(QString::fromUtf8("saturationAdj"));
-        saturationAdj->resize(282, 244);
-        verticalLayout_3 = new QVBoxLayout(saturationAdj);
+        if (kernelDialog->objectName().isEmpty())
+            kernelDialog->setObjectName(QString::fromUtf8("kernelDialog"));
+        kernelDialog->resize(282, 244);
+        verticalLayout_3 = new QVBoxLayout(kernelDialog);
         verticalLayout_3->setObjectName(QString::fromUtf8("verticalLayout_3"));
         verticalLayout_6 = new QVBoxLayout();
         verticalLayout_6->setObjectName(QString::fromUtf8("verticalLayout_6"));
-        label = new QLabel(saturationAdj);
+        label = new QLabel(kernelDialog);
         label->setObjectName(QString::fromUtf8("label"));
         label->setEnabled(true);
         label->setCursor(QCursor(Qt::CrossCursor));
@@ -67,43 +70,30 @@ public:
         verticalLayout_1 = new QVBoxLayout();
         verticalLayout_1->setObjectName(QString::fromUtf8("verticalLayout_1"));
 
-        qcb = new QComboBox(saturationAdj);
-        qcb->setObjectName(QString::fromUtf8("combo"));
-        qcb->addItems(QStringList({"HSV", "HSL"}));
-        qcb->setCurrentIndex(0);
+        qcb1 = new QComboBox(kernelDialog);
+        qcb1->setObjectName(QString::fromUtf8("combo1"));
+        for (string s : graphics::filterNames)
+            qcb1->addItem(s.c_str());
+        qcb1->setCurrentIndex(0);
 
-        verticalLayout_1->addWidget(qcb);
+        verticalLayout_1->addWidget(qcb1);
 
         horizontalLayout_3->addLayout(verticalLayout_1);
 
         verticalLayout_5 = new QVBoxLayout();
         verticalLayout_5->setObjectName(QString::fromUtf8("verticalLayout_5"));
 
-        spinbox = new QDoubleSpinBox(saturationAdj);
+
+        spinbox = new QSpinBox(kernelDialog);
         spinbox->setObjectName(QString::fromUtf8("spinbox"));
         spinbox->setAlignment(Qt::AlignCenter);
-        spinbox->setRange(-1.0, 1.0);
-        spinbox->setDecimals(3);
-        spinbox->setValue(0.0);
-        spinbox->setSingleStep(0.01);
+        spinbox->setRange(1, 15);
+        spinbox->setSingleStep(2);
+        spinbox->setValue(1);
 
         verticalLayout_5->addWidget(spinbox);
 
         horizontalLayout_3->addLayout(verticalLayout_5);
-
-        verticalLayout_4 = new QVBoxLayout();
-        verticalLayout_4->setObjectName(QString::fromUtf8("verticalLayout_4"));
-
-        slider = new QSlider(saturationAdj);
-        slider->setObjectName(QString::fromUtf8("slider"));
-        slider->setMinimum(-255);
-        slider->setMaximum(255);
-        slider->setValue(0);
-        slider->setOrientation(Qt::Orientation::Horizontal);
-
-        verticalLayout_4->addWidget(slider);
-
-        horizontalLayout_3->addLayout(verticalLayout_4);
 
         verticalLayout_2->addLayout(horizontalLayout_3);
 
@@ -111,7 +101,7 @@ public:
 
         verticalLayout = new QVBoxLayout();
         verticalLayout->setObjectName(QString::fromUtf8("verticalLayout"));
-        buttonBox = new QDialogButtonBox(saturationAdj);
+        buttonBox = new QDialogButtonBox(kernelDialog);
         buttonBox->setObjectName(QString::fromUtf8("buttonBox"));
         buttonBox->setStandardButtons(QDialogButtonBox::Cancel|QDialogButtonBox::Ok);
 
@@ -121,22 +111,22 @@ public:
 
         verticalLayout_3->addLayout(horizontalLayout);
 
-        retranslateUi(saturationAdj);
+        retranslateUi(kernelDialog);
 
-        QMetaObject::connectSlotsByName(saturationAdj);
+        QMetaObject::connectSlotsByName(kernelDialog);
     } // setupUi
 
-    void retranslateUi(QWidget *saturationAdj)
+    void retranslateUi(QWidget *kernelDialog)
     {
-        saturationAdj->setWindowTitle(QCoreApplication::translate("SaturationAdj", "Form", nullptr));
+        kernelDialog->setWindowTitle(QCoreApplication::translate("kernelDialog", "Form", nullptr));
     } // retranslateUi
 
 };
 
 namespace Ui {
-    class SaturationAdj: public Ui_SaturationAdj {};
+    class KernelDialog: public Ui_KernelDialog {};
 } // namespace Ui
 
 QT_END_NAMESPACE
 
-#endif // UI_SATURATIONADJ_H
+#endif // UI_KERNELDIALOG_H

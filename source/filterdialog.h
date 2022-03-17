@@ -1,39 +1,39 @@
-#ifndef BRIGHTNESSADJ_H
-#define BRIGHTNESSADJ_H
+#ifndef FILTERDIALOG_H
+#define FILTERDIALOG_H
 
 #include <QDialog>
 #include <QPainter>
 
-#include <stdfuncs.h>
 #include <graphics.h>
-using graphics::eType;
-using graphics::Color;
+
+using graphics::Filter;
+using graphics::Filtering;
 
 namespace Ui {
-class BrightnessAdj;
+class FilterDialog;
 }
 
-class BrightnessAdj : public QDialog
+class FilterDialog : public QDialog
 {
         Q_OBJECT
 public:
-    BrightnessAdj(QWidget *parent = nullptr);
-    ~BrightnessAdj();
+    FilterDialog(QWidget *parent = nullptr);
+    ~FilterDialog();
     void setWork(QImage *toProcess);
 
 private slots:
+    void comboChange();
     void on_spinbox_valueChanged(double value);
     void on_slider_valueChanged(int value);
-    void process();
     void on_buttonBox_accepted();
     void on_buttonBox_rejected();
 
 private:
-    Ui::BrightnessAdj *ui;
+    void process();
+    Ui::FilterDialog *ui;
     QImage *qi, processed, proDisp;
-    double val;
+    int val;
 
 };
 
-#endif // BRIGHTNESSADJ_H
-
+#endif // FILTERDIALOG_H

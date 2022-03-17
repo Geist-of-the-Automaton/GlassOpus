@@ -5,7 +5,6 @@ BrightnessAdj::BrightnessAdj(QWidget *parent) :
     QDialog(parent),
     ui(new Ui::BrightnessAdj)
 {
-    this->setWindowFlag(Qt::WindowStaysOnTopHint, true);
     ui->setupUi(this);
     setWindowTitle("Brightness Adjustment");
     connect(ui->qcb, SIGNAL(currentIndexChanged(int)), this, SLOT(process()));
@@ -20,6 +19,9 @@ void BrightnessAdj::setWork(QImage *toProcess) {
     processed = qi->scaled(qi->width() / 3, qi->height() / 3, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
     proDisp = processed.copy();
     ui->label->setPixmap(QPixmap::fromImage(proDisp));
+    ui->slider->setValue(0);
+    ui->spinbox->setValue(0.0);
+    ui->qcb->setCurrentIndex(0);
 }
 
 void BrightnessAdj::on_spinbox_valueChanged(double value) {

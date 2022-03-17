@@ -1,5 +1,5 @@
-#ifndef UI_SATURATIONADJ_H
-#define UI_SATURATIONADJ_H
+#ifndef UI_FILTERDIALOG_H
+#define UI_FILTERDIALOG_H
 
 #include <QtCore/QVariant>
 #include <QtWidgets/QApplication>
@@ -12,10 +12,15 @@
 #include <QtWidgets/QWidget>
 #include <QtWidgets/QDoubleSpinBox>
 #include <QtWidgets/QComboBox>
+#include <QtWidgets/QSlider>
+#include <string>
+using std::to_string;
+
+#include <graphics.h>
 
 QT_BEGIN_NAMESPACE
 
-class Ui_SaturationAdj
+class Ui_FilterDialog
 {
 public:
     QVBoxLayout *verticalLayout_3;
@@ -26,24 +31,24 @@ public:
     QSpacerItem *horizontalSpacer;
     QHBoxLayout *horizontalLayout_3;
     QVBoxLayout *verticalLayout_5;
-    QDoubleSpinBox *spinbox;
     QVBoxLayout *verticalLayout_4;
     QVBoxLayout *verticalLayout_1;
-    QSlider *slider;
     QVBoxLayout *verticalLayout;
     QDialogButtonBox *buttonBox;
-    QComboBox *qcb;
+    QComboBox *qcb1;
+    QDoubleSpinBox *spinbox;
+    QSlider *slider;
 
-    void setupUi(QWidget *saturationAdj)
+    void setupUi(QWidget *filterDialog)
     {
-        if (saturationAdj->objectName().isEmpty())
-            saturationAdj->setObjectName(QString::fromUtf8("saturationAdj"));
-        saturationAdj->resize(282, 244);
-        verticalLayout_3 = new QVBoxLayout(saturationAdj);
+        if (filterDialog->objectName().isEmpty())
+            filterDialog->setObjectName(QString::fromUtf8("filterDialog"));
+        filterDialog->resize(282, 244);
+        verticalLayout_3 = new QVBoxLayout(filterDialog);
         verticalLayout_3->setObjectName(QString::fromUtf8("verticalLayout_3"));
         verticalLayout_6 = new QVBoxLayout();
         verticalLayout_6->setObjectName(QString::fromUtf8("verticalLayout_6"));
-        label = new QLabel(saturationAdj);
+        label = new QLabel(filterDialog);
         label->setObjectName(QString::fromUtf8("label"));
         label->setEnabled(true);
         label->setCursor(QCursor(Qt::CrossCursor));
@@ -67,24 +72,26 @@ public:
         verticalLayout_1 = new QVBoxLayout();
         verticalLayout_1->setObjectName(QString::fromUtf8("verticalLayout_1"));
 
-        qcb = new QComboBox(saturationAdj);
-        qcb->setObjectName(QString::fromUtf8("combo"));
-        qcb->addItems(QStringList({"HSV", "HSL"}));
-        qcb->setCurrentIndex(0);
+        qcb1 = new QComboBox(filterDialog);
+        qcb1->setObjectName(QString::fromUtf8("combo1"));
+        for (string s : graphics::filterNames)
+            qcb1->addItem(s.c_str());
+        qcb1->setCurrentIndex(0);
 
-        verticalLayout_1->addWidget(qcb);
+        verticalLayout_1->addWidget(qcb1);
 
         horizontalLayout_3->addLayout(verticalLayout_1);
 
         verticalLayout_5 = new QVBoxLayout();
         verticalLayout_5->setObjectName(QString::fromUtf8("verticalLayout_5"));
 
-        spinbox = new QDoubleSpinBox(saturationAdj);
+
+        spinbox = new QDoubleSpinBox(filterDialog);
         spinbox->setObjectName(QString::fromUtf8("spinbox"));
         spinbox->setAlignment(Qt::AlignCenter);
-        spinbox->setRange(-1.0, 1.0);
+        spinbox->setRange(0.0, 1.0);
         spinbox->setDecimals(3);
-        spinbox->setValue(0.0);
+        spinbox->setValue(1.0);
         spinbox->setSingleStep(0.01);
 
         verticalLayout_5->addWidget(spinbox);
@@ -94,11 +101,10 @@ public:
         verticalLayout_4 = new QVBoxLayout();
         verticalLayout_4->setObjectName(QString::fromUtf8("verticalLayout_4"));
 
-        slider = new QSlider(saturationAdj);
+        slider = new QSlider(filterDialog);
         slider->setObjectName(QString::fromUtf8("slider"));
-        slider->setMinimum(-255);
-        slider->setMaximum(255);
-        slider->setValue(0);
+        slider->setRange(0, 255);
+        slider->setValue(255);
         slider->setOrientation(Qt::Orientation::Horizontal);
 
         verticalLayout_4->addWidget(slider);
@@ -111,7 +117,7 @@ public:
 
         verticalLayout = new QVBoxLayout();
         verticalLayout->setObjectName(QString::fromUtf8("verticalLayout"));
-        buttonBox = new QDialogButtonBox(saturationAdj);
+        buttonBox = new QDialogButtonBox(filterDialog);
         buttonBox->setObjectName(QString::fromUtf8("buttonBox"));
         buttonBox->setStandardButtons(QDialogButtonBox::Cancel|QDialogButtonBox::Ok);
 
@@ -121,22 +127,22 @@ public:
 
         verticalLayout_3->addLayout(horizontalLayout);
 
-        retranslateUi(saturationAdj);
+        retranslateUi(filterDialog);
 
-        QMetaObject::connectSlotsByName(saturationAdj);
+        QMetaObject::connectSlotsByName(filterDialog);
     } // setupUi
 
-    void retranslateUi(QWidget *saturationAdj)
+    void retranslateUi(QWidget *filterDialog)
     {
-        saturationAdj->setWindowTitle(QCoreApplication::translate("SaturationAdj", "Form", nullptr));
+        filterDialog->setWindowTitle(QCoreApplication::translate("filterDialog", "Form", nullptr));
     } // retranslateUi
 
 };
 
 namespace Ui {
-    class SaturationAdj: public Ui_SaturationAdj {};
+    class FilterDialog: public Ui_FilterDialog {};
 } // namespace Ui
 
 QT_END_NAMESPACE
 
-#endif // UI_SATURATIONADJ_H
+#endif // UI_FILTERDIALOG_H

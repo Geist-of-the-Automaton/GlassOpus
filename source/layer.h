@@ -24,10 +24,9 @@ const float ipolMax = 0.1f;
 const unsigned char ptSize = 5;
 const double pi = 3.14159265359;
 const unsigned char maxVects = UCHAR_MAX;
+
 const int maxSymDiv = 36;
 const int minSymDiv = 1;
-
-enum sym2DivType {Rotate, Reflect};
 
 class Layer {
 
@@ -103,10 +102,7 @@ public:
     void setFilter(string filterName);
     static float getipol(float a, float b, float ipol);
     void applyKernalToSelection(QProgressDialog *qpd, string fileName);
-    void setSymDivPt(QPoint qp);
-    void setSymDiv(int div);
-    void setSymDivType(int type);
-    int getSymDiv();
+    void setSym(QPoint qp, int div, int ofEvery, int skip);
     int symActive();
     Filter filter;
 
@@ -129,8 +125,7 @@ private:
     bool shiftFlag, selectOgActive, selecting, symCreate;
     QPoint deltaMove, boundPt1, boundPt2, rotateAnchor;
     QPoint symPt;
-    int symDiv;
-    sym2DivType divType;
+    int symDiv, symOfEvery, symSkip;
 
 };
 

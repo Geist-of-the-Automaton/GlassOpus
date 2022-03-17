@@ -126,12 +126,21 @@ void DataIOHandler::renderLayer(QProgressDialog *fqpd, QProgressDialog *qpd, QIm
         int width = vects[i].getWidth();
         pair <QPoint, QPoint> bounds = vects[i].getBounds();
         bool flag = bounds.first.x() > width && bounds.first.y() > width && bounds.second.x() < w - width && bounds.second.y() < h - width;
+        short band = vects[i].getBand(), gap = vects[i].getGap();
+        float totalTri = static_cast<float>(tris[i].size() / 2);
+        float offset = (totalTri / static_cast<float>(band + gap));
+        int styler = -static_cast<int>(((static_cast<float>(band + gap) * offset) - totalTri) / 2.0);
         if (vects[i].getMode() == ColorFill) {
             if (flag) { //normal draw
                 if (colors.first == colors.second) {
                     color = ca.rgba();
-                    for (Triangle &t : *dTris[i])
-                        fillTri(toProcess, t, color);
+                    for (Triangle &t : *dTris[i]) {
+                        if (styler >= 0)
+                            fillTri(toProcess, t, color);
+                        styler += 1;
+                        if (styler == band - 1)
+                            styler = -gap;
+                    }
                 }
                 else {
                     float ccomp = 1.0 / static_cast<float>((*dTris[i]).size());
@@ -142,7 +151,11 @@ void DataIOHandler::renderLayer(QProgressDialog *fqpd, QProgressDialog *qpd, QIm
                         int g = static_cast<int>((ccc * static_cast<float>(ca.green())) + ((1.0 - ccc) * static_cast<float>(cb.green())));
                         int b = static_cast<int>((ccc * static_cast<float>(ca.blue())) + ((1.0 - ccc) * static_cast<float>(cb.blue())));
                         color = QColor(r, g, b).rgba();
-                        fillTri(toProcess, t, color);
+                        if (styler >= 0)
+                            fillTri(toProcess, t, color);
+                        styler += 1;
+                        if (styler == band - 1)
+                            styler = -gap;
                         cnt += 1.0;
                     }
                 }
@@ -151,14 +164,19 @@ void DataIOHandler::renderLayer(QProgressDialog *fqpd, QProgressDialog *qpd, QIm
                 if (colors.first == colors.second) {
                     color = ca.rgba();
                     for (Triangle &t : *dTris[i]) {
-                        if (t.A().x() < 0 || t.A().x() >= w || t.A().y() < 0 || t.A().y() >= h)
-                            fillTriSafe(toProcess, t, color);
-                        else if (t.B().x() < 0 || t.B().x() >= w || t.B().y() < 0 || t.B().y() >= h)
-                            fillTriSafe(toProcess, t, color);
-                        else if (t.C().x() < 0 || t.C().x() >= w || t.C().y() < 0 || t.C().y() >= h)
-                            fillTriSafe(toProcess, t, color);
-                        else
-                            fillTri(toProcess, t, color);
+                        if (styler >= 0) {
+                            if (t.A().x() < 0 || t.A().x() >= w || t.A().y() < 0 || t.A().y() >= h)
+                                fillTriSafe(toProcess, t, color);
+                            else if (t.B().x() < 0 || t.B().x() >= w || t.B().y() < 0 || t.B().y() >= h)
+                                fillTriSafe(toProcess, t, color);
+                            else if (t.C().x() < 0 || t.C().x() >= w || t.C().y() < 0 || t.C().y() >= h)
+                                fillTriSafe(toProcess, t, color);
+                            else
+                                fillTri(toProcess, t, color);
+                        }
+                        styler += 1;
+                        if (styler == band - 1)
+                            styler = -gap;
                     }
                 }
                 else {
@@ -170,14 +188,19 @@ void DataIOHandler::renderLayer(QProgressDialog *fqpd, QProgressDialog *qpd, QIm
                         int g = static_cast<int>((ccc * static_cast<float>(ca.green())) + ((1.0 - ccc) * static_cast<float>(cb.green())));
                         int b = static_cast<int>((ccc * static_cast<float>(ca.blue())) + ((1.0 - ccc) * static_cast<float>(cb.blue())));
                         color = QColor(r, g, b).rgba();
-                        if (t.A().x() < 0 || t.A().x() >= w || t.A().y() < 0 || t.A().y() >= h)
-                            fillTriSafe(toProcess, t, color);
-                        else if (t.B().x() < 0 || t.B().x() >= w || t.B().y() < 0 || t.B().y() >= h)
-                            fillTriSafe(toProcess, t, color);
-                        else if (t.C().x() < 0 || t.C().x() >= w || t.C().y() < 0 || t.C().y() >= h)
-                            fillTriSafe(toProcess, t, color);
-                        else
-                            fillTri(toProcess, t, color);
+                        if (styler >= 0) {
+                            if (t.A().x() < 0 || t.A().x() >= w || t.A().y() < 0 || t.A().y() >= h)
+                                fillTriSafe(toProcess, t, color);
+                            else if (t.B().x() < 0 || t.B().x() >= w || t.B().y() < 0 || t.B().y() >= h)
+                                fillTriSafe(toProcess, t, color);
+                            else if (t.C().x() < 0 || t.C().x() >= w || t.C().y() < 0 || t.C().y() >= h)
+                                fillTriSafe(toProcess, t, color);
+                            else
+                                fillTri(toProcess, t, color);
+                        }
+                        styler += 1;
+                        if (styler == band - 1)
+                            styler = -gap;
                         cnt += 1.0;
                     }
                 }
@@ -185,18 +208,28 @@ void DataIOHandler::renderLayer(QProgressDialog *fqpd, QProgressDialog *qpd, QIm
         }
         else {
             if (flag) //normal draw
-                for (Triangle &t : *dTris[i])
-                    filterTri(toProcess, t, vf);
+                for (Triangle &t : *dTris[i]) {
+                    if (styler >= 0)
+                        filterTri(toProcess, t, vf);
+                    styler += 1;
+                    if (styler == band - 1)
+                        styler = -gap;
+                }
             else  // safe draw
                 for (Triangle &t : *dTris[i]) {
-                    if (t.A().x() < 0 || t.A().x() >= w || t.A().y() < 0 || t.A().y() >= h)
-                        filterTriSafe(toProcess, t, vf);
-                    else if (t.B().x() < 0 || t.B().x() >= w || t.B().y() < 0 || t.B().y() >= h)
-                        filterTriSafe(toProcess, t, vf);
-                    else if (t.C().x() < 0 || t.C().x() >= w || t.C().y() < 0 || t.C().y() >= h)
-                        filterTriSafe(toProcess, t, vf);
-                    else
-                        filterTri(toProcess, t, vf);
+                    if (styler >= 0) {
+                        if (t.A().x() < 0 || t.A().x() >= w || t.A().y() < 0 || t.A().y() >= h)
+                            filterTriSafe(toProcess, t, vf);
+                        else if (t.B().x() < 0 || t.B().x() >= w || t.B().y() < 0 || t.B().y() >= h)
+                            filterTriSafe(toProcess, t, vf);
+                        else if (t.C().x() < 0 || t.C().x() >= w || t.C().y() < 0 || t.C().y() >= h)
+                            filterTriSafe(toProcess, t, vf);
+                        else
+                            filterTri(toProcess, t, vf);
+                    }
+                    styler += 1;
+                    if (styler == band - 1)
+                        styler = -gap;
                 }
         }
         if (qpd != nullptr) {
@@ -841,6 +874,8 @@ void DataIOHandler::save(QString projectName) {
             out << static_cast<unsigned char>(sv.getTaper().second);
             out << static_cast<unsigned char>(Taper(sv.getTaperType()));
             out << static_cast<unsigned char>(VectorMode(sv.getMode()));
+            out << static_cast<unsigned short>(sv.getBand());
+            out << static_cast<unsigned short>(sv.getGap());
         }
     }
     if (QFile::exists(backupName.c_str()))
@@ -878,7 +913,6 @@ int DataIOHandler::load(QString projectName) {
                 // Read size of vects
                 in >> numVects;
                 if (numVects > maxVects)  {
-                    cout << "here" << endl;
                     retCode = 1;
                     break;
                 }
@@ -945,6 +979,11 @@ int DataIOHandler::load(QString projectName) {
                         break;
                     }
                     sv.setMode(static_cast<VectorMode>(ucharTemp));
+                    unsigned short uShortTemp;
+                    in >> uShortTemp;
+                    sv.setBand(uShortTemp);
+                    in >> uShortTemp;
+                    sv.setGap(uShortTemp);
                     svs.push_back(sv);
                 }
                 if (retCode == 0) {
@@ -989,17 +1028,7 @@ vector <Layer *> DataIOHandler::backup() {
     return compare;
 }
 
-void DataIOHandler::setSymDiv(int div) {
-    for (size_t i = 0; i < frame.size(); ++i)
-        frame[i]->setSymDiv(div);
-}
-
-void DataIOHandler::setDivType(int type) {
-    for (size_t i = 0; i < frame.size(); ++i)
-        frame[i]->setSymDivType(type);
-}
-
-void DataIOHandler::setSymPt(QPoint qp) {
-    for (size_t i = 0; i < frame.size(); ++i)
-        frame[i]->setSymDivPt(qp);
+void DataIOHandler::setSym(QPoint qp, int div, int ofEvery, int skip) {
+    for (Layer *l : frame)
+        l->setSym(qp, div, ofEvery, skip);
 }

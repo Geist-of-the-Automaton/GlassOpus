@@ -29,14 +29,26 @@ HEADERS = \
     $$PWD/patternprofiler.h \
     brightnessadj.h \
     contrastadj.h \
+    ditherdialog.h \
+    filterdialog.h \
     gammaadj.h \
+    histodialog.h \
     hueshift.h \
+    kerneldialog.h \
     saturationadj.h \
+    symdialog.h \
+    transferdialog.h \
     ui_brightnessadj.h \
     ui_contrastadj.h \
+    ui_ditherdialog.h \
+    ui_filterdialog.h \
     ui_gammaadj.h \
+    ui_histodialog.h \
     ui_hueshift.h \
+    ui_kerneldialog.h \
     ui_saturationadj.h \
+    ui_symdialog.h \
+    ui_transfer.h \
     vec_mat_maths.h
 
 SOURCES = \
@@ -60,9 +72,15 @@ SOURCES = \
     $$PWD/patternprofiler.cpp \
     brightnessadj.cpp \
     contrastadj.cpp \
+    ditherdialog.cpp \
+    filterdialog.cpp \
     gammaadj.cpp \
+    histodialog.cpp \
     hueshift.cpp \
-    saturationadj.cpp
+    kerneldialog.cpp \
+    saturationadj.cpp \
+    symdialog.cpp \
+    transferdialog.cpp
 
 # Default rules for deployment
 qnx: target.path = /tmp/$${TARGET}/bin

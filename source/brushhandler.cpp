@@ -31,7 +31,9 @@ brushHandler::brushHandler(unsigned char str, int size, int density, string type
     ipolActive = false;
     relativityPoint = QPoint(-1000,-1000);
     resetPoint();
-    symDiv = 20;
+    symDiv = 1;
+    symOfEvery = 1;
+    symSkip = 0;
 }
 
 brushHandler::~brushHandler() {
@@ -324,7 +326,7 @@ void brushHandler::overwrite(QImage *qi) {
         else {
             float offset = 2 * pi / static_cast<float>(symDiv);
             for (float mult = 0.0; mult < symDiv; mult += 1.0) {
-                if (static_cast<int>(mult) % 5 > 3)
+                if (static_cast<int>(mult) % symOfEvery >= (symOfEvery - symSkip))
                     continue;
                 float angle = offset * mult;
                 float x = currPnt.x();
@@ -551,19 +553,14 @@ Shape brushHandler::getBrushShape() {
     return brush.getBrushShape();
 }
 
-int brushHandler::getSymDiv() {
-    return symDiv;
-}
-
-void brushHandler::setSymDiv(int div) {
-    symDiv = div;
-}
-
-void brushHandler::setSymDivPt(QPoint qp) {
+void brushHandler::setSym(QPoint qp, int div, int ofEvery, int skip) {
     symPt = qp;
+    symDiv = div;
+    symOfEvery = ofEvery;
+    symSkip = skip;
 }
 
-void brushHandler::setSymDivType(int type) {
-    divType = sym2DivType(type);
+QPoint brushHandler::getSymPt() {
+    return symPt;
 }
 

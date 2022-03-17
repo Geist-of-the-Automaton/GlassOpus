@@ -66,10 +66,8 @@ public:
     void setInterpolationActive(bool flag);
     void setSize(int size);
     Shape getBrushShape();
-    void setSymDivPt(QPoint qp);
-    void setSymDiv(int div);
-    void setSymDivType(int type);
-    int getSymDiv();
+    void setSym(QPoint qp, int div, int ofEvery, int skip);
+    QPoint getSymPt();
 
 private:
 
@@ -102,8 +100,7 @@ private:
     vector <int> radialValues;
     vector <vector <unsigned char> > patternMap;
     QPoint symPt;
-    int symDiv;
-    sym2DivType divType;
+    int symDiv, symOfEvery, symSkip;
 };
 
 #endif // brushHANDLER_H

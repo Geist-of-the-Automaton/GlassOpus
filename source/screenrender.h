@@ -15,6 +15,9 @@
 #include <layer.h>
 #include <dataIOHandler.h>
 #include <thread>
+#include <QCursor>
+
+using Qt::CrossCursor;
 
 using std::find;
 using std::vector;
@@ -83,12 +86,13 @@ private:
     Filter filter;
     DataIOHandler *ioh;
     EditMode mode;
-    unsigned char **hoverMap;
     int radius;
+    unsigned char **hoverMap;
     bool hoverActive;
     long long time;
     int yStart, yMid, yEnd;
     unsigned int alphaVal;
+
 
 public slots:
 

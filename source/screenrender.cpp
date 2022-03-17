@@ -16,6 +16,7 @@ screenRender::screenRender(DataIOHandler *dioh, QWidget *parent) : QWidget(paren
     setAttribute(Qt::WA_Hover);
     radius = -1;
     yStart = 0;
+    setCursor(CrossCursor);
 }
 
 screenRender::~screenRender() {
@@ -25,10 +26,14 @@ screenRender::~screenRender() {
 
 void screenRender::setMode(EditMode emode) {
     mode = emode;
-    if (mode != Brush_Mode)
+    if (mode != Brush_Mode) {
         resume();
-    else
+        setCursor(CrossCursor);
+    }
+    else {
         stopFlashing();
+        setCursor(QCursor(QPixmap::fromImage(QImage(1, 1, QImage::Format_ARGB32_Premultiplied)), -1, -1));
+    }
 }
 
 void screenRender::setHoverActive(bool active) {
@@ -36,7 +41,6 @@ void screenRender::setHoverActive(bool active) {
 }
 
 void screenRender::updateHoverMap(int r, const unsigned char const* const* arr) {
-
     //return;
     //fix this
     stopFlashing();
@@ -292,8 +296,14 @@ void screenRender::paintEvent(QPaintEvent *event) {
                 QRgb *line = reinterpret_cast<QRgb *>(qi.scanLine(j));
                 for (int i = stdFuncs::clamp(qp.x() - ptSize, 0, w); i < stdFuncs::clamp(qp.x() + ptSize + 1, 0, w); ++i) {
                     int dist = abs(i - qp.x()) + abs(j - qp.y());
-                    if ((flashFlag || dist >= ptSize - 1) && dist <= ptSize)
-                        line[i] = Filtering::negative(line[i], 255);
+                    if ((flashFlag || dist >= ptSize - 1) && dist <= ptSize) {
+                        QRgb c = line[i];
+                        if (!(c & 0xFF000000))
+                            c = 0xFFFFFFFF;
+                        else
+                            c |= 0xFF000000;
+                        line[i] = Filtering::negative(c, 255);
+                    }
                 }
             }
         }
@@ -303,8 +313,10 @@ void screenRender::paintEvent(QPaintEvent *event) {
     for (int i = stdFuncs::clamp(samplePoint.x() - ptSize, 0, w); i < stdFuncs::clamp(samplePoint.x() + ptSize + 1, 0, w); ++i)
         for (int j = stdFuncs::clamp(samplePoint.y() - ptSize, 0, h); j < stdFuncs::clamp(samplePoint.y() + ptSize + 1, 0, h); ++j) {
             int dist = abs(i - samplePoint.x()) + abs(j - samplePoint.y());
-            if ((flashFlag || dist >= ptSize - 1) && dist <= ptSize)
-                qi.setPixel(i, j, Filtering::negative(qi.pixelColor(i, j), 255));
+            if ((flashFlag || dist >= ptSize - 1) && dist <= ptSize) {
+                QColor qc = qi.pixelColor(i, j);
+                qi.setPixel(i, j, qc.alpha() == 0 ? QColor(0, 0, 0).rgba() : Filtering::negative(qi.pixelColor(i, j), 255));
+            }
         }
     for (QPoint qp : workLayer->getRasterEdges()) {
         for (int i = stdFuncs::clamp(qp.x() - ptSize, 0, w); i < stdFuncs::clamp(qp.x() + ptSize + 1, 0, w); ++i)
@@ -318,17 +330,27 @@ void screenRender::paintEvent(QPaintEvent *event) {
             }
     }
     if (underMouse() && hoverActive && mode == Brush_Mode && hoverLock.try_lock()) {
+        QPoint qp = brushLoc;
+        brushLoc = QPoint(brushLoc.x() + 1, brushLoc.y() + 7);
         int x = brushLoc.x() < radius ? radius - brushLoc.x() - 1 : 0, yStarter = brushLoc.y() < radius ? radius - brushLoc.y() : 0;
         for (int i = max(0, brushLoc.x() - radius); i <= min(qi.width() - 1, brushLoc.x() + radius + (brushLoc.x() < radius ? 1 : 0)); ++i) {
             int y = yStarter;
             for (int j = max(0, brushLoc.y() - radius); j <= min(qi.height() - 1, brushLoc.y() + radius); ++j) {
-                if (hoverMap[x][y] == 1)
-                    qi.setPixel(i, j, graphics::Filtering::negative(graphics::Filtering::polarize(qi.pixel(i, j) | 0xFF000000, 128), 255));
+                if (hoverMap[x][y] == 1) {
+                    QRgb c = qi.pixel(i, j);
+                    if (!(c & 0xFF000000))
+                        c = 0xFFFFFFFF;
+                    else
+                        c |= 0xFF000000;
+                    qi.setPixel(i, j, graphics::Filtering::negative(graphics::Filtering::polarize(c, 128), 255));
+
+                }
                 ++y;
             }
             ++x;
         }
         hoverLock.unlock();
+        brushLoc = qp;
     }
     graphics::ImgSupport::applyAlpha(&qi, &yStart, &yEnd, &alphaVal);
     qp.drawImage(0, 0, screenZoom.zoomImg(qi));
