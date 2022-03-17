@@ -88,7 +88,6 @@ public:
         spinbox->setObjectName(QString::fromUtf8("spinbox"));
         spinbox->setAlignment(Qt::AlignCenter);
         spinbox->setRange(1, 15);
-        spinbox->setSingleStep(2);
         spinbox->setValue(1);
 
         verticalLayout_5->addWidget(spinbox);
