@@ -5,12 +5,11 @@ Layer::Layer() {
     activePt = -1;
     alpha = 0;
     qi = new QImage();
-    shiftFlag = false;
+    addOrSub = dragDraw = selectOgActive = shiftFlag = false;
     ipolPts = ipolMin;
     mode = Brush_Mode;
     selection = NoSelect;
     postAngle = 0.0;
-    selectOgActive = false;
     deltaMove =  boundPt1 = boundPt2 = rotateAnchor = QPoint(-1000, -1000);
     symDiv = 1;
     symOfEvery = 1;
@@ -22,12 +21,11 @@ Layer::Layer(QSize qs) {
     alpha = 255;
     qi = new QImage(qs, QImage::Format_ARGB32);
     qi->fill(0x00000000);
-    shiftFlag = false;
+    addOrSub = dragDraw = selectOgActive = shiftFlag = false;
     ipolPts = ipolMin;
     mode = Brush_Mode;
     selection = NoSelect;
     postAngle = 0.0;
-    selectOgActive = false;
     deltaMove =  boundPt1 = boundPt2 = rotateAnchor = QPoint(-1000, -1000);
     symDiv = 1;
     symOfEvery = 1;
@@ -39,12 +37,11 @@ Layer::Layer(QImage in, int alphaValue) {
     alpha = alphaValue;
     // need to fill alpha?
     qi = new QImage(in);
-    shiftFlag = false;
+    addOrSub = dragDraw = selectOgActive = shiftFlag = false;
     ipolPts = ipolMin;
     mode = Brush_Mode;
     selection = NoSelect;
     postAngle = 0.0;
-    selectOgActive = false;
     deltaMove =  boundPt1 = boundPt2 = rotateAnchor = QPoint(-1000, -1000);
     symDiv = 1;
     symOfEvery = 1;
@@ -59,7 +56,7 @@ Layer& Layer::operator=(const Layer &layer) {
     mode = Brush_Mode;
     selection = NoSelect;
     vects = layer.vects;
-    tris = layer.tris;
+    vectTris = layer.vectTris;
     //active vects don't get copied.
     activePt = -1;
     qi = new QImage(layer.qi->copy());
@@ -81,17 +78,33 @@ Layer& Layer::operator=(const Layer &layer) {
     return *this;
 }
 
+void Layer::pasteText(list<DrawText> dws) {
+    deselect();
+    unsigned char i = static_cast<unsigned char>(texts.size());
+    texts.insert(texts.end(), dws.begin(), dws.end());
+    while (i < texts.size())
+        activeTexts.push_back(i++);
+}
+
 void Layer::pasteVectors(list<SplineVector> svs) {
     deselect();
     unsigned char i = static_cast<unsigned char>(vects.size());
     vects.insert(vects.end(), svs.begin(), svs.end());
-    while (tris.size() < vects.size())
-        tris.push_back(list <Triangle> ());
+    while (vectTris.size() < vects.size())
+        vectTris.push_back(list <Triangle> ());
     for (size_t j = i; j < vects.size(); ++j)
         vects[j].cleanup();
     while (i < vects.size())
         activeVects.push_back(i++);
     calcLine();
+}
+
+void Layer::pastePolygons(list<Polygon> pgs) {
+    deselect();
+    unsigned char i = static_cast<unsigned char>(gons.size());
+    gons.insert(gons.end(), pgs.begin(), pgs.end());
+    while (i < gons.size())
+        activeGons.push_back(i++);
 }
 
 void Layer::pasteRaster(QImage rasterIn, double angleIn, pair<QPoint, QPoint> bounds) {
@@ -221,7 +234,7 @@ void Layer::patternFill(QPoint qp, QColor qc) {
 }
 
 vector <list <Triangle> > Layer::getTriangles() {
-    return tris;
+    return vectTris;
 }
 
 vector <SplineVector> Layer::getVectors() {
@@ -291,7 +304,7 @@ void Layer::calcLine() {
             pairs.push_back(pair <QPoint, QPoint> (QPoint(x1, y1), QPoint(x2, y2)));
             workPts[0] = controlPts[0];
         }
-        tris[activeVect].clear();
+        vectTris[activeVect].clear();
         pair <QPoint, QPoint> first = pairs.front();
         pairs.pop_front();
         int x, y;
@@ -305,12 +318,12 @@ void Layer::calcLine() {
             y = first.second.y() - second.first.y();
             int dist2 = x * x + y * y;
             if (dist1 > dist2) {
-                tris[activeVect].push_back(Triangle(first.first, second.second, first.second));
-                tris[activeVect].push_back(Triangle(first.first, second.second, second.first));
+                vectTris[activeVect].push_back(Triangle(first.first, second.second, first.second));
+                vectTris[activeVect].push_back(Triangle(first.first, second.second, second.first));
             }
             else {
-                tris[activeVect].push_back(Triangle(first.second, second.first, first.first));
-                tris[activeVect].push_back(Triangle(first.second, second.first, second.second));
+                vectTris[activeVect].push_back(Triangle(first.second, second.first, first.first));
+                vectTris[activeVect].push_back(Triangle(first.second, second.first, second.second));
             }
             first = second;
         }
@@ -325,10 +338,38 @@ void Layer::spinWheel(int dy) {
     }
     else if (mode == Raster_Mode && selectOgActive)
         postAngle += dy < 0 ? -0.01 : 0.01;
+    else if (mode == Polygon_Mode)
+        for (unsigned char activeGon : activeGons)
+            gons[activeGon].setEdgeSize(gons[activeGon].getEdgeSize() + dy);
+    else if (mode == Text_Mode) {
+        if (shiftFlag)
+            for (unsigned char activeText : activeTexts) {
+                QFont qf = texts[activeText].getFont();
+                int size = qf.pointSize() + dy;
+                if (size > 0) {
+                    qf.setPointSize(qf.pointSize() + dy);
+                    texts[activeText].updateFont(qf);
+                }
+            }
+        else
+            for (unsigned char activeText : activeTexts) {
+                QStaticText qsText = texts[activeText].getText();
+                int width = qsText.textWidth() + 10 * dy;
+                if (width >= 0) {
+                    qsText.setTextWidth(width);
+                    texts[activeText].updateText(qsText);
+                }
+            }
+    }
 }
 
 void Layer::release(QPoint qp, MouseButton button) {
-    if (mode == Spline_Mode) {
+    if (mode == Polygon_Mode) {
+        activePt = -1;
+        for (int activeGon : activeGons)
+            gons[activeGon].cleanup();
+    }
+    else if (mode == Spline_Mode) {
         activePt = -1;
         if (shiftFlag)
             for (unsigned char i : activeVects)
@@ -375,8 +416,32 @@ void Layer::release(QPoint qp, MouseButton button) {
    }
 }
 
-void Layer::moveLeft(QPoint qp) {
-    if (mode == Spline_Mode) {
+void Layer::moveLeft(QPointF pt, QPoint lastPos) {
+    QPoint qp = pt.toPoint();
+    if (mode == Text_Mode) {
+        if (shiftFlag) {
+            float xscale = static_cast<float>(qp.x()) / static_cast<float>(lastPos.x()) - 1.0;
+            float yscale = static_cast<float>(qp.y()) / static_cast<float>(lastPos.y()) - 1.0;
+            for (unsigned char activeText : activeTexts)
+                texts[activeText].updateScale(xscale, yscale);
+        }
+        else {
+            qp -= lastPos;
+            for (unsigned char activeText : activeTexts)
+                texts[activeText].updatePos(qp);
+        }
+    }
+    else if (mode == Polygon_Mode) {
+        if (shiftFlag)
+            for (int activeGon : activeGons)
+                gons[activeGon].scale(qp);
+        else if (activeGons.size() == 1 && activePt != -1)
+            gons[activeGons[0]].movePt(qp, activePt);
+        else
+            for (int activeGon : activeGons)
+                gons[activeGon].translate(qp);
+    }
+    else if (mode == Spline_Mode) {
         if (activePt == -1) {
             if (shiftFlag)
                 for (unsigned char i : activeVects)
@@ -465,8 +530,44 @@ void Layer::moveLeft(QPoint qp) {
     }
 }
 
-void Layer::moveRight(QPoint qp) {
-    if (mode == Spline_Mode) {
+void Layer::moveRight(QPoint qp, QPoint lastPos) {
+    if (mode == Text_Mode) {
+        if (activeTexts.size() == 1) {
+            QPoint center = texts[activeTexts[0]].getCorner();
+            float angle = atan2(qp.y() - center.y(), qp.x() - center.x()) - atan2(lastPos.y() - center.y(), lastPos.x() - center.x());
+            texts[activeTexts[0]].updateRotate(angle * rad2deg);
+        }
+    }
+    else if (mode == Polygon_Mode) {
+        if (activeGons.size() == 1 && dragDraw) {
+            if (addOrSub) {
+                if (activePt == -1)
+                    gons[activeGons[0]].addPt(qp);
+            }
+            else {
+                vector <QPoint> pts = gons[activeGons[0]].getPts();
+                for (int i = 0; i < pts.size(); ++i) {
+                    QPoint pt = pts[i];
+                    if (abs(pt.x() - qp.x()) <= ptSize && abs(pt.y() - qp.y()) < ptSize) {
+                        activePt = i;
+                        break;
+                    }
+                }
+                if (activePt != -1) {
+                    gons[activeGons[0]].removePt(activePt);
+                    activePt = -1;
+                    if (pts.size() - 1 == 0) {
+                        gons.erase(gons.begin() + activeGons[0]);
+                        activeGons.clear();
+                    }
+                }
+            }
+        }
+        else
+            for (int activeGon : activeGons)
+                gons[activeGon].rotate(qp);
+    }
+    else if (mode == Spline_Mode) {
         for (unsigned char i : activeVects)
             vects[i].rotate(qp);
         calcLine();
@@ -476,13 +577,46 @@ void Layer::moveRight(QPoint qp) {
 }
 
 void Layer::pressLeft(QPoint qp) {
-    if (mode == Spline_Mode) {
+    if (mode == Polygon_Mode) {
+        if (shiftFlag && activeGons.size() >= 1) {
+            QPoint corner = gons[activeGons[0]].getPts()[0];
+            for (int activeGon : activeGons) {
+                for (QPoint pt : gons[activeGon].getPts()) {
+                    if (pt.x() < corner.x())
+                        corner.setX(pt.x());
+                    if (pt.y() < corner.y())
+                        corner.setY(pt.y());
+                }
+            }
+            for (int activeGon : activeGons) {
+                gons[activeGon].setRPt2(qp);
+                gons[activeGon].setRPt1(corner);
+                gons[activeGon].makeBackup();
+            }
+        }
+        else {
+            if (activeGons.size() == 1) {
+                vector <QPoint> pts = gons[activeGons[0]].getPts();
+                for (int i = 0; i < pts.size(); ++i) {
+                    QPoint pt = pts[i];
+                    if (abs(pt.x() - qp.x()) <= ptSize && abs(pt.y() - qp.y()) < ptSize) {
+                        activePt = i;
+                        break;
+                    }
+                }
+            }
+            if (activePt == -1)
+                for (int activeGon : activeGons)
+                    gons[activeGon].setRPt1(qp);
+        }
+    }
+    else if (mode == Spline_Mode) {
         if (activeVects.size() != 0) {
             if (!shiftFlag) {
                 vector <QPoint> controlPts = vects[activeVects[0]].getControls();
                 for (size_t i = 0; i < controlPts.size(); ++i)
                     if (abs(qp.x() - controlPts[i].x()) + abs(qp.y() - controlPts[i].y()) < ptSize + 2) {
-                        activePt = static_cast<unsigned char>(i);
+                        activePt = static_cast<int>(i);
                         break;
                     }
                 if (activePt == -1)
@@ -581,12 +715,58 @@ void Layer::pressLeft(QPoint qp) {
 
 MouseButton Layer::pressRight(QPoint qp) {
     MouseButton response = RightButton;
+    if (mode == Polygon_Mode) {
+        if (!shiftFlag) {
+            if (activeGons.size() == 1) {
+                vector <QPoint> pts = gons[activeGons[0]].getPts();
+                for (int i = 0; i < pts.size(); ++i) {
+                    QPoint pt = pts[i];
+                    if (abs(pt.x() - qp.x()) <= ptSize && abs(pt.y() - qp.y()) < ptSize) {
+                        activePt = i;
+                        break;
+                    }
+                }
+            }
+            else if (activeGons.size() == 0) {
+                activeGons.push_back(gons.size());
+                gons.push_back(Polygon());
+            }
+            if (activeGons.size() == 1) {
+                addOrSub = activePt == -1;
+                if (activePt == -1) {
+                    if (!dragDraw)
+                        activePt = gons[activeGons[0]].getPts().size();
+                    gons[activeGons[0]].addPt(qp);
+                    response = dragDraw ? RightButton : LeftButton;
+                }
+                else {
+                    gons[activeGons[0]].removePt(activePt);
+                    activePt = -1;
+                    if (gons[activeGons[0]].getPts().size() == 0) {
+                        gons.erase(gons.begin() + activeGons[0]);
+                        activeGons.clear();
+                    }
+                }
+            }
+        }
+        else {
+            QPoint center(0, 0);
+            for (int activeGon : activeGons) {
+                center += gons[activeGon].getCenter();
+                gons[activeGon].makeBackup();
+                gons[activeGon].setRPt2(qp);
+            }
+            center = QPoint(center.x() / activeGons.size(), center.y() / activeGons.size());
+            for (int activeGon : activeGons)
+                gons[activeGon].setRPt1(center);
+        }
+    }
     if (mode == Spline_Mode) {
         if (activeVects.size() == 0) {
             if ((vects.size() + symDiv) < CHAR_MAX - 1) {
                 if (symDiv == 1) {
                     vects.push_back(SplineVector(qp, QPoint(qp.x() + 1, qp.y())));
-                    tris.push_back(list <Triangle> ());
+                    vectTris.push_back(list <Triangle> ());
                     activeVects.push_back(static_cast<unsigned char>(vects.size() - 1));
                 }
                 else {
@@ -611,7 +791,7 @@ MouseButton Layer::pressRight(QPoint qp) {
                         x = xnew + symPt.x();
                         y = ynew + symPt.y();
                         vects.push_back(SplineVector(QPoint(x, y), QPoint(x + 1, y)));
-                        tris.push_back(list <Triangle> ());
+                        vectTris.push_back(list <Triangle> ());
                         activeVects.push_back(static_cast<unsigned char>(vects.size() - 1));
                     }
                 }
@@ -655,7 +835,7 @@ MouseButton Layer::pressRight(QPoint qp) {
                     for (int i = activeVects.size() - 1; i >= 0; --i) {
                         unsigned char activeVect = activeVects[i];
                         vects.erase(vects.begin() + activeVect);
-                        tris.erase(tris.begin() + activeVect);
+                        vectTris.erase(vectTris.begin() + activeVect);
                     }
                     activeVects.clear();
                 }
@@ -704,7 +884,7 @@ MouseButton Layer::pressRight(QPoint qp) {
                 }
                 else
                     vects[activeVects[0]].addPt(qp, index);
-                activePt = static_cast<unsigned char>(index);
+                activePt = static_cast<int>(index);
                 response = LeftButton;
             }
             calcLine();
@@ -718,7 +898,46 @@ MouseButton Layer::pressRight(QPoint qp) {
 }
 
 void Layer::doubleClickLeft(QPoint qp, bool ctrlFlag) {
-    if (mode == Spline_Mode) {
+    if (mode == Text_Mode) {
+        bool flag = true;
+        for (int i = 0; i < texts.size(); ++i) {
+            QPoint  dist = texts[i].getShowPoint() - qp;
+            if (abs(dist.x()) <= 3 * ptSize && abs(dist.y()) <= 3 * ptSize) {
+                vector<unsigned char>::iterator where = std::find(activeTexts.begin(), activeTexts.end(), i);
+                if (where != activeTexts.end())
+                    activeTexts.erase(where);
+                else
+                    activeTexts.push_back(i);
+                flag = false;
+                break;
+            }
+        }
+        if (flag)
+            activeTexts.clear();
+    }
+    else if (mode == Polygon_Mode) {
+        int i;
+        for (i = 0; i < gons.size(); ++i) {
+            bool flag = false;
+            for (Triangle t : gons[i].getTris())
+                if (inTri(qp, t.a, t.b, t.c)) {
+                    flag = true;
+                    break;
+                }
+            if (flag)
+                break;
+        }
+        if (i != gons.size()) {
+            vector<unsigned char>::iterator iter = std::find(activeGons.begin(), activeGons.end(), i);
+            if (iter != activeGons.end())
+                activeGons.erase(iter);
+            else
+                activeGons.push_back(i);
+        }
+        else
+            deselect();
+    }
+    else if (mode == Spline_Mode) {
         if (activeVects.size() != 0) {
             if (!ctrlFlag)
                 deselect();
@@ -771,7 +990,30 @@ void Layer::doubleClickLeft(QPoint qp, bool ctrlFlag) {
 }
 
 void Layer::doubleClickRight(QPoint qp) {
-    if (mode == Spline_Mode && activeVects.size() != 0) {
+    if (mode == Text_Mode) {
+        if (activeTexts.size() == 0) {
+            bool flag = false;
+            for (int i = 0; i < texts.size(); ++i) {
+                QPoint  dist = texts[i].getShowPoint() - qp;
+                if (abs(dist.x()) <= 3 * ptSize && abs(dist.y()) <= 3 * ptSize) {
+                    vector<unsigned char>::iterator where = std::find(activeTexts.begin(), activeTexts.end(), i);
+                    flag = where != activeTexts.end();
+                    if (flag)
+                        break;
+                }
+            }
+            if (!flag) {
+                texts.push_back(DrawText());
+                QStaticText text;
+                text.setText("TEXT");
+                int index = texts.size() - 1;
+                texts[index].updateText(text);
+                texts[index].updatePos(qp);
+                activeTexts.push_back(index);
+            }
+        }
+    }
+    else if (mode == Spline_Mode && activeVects.size() != 0) {
         int dist = INT_MAX;
         size_t index = 0;
         for (size_t i = 0; i < activeVects.size(); ++i) {
@@ -947,12 +1189,28 @@ void Layer::cleanUp() {
 }
 
 void Layer::deleteSelected() {
+    if (mode == Text_Mode) {
+        sort(activeTexts.begin(), activeTexts.end());
+        for (int i = activeTexts.size() - 1; i >= 0; --i) {
+            int j = activeTexts[i];
+            activeTexts.pop_back();
+            texts.erase(texts.begin() + j);
+        }
+    }
+    if (mode == Polygon_Mode) {
+        sort(activeGons.begin(), activeGons.end());
+        for (int i = activeGons.size() - 1; i >= 0; --i) {
+            int j = activeGons[i];
+            activeGons.pop_back();
+            gons.erase(gons.begin() + j);
+        }
+    }
     if (mode == Spline_Mode && activeVects.size() != 0) {
         sort(activeVects.begin(), activeVects.end());
         for (int i = static_cast<int>(activeVects.size() - 1); i >= 0; --i) {
             unsigned char activeVect = activeVects[i];
             vects.erase(vects.begin() + activeVect);
-            tris.erase(tris.begin() + activeVect);
+            vectTris.erase(vectTris.begin() + activeVect);
         }
     }
     else
@@ -999,6 +1257,13 @@ void Layer::selectAll() {
         deltaMove = rotateAnchor = boundPt1;
         selectOgActive = true;
     }
+    else if (mode == Polygon_Mode) {
+        for (int i = 0; i < gons.size(); ++i)
+            activeGons.push_back(i);
+    }
+    else if (mode == Text_Mode)
+        for (int i = 0; i < texts.size(); ++i)
+            activeTexts.push_back(i);
 }
 
 void Layer::deselect() {
@@ -1017,12 +1282,18 @@ void Layer::deselect() {
         postAngle = 0.0;
         selecting = selectOgActive = false;
     }
+    else if (mode == Polygon_Mode) {
+        activePt = -1;
+        activeGons.clear();
+    }
+    else if (mode == Text_Mode)
+        activeTexts.clear();
     deltaMove =  boundPt1 = boundPt2 = rotateAnchor = QPoint(-1000, -1000);
 }
 
 void Layer::clearVectors() {
     vects.clear();
-    tris.clear();
+    vectTris.clear();
     activeVects.clear();
 }
 
@@ -1068,3 +1339,105 @@ void Layer::setSym(QPoint qp, int div, int ofEvery, int skip) {
 int Layer::symActive() {
     return symCreate;
 }
+
+vector <Polygon> Layer::getPolgons() {
+    return gons;
+}
+
+vector <unsigned char> Layer::getActiveGons() {
+    return activeGons;
+}
+
+void Layer::reduceGonPts() {
+    for (unsigned char i : activeGons)
+        gons[i].reducePts();
+}
+
+void Layer::setDragDraw(bool dd) {
+    dragDraw = dd;
+}
+
+pair <QColor, QColor> Layer::getGonColor() {
+    return pair <QColor, QColor> (gons[activeGons[0]].getPolyColor(), gons[activeGons[0]].getEdgeColor());
+}
+
+void Layer::setGonColor(pair<QColor, QColor> qcs) {
+    if (gons[activeGons[0]].getEdgeColor() == qcs.second.rgba())
+        gons[activeGons[0]].setPolyColor(qcs.first.rgba());
+    gons[activeGons[0]].setEdgeColor(qcs.second.rgba());
+}
+
+int Layer::getEdgeSize() {
+    return gons[activeGons[0]].getEdgeSize();
+}
+
+void Layer::setEdgeSize(int size) {
+    gons[activeGons[0]].setEdgeSize(size);
+}
+
+void Layer::setPolygonFilter(string s) {
+    if (activeGons.size() == 1)
+        gons[activeGons[0]].setFilter(s);
+}
+
+void Layer::setPolyMode(PolyMode mode) {
+    for (unsigned char i : activeGons)
+        gons[i].setPolyMode(mode);
+}
+
+void Layer::setPolyFilterStrength(int s) {
+    gons[activeGons[0]].setFilterStrength(s);
+}
+
+int Layer::getPolyFilterStrength() {
+    return gons[activeGons[0]].getFilter().getStrength();
+}
+
+void Layer::createEllipse(QPoint cPt) {
+    deselect();
+    gons.push_back(Polygon::ellipse(cPt));
+    activeGons.push_back(gons.size() - 1);
+}
+
+void Layer::setShowDivs(bool b) {
+    for (unsigned char i : activeGons)
+        gons[i].setShowDivs(b);
+}
+
+vector <DrawText> Layer::getTexts() {
+    return texts;
+}
+
+vector <unsigned char> Layer::getActiveTexts() {
+    return activeTexts;
+}
+
+QFont Layer::getFont() {
+    return texts[activeTexts[0]].getFont();
+}
+
+QStaticText Layer::getText() {
+    return texts[activeTexts[0]].getText();
+}
+
+QColor Layer::getTextColor() {
+    return texts[activeTexts[0]].getColor();
+}
+
+void Layer::setFont(QFont font) {
+    texts[activeTexts[0]].updateFont(font);
+}
+
+void Layer::setText(QStaticText text) {
+    texts[activeTexts[0]].updateText(text);
+}
+
+void Layer::setTextColor(QColor color) {
+    texts[activeTexts[0]].updateColor(color);
+}
+
+bool Layer::updateText(Qt::Key key, bool shiftFlag) {
+    return texts[activeTexts[0]].updateText(key, shiftFlag);
+}
+
+

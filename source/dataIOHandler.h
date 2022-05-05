@@ -75,10 +75,18 @@ public:
     int getNumLayers();
     int getActiveLayer();
     bool wasUpdated();
+    void copyText();
+    void cutText();
+    void pasteText();
+    void deleteText();
     void copyVectors();
     void cutVectors();
     void deleteVectors();
     void pasteVectors();
+    void copyPolygons();
+    void cutPolygons();
+    void deletePolygons();
+    void pastePolygons();
     void copyRaster();
     void cutRaster();
     void deleteRaster();
@@ -109,6 +117,8 @@ private:
     QSize dims;
     vector <Layer *> frame;
     list <SplineVector> vectorCopySlot;
+    list <Polygon> polygonCopySlot;
+    list <DrawText> textCopySlot;
     Layer layerCopySlot;
     QString file;
     unsigned char activeLayer;

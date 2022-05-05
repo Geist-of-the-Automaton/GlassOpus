@@ -1,6 +1,7 @@
 #include "mainwindow.h"
 #include <QApplication>
 #include <Windows.h>
+#include <vec_mat_maths.h>
 
 #pragma comment(lib, "urlmon.lib")
 

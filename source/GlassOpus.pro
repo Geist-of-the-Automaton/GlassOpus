@@ -30,11 +30,13 @@ HEADERS = \
     brightnessadj.h \
     contrastadj.h \
     ditherdialog.h \
+    drawtext.h \
     filterdialog.h \
     gammaadj.h \
     histodialog.h \
     hueshift.h \
     kerneldialog.h \
+    polygon.h \
     saturationadj.h \
     symdialog.h \
     transferdialog.h \
@@ -66,18 +68,19 @@ SOURCES = \
     $$PWD/resizewindow.cpp \
     $$PWD/screenrender.cpp \
     $$PWD/splinevector.cpp \
-    $$PWD/triangle.cpp \
     $$PWD/viewscroller.cpp\
     $$PWD/brushShape.cpp\
     $$PWD/patternprofiler.cpp \
     brightnessadj.cpp \
     contrastadj.cpp \
     ditherdialog.cpp \
+    drawtext.cpp \
     filterdialog.cpp \
     gammaadj.cpp \
     histodialog.cpp \
     hueshift.cpp \
     kerneldialog.cpp \
+    polygon.cpp \
     saturationadj.cpp \
     symdialog.cpp \
     transferdialog.cpp

@@ -978,10 +978,8 @@ QImage graphics::Color::Histogram(QImage *in, eType type) {
     int h = 3 * bins;
     QImage qi (QSize(bins * 2, h), QImage::Format_ARGB32_Premultiplied);
     qi.fill(0xFF000000);
-    int histo[4][bins];
-    for (int x = 0; x < bins; ++x)
-        for (int y = 0; y < 4; ++y)
-            histo[y][x] = 0;
+    int end = type == RGB ? 4 : 3;
+    int histo[4][bins] = {{0}, {0}, {0}, {0}};
     QImage image = in->copy();
     // Fill the array(s) tht the histograms will be constructed from.
     int total = 0;
@@ -997,29 +995,30 @@ QImage graphics::Color::Histogram(QImage *in, eType type) {
                     ++histo[3][qc.blue()];
                 }
                 else if (type == HSV) {
-                    ++histo[0][qc.hsvHue()];
-                    ++histo[1][qc.hsvSaturation()];
-                    ++histo[2][qc.value()];
+                    ++histo[0][static_cast<int>(255.0 * static_cast<float>(qc.hsvHue() + 1.0) / 360.0)];
+                    ++histo[1][static_cast<int>(255.0 * qc.hsvSaturationF())];
+                    ++histo[2][static_cast<int>(255.0 * qc.valueF())];
                 }
                 else {
-                    ++histo[0][qc.hslHue()];
-                    ++histo[1][qc.hslSaturation()];
-                    ++histo[2][qc.lightness()];
+                    ++histo[0][static_cast<int>(255.0 * static_cast<float>(qc.hslHue() + 1.0) / 360.0)];
+                    ++histo[1][static_cast<int>(255.0 * qc.hslSaturationF())];
+                    ++histo[2][static_cast<int>(255.0 * qc.lightnessF())];
                 }
                 ++total;
             }
         }
     int maxI = 0, cutoff = (total) / 4;
-    for (int j = 0; j < 4; ++j)
+    for (int j = 0; j < end; ++j)
         for (int i = 1; i < bins - 1; ++i)
             if (histo[j][i] < cutoff)
                 maxI = max(maxI, histo[j][i]);
+    maxI = max(maxI, 1);
     // Draw histograms.
     double div = static_cast<double>(h / 2 - 1) / static_cast<double>(maxI);
     float fbins = static_cast<float>(bins - 1);
     for (int x = 0; x < bins; ++x) {
         QRgb value = static_cast<QRgb>(bins + x) / 2;
-        for  (int j = 0; j < 4; ++j) {
+        for  (int j = 0; j < end; ++j) {
             QRgb color = 0xFF000000;
             if (type == RGB && j != 0)
                 color += (value << (8 * (2 - (j - 1))));

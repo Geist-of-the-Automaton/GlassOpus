@@ -7,6 +7,8 @@
 #include <QPainter>
 #include <splinevector.h>
 #include <triangle.h>
+#include <polygon.h>
+#include <drawtext.h>
 
 using std::vector;
 using std::list;
@@ -16,12 +18,11 @@ using Qt::RightButton;
 using Qt::TransformationMode::FastTransformation;
 using Qt::TransformationMode::SmoothTransformation;
 
-enum EditMode {Brush_Mode, Spline_Mode, Raster_Mode};
+enum EditMode {Brush_Mode, Spline_Mode, Raster_Mode, Polygon_Mode, Text_Mode, Mode_3D};
 enum Selection {TopLeft, Top, TopRight, Right, BottomRight, Bottom, BottomLeft, Left, BodySelect, NoSelect};
 
 const float ipolMin = 0.001f;
 const float ipolMax = 0.1f;
-const unsigned char ptSize = 5;
 const double pi = 3.14159265359;
 const unsigned char maxVects = UCHAR_MAX;
 
@@ -44,7 +45,9 @@ public:
     void applyFilterToRaster(Filter f);
     vector <list <Triangle> > getTriangles();
     vector <SplineVector> getVectors();
+    void pasteText(list <DrawText> dws);
     void pasteVectors(list <SplineVector> svs);
+    void pastePolygons(list <Polygon> pgs);
     void pasteRaster(QImage rasterIn, double angleIn, pair <QPoint, QPoint> bounds);
     QImage getRaster();
     QImage* getRasterPtr();
@@ -54,8 +57,8 @@ public:
     vector <unsigned char> getActiveVectors();
     void spinWheel(int dy);
     void release(QPoint qp, MouseButton button);
-    void moveLeft(QPoint qp);
-    void moveRight(QPoint qp);
+    void moveLeft(QPointF qp, QPoint lastPos = QPoint());
+    void moveRight(QPoint qp,  QPoint lastPos = QPoint());
     void pressLeft(QPoint qp);
     MouseButton pressRight(QPoint qp);
     void doubleClickLeft(QPoint qp, bool ctrlFlag);
@@ -104,6 +107,35 @@ public:
     void applyKernalToSelection(QProgressDialog *qpd, string fileName);
     void setSym(QPoint qp, int div, int ofEvery, int skip);
     int symActive();
+
+    vector <Polygon> getPolgons();
+    vector <unsigned char> getActiveGons();
+    void reduceGonPts();
+    void setDragDraw(bool dd);
+    pair <QColor, QColor> getGonColor();
+    void setGonColor(pair <QColor, QColor> qcs);
+    int getEdgeSize();
+    void setEdgeSize(int size);
+    void setPolygonFilter(string s);
+    void setPolyFilterStrength(int s);
+    int getPolyFilterStrength();
+    void setPolyMode(PolyMode mode);
+    void createEllipse(QPoint cPt);
+    void setShowDivs(bool b);
+
+    //swap colors,
+
+    vector <DrawText> getTexts();
+    vector <unsigned char> getActiveTexts();
+    QFont getFont();
+    QStaticText getText();
+    QColor getTextColor();
+    void setFont(QFont font);
+    void setText(QStaticText text);
+    void setTextColor(QColor color);
+    bool updateText(Qt::Key key, bool shiftFlag);
+
+
     Filter filter;
 
 
@@ -116,13 +148,18 @@ private:
     EditMode mode;
     Selection selection;
     vector <SplineVector> vects;
-    vector <list <Triangle>> tris;
+    vector <Polygon> gons;
+    vector <DrawText> texts;
+    vector <list <Triangle>> vectTris;
+    vector <list <Triangle>> gonTris;
     vector <unsigned char> activeVects;
-    char activePt;
+    vector <unsigned char> activeGons;
+    vector <unsigned char> activeTexts;
+    int activePt;
     QImage *qi, alphaLayer, rasterselectOg;
     float ipolPts, limiter = ipolMin, limitCnt = 2.0, postAngle;
     int alpha;
-    bool shiftFlag, selectOgActive, selecting, symCreate;
+    bool shiftFlag, selectOgActive, selecting, symCreate, dragDraw, addOrSub;
     QPoint deltaMove, boundPt1, boundPt2, rotateAnchor;
     QPoint symPt;
     int symDiv, symOfEvery, symSkip;

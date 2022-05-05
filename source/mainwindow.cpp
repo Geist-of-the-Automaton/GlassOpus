@@ -46,10 +46,14 @@ MainWindow::MainWindow(string startPath, string projectFile, QWidget *parent)
     bool exists = createMenubar();
     if (exists) {
         QMenu* vFiltering = static_cast<QMenu *>(objFetch.at("Vector Filter"));
+        QMenu* pFiltering = static_cast<QMenu *>(objFetch.at("Polygon Filter"));
         for (string name : vectorFilters) {
             QAction *vAction = vFiltering->addAction((name).c_str());
             connect(vAction, &QAction::triggered, this, [=]() { this->changeVectorFilter(vAction->text().toStdString()); });
             log(name, vAction);
+            QAction *pAction = pFiltering->addAction((name).c_str());
+            connect(pAction, &QAction::triggered, this, [=]() { this->changePolygonFilter(pAction->text().toStdString()); });
+            log(name, pAction);
         }
         QMenu* bShape = static_cast<QMenu *>(objFetch.at("Brush Shape"));
         for (string name : brushShapes) {
@@ -129,6 +133,7 @@ MainWindow::MainWindow(string startPath, string projectFile, QWidget *parent)
     }
     histograms = new QLabel();
     symDialog = new SymDialog(this);
+    connect(&qte, SIGNAL(textChanged()), this, SLOT(textChanged()));
 }
 
 void MainWindow::mouseMoveEvent(QMouseEvent *event) {
@@ -137,12 +142,12 @@ void MainWindow::mouseMoveEvent(QMouseEvent *event) {
     if (takeFlag)
         return;
     QPoint qp = sr->getZoomCorrected(vs->getScrollCorrected(event->pos()));
-    statusBar()->showMessage(("(" + to_string(qp.x()) + " , " + to_string(qp.y())).c_str(), 1000);
+    statusBar()->showMessage(("(" + to_string(qp.x()) + " , " + to_string(qp.y()) + ")").c_str(), 1000);
     if (altFlag) {
         sr->setSamplePt(qp);
+        refresh();
         return;
     }
-    statusBar()->showMessage((to_string(qp.x()) + "," + to_string(qp.y())).c_str(), 1000);
     if (mode == Brush_Mode) {
         if (lastButton == LeftButton)
             bh.applyBrush(ioh->getWorkingLayer()->getCanvas(), qp);
@@ -153,13 +158,22 @@ void MainWindow::mouseMoveEvent(QMouseEvent *event) {
                 bh.erase(ioh->getWorkingLayer()->getCanvas(), qp);
         }
     }
-    else if (mode == Spline_Mode || mode == Raster_Mode) {
+    else if (mode == Spline_Mode || mode == Raster_Mode || mode == Text_Mode) {
         if (ctrlFlag)
             return;
         Layer *layer = ioh->getWorkingLayer();
         if (lastButton == Qt::LeftButton)
-            layer->moveLeft(qp);
+            layer->moveLeft(qp, lastPos);
         else if (lastButton == RightButton && shiftFlag)
+            layer->moveRight(qp, lastPos);
+        lastPos = qp;
+        refresh();
+    }
+    else if (mode == Polygon_Mode) {
+        Layer *layer = ioh->getWorkingLayer();
+        if (lastButton == Qt::LeftButton)
+            layer->moveLeft(qp);
+        else if (lastButton == RightButton)
             layer->moveRight(qp);
         refresh();
     }
@@ -178,10 +192,11 @@ void MainWindow::mousePressEvent(QMouseEvent *event) {
         return;
     }
     lastButton = event->button();
-    QPoint qp = sr->getZoomCorrected(vs->getScrollCorrected(event->pos()));
+    QPoint qp = lastPos = sr->getZoomCorrected(vs->getScrollCorrected(event->pos()));
     if (altFlag) {
         onePress = false;
         sr->setSamplePt(qp);
+        refresh();
         return;
     }
     if (mode == Raster_Mode && event->button() == RightButton && !shiftFlag && !ioh->getWorkingLayer()->isRotating())
@@ -202,7 +217,7 @@ void MainWindow::mousePressEvent(QMouseEvent *event) {
             bh.setInterpolationActive(true);
         }
     }
-    else if (mode == Spline_Mode || mode == Raster_Mode) {
+    else if (mode == Polygon_Mode || mode == Spline_Mode || mode == Raster_Mode || mode == Text_Mode) {
         Layer *layer = ioh->getWorkingLayer();
         if (lastButton == RightButton)
             lastButton = layer->pressRight(qp);
@@ -217,14 +232,25 @@ void MainWindow::mouseReleaseEvent(QMouseEvent *event) {
         return;
     QPoint qp = sr->getZoomCorrected(vs->getScrollCorrected(event->pos()));
     if (altFlag) {
-        symDialog->exec();
-        ioh->setSym(qp, symDialog->getDiv(), symDialog->getOfEvery(), symDialog->getSkip());
-        bh.setSym(qp, symDialog->getDiv(), symDialog->getOfEvery(), symDialog->getSkip());
-        if (symDialog->getDiv() == 1)
-            sr->setSamplePt(QPoint(-1000, -1000));
-        else
+        if (bh.getMethodIndex() == appMethod::sample) {
             sr->setSamplePt(qp);
-        altFlag = false;
+            bh.setSamplePoint(qp);
+        }
+        else if (mode == Polygon_Mode) {
+            sr->setSamplePt(qp);
+            ioh->getWorkingLayer()->createEllipse(qp);
+            sr->setSamplePt(QPoint(-1000, -1000));
+            altFlag = false;
+        }
+        else {
+            symDialog->exec();
+            ioh->setSym(qp, symDialog->getDiv(), symDialog->getOfEvery(), symDialog->getSkip());
+            bh.setSym(qp, symDialog->getDiv(), symDialog->getOfEvery(), symDialog->getSkip());
+            if (symDialog->getDiv() == 1)
+                sr->setSamplePt(QPoint(-1000, -1000));
+            altFlag = false;
+        }
+        refresh();
         return;
     }
     if (takeFlag) {
@@ -241,7 +267,7 @@ void MainWindow::mouseReleaseEvent(QMouseEvent *event) {
         bh.setInterpolationActive(false);
         refresh();
     }
-    else if (mode == Spline_Mode || (mode == Raster_Mode && event->button() != Qt::RightButton))
+    else if (mode == Polygon_Mode || mode == Spline_Mode || (mode == Raster_Mode && event->button() != Qt::RightButton))
         ioh->getWorkingLayer()->release(qp, event->button());
     else if (event->button() >= 8) {
         takeFlag = false;
@@ -258,13 +284,13 @@ void MainWindow::mouseDoubleClickEvent(QMouseEvent *event) {
         return;
     QPoint qp = sr->getZoomCorrected(vs->getScrollCorrected(event->pos()));
     MouseButton button = event->button();
-    if (mode == Spline_Mode) {
+    if (mode == Spline_Mode || mode == Polygon_Mode || mode == Text_Mode) {
         if (shiftFlag)
             return;
         Layer *layer = ioh->getWorkingLayer();
         if (button == LeftButton)
             layer->doubleClickLeft(qp, ctrlFlag);
-        else if (button == RightButton && ctrlFlag)
+        else if (button == RightButton && (ctrlFlag || mode == Text_Mode))
             layer->doubleClickRight(qp);
         sr->showPts();
         refresh();
@@ -324,7 +350,7 @@ void MainWindow::wheelEvent(QWheelEvent *event) {
                 statusBar()->showMessage(("Vector Width: " + to_string(ioh->getWorkingLayer()->getWidth())).c_str(), 1000);
         }
     }
-    else if (mode == Raster_Mode)
+    else if (mode == Raster_Mode || mode == Polygon_Mode || mode == Text_Mode)
         ioh->getWorkingLayer()->spinWheel(dy);
     scrollLock.unlock();
     refresh();
@@ -690,6 +716,180 @@ void MainWindow::doSomething(string btnPress) {
         if (symDialog->getDiv() != 1)
             sr->setSamplePt(bh.getSymPt());
     }
+    else if (btnPress == "Color Polygon")
+        ioh->getWorkingLayer()->setPolyMode(ColorGon);
+    else if (btnPress == "Filter Polygon")
+        ioh->getWorkingLayer()->setPolyMode(FilterGon);
+    else if (btnPress == "Interior Color") {
+        Layer *layer = ioh->getWorkingLayer();
+        if (layer->getActiveGons().size() == 1) {
+            pair<QColor, QColor> colors = layer->getGonColor();
+            colors.first = QColorDialog::getColor(colors.first, this);
+            layer->setGonColor(colors);
+        }
+    }
+    else if (btnPress == "Edge Color") {
+        Layer *layer = ioh->getWorkingLayer();
+        if (layer->getActiveGons().size() == 1) {
+            pair<QColor, QColor> colors = layer->getGonColor();
+            colors.second = QColorDialog::getColor(colors.second, this);
+            layer->setGonColor(colors);
+        }
+    }
+    else if (btnPress == "Transparent Interior") {
+        Layer *layer = ioh->getWorkingLayer();
+        if (layer->getActiveGons().size() == 1) {
+            pair<QColor, QColor> colors = layer->getGonColor();
+            colors.first.setAlpha(0);
+            layer->setGonColor(colors);
+        }
+    }
+    else if (btnPress == "Polygon Filter Strength") {
+        Layer *layer = ioh->getWorkingLayer();
+        if (layer->getActiveGons().size() == 1) {
+            bool ok = false;
+            int ret = QInputDialog::getInt(this, "Glass Opus", "Please enter a filter strength", layer->getPolyFilterStrength(), 0, 255, 1, &ok);
+            if (ok)
+                layer->setPolyFilterStrength(ret);
+        }
+    }
+    else if (btnPress == "Edge Size") {
+        Layer *layer = ioh->getWorkingLayer();
+        if (layer->getActiveGons().size() == 1) {
+            bool ok = false;
+            int ret = QInputDialog::getInt(this, "Glass Opus", "Please enter a edge size", layer->getEdgeSize(), 0, maxEdgeSize, 1, &ok);
+            if (ok)
+                layer->setEdgeSize(ret);
+        }
+    }
+    else if (btnPress == "Drag Draw On")
+        ioh->getWorkingLayer()->setDragDraw(true);
+    else if (btnPress == "Drag Draw Off")
+        ioh->getWorkingLayer()->setDragDraw(false);
+    else if (btnPress == "Reduce Points")
+        ioh->getWorkingLayer()->reduceGonPts();
+    else if (btnPress == "View Divisions")
+        ioh->getWorkingLayer()->setShowDivs(true);
+    else if (btnPress == "Hide Divisions")
+        ioh->getWorkingLayer()->setShowDivs(false);
+    else if (btnPress == "Edit Text") {
+        if (ioh->getWorkingLayer()->getActiveTexts().size() == 1) {
+            QString text = ioh->getWorkingLayer()->getText().text();
+            qte.clear();
+            qte.setText(text);
+            qte.setWindowModality(Qt::ApplicationModal);
+            qte.show();
+        }
+    }
+    else if (btnPress == "Font") {
+        if (ioh->getWorkingLayer()->getActiveTexts().size() == 1) {
+            QInputDialog fontPrompt;
+            QFontDatabase qfd;
+            QStringList items = qfd.families();
+            Layer *l = ioh->getWorkingLayer();
+            QFont font = l->getFont();
+            items.indexOf(font.family());
+            fontPrompt.setOptions(QInputDialog::UseListViewForComboBoxItems);
+            fontPrompt.setComboBoxItems(items);
+            fontPrompt.setTextValue(items.first());
+            fontPrompt.setWindowTitle("Fonts");
+            fontPrompt.setWhatsThis("This will set the resolution of the layers and resulting export. Importing a saved project file after this dialog will update the resolution");
+            fontPrompt.exec();
+            font.setFamily(fontPrompt.textValue());
+            l->setFont(font);
+        }
+    }
+    else if (btnPress == "Text Size") {
+        if (ioh->getWorkingLayer()->getActiveTexts().size() == 1) {
+            Layer *l = ioh->getWorkingLayer();
+            QFont font = l->getFont();
+            bool ok = false;
+            int ret = QInputDialog::getInt(this, "Glass Opus", "Please enter a text size", font.pointSize(), 0, 1000, 1, &ok);
+            if (ok)
+                font.setPixelSize(ret);
+            l->setFont(font);
+        }
+    }
+    else if (btnPress == "Text Color") {
+        if (ioh->getWorkingLayer()->getActiveTexts().size() == 1) {
+            Layer *l = ioh->getWorkingLayer();
+            QColor qc = QColorDialog::getColor(l->getTextColor(), this);
+            l->setTextColor(qc);
+        }
+    }
+    else if (btnPress == "Bold") {
+        if (ioh->getWorkingLayer()->getActiveTexts().size() == 1) {
+            Layer *l = ioh->getWorkingLayer();
+            QFont font = l->getFont();
+            font.setBold(!font.bold());
+            l->setFont(font);
+        }
+    }
+    else if (btnPress == "Italic") {
+        if (ioh->getWorkingLayer()->getActiveTexts().size() == 1) {
+            Layer *l = ioh->getWorkingLayer();
+            QFont font = l->getFont();
+            font.setItalic(!font.italic());
+            l->setFont(font);
+        }
+    }
+    else if (btnPress == "Underline") {
+        if (ioh->getWorkingLayer()->getActiveTexts().size() == 1) {
+            Layer *l = ioh->getWorkingLayer();
+            QFont font = l->getFont();
+            font.setUnderline(!font.underline());
+            l->setFont(font);
+        }
+    }
+    else if (btnPress == "Overline") {
+        if (ioh->getWorkingLayer()->getActiveTexts().size() == 1) {
+            Layer *l = ioh->getWorkingLayer();
+            QFont font = l->getFont();
+            font.setOverline(!font.overline());
+            l->setFont(font);
+        }
+    }
+    else if (btnPress == "Strikeout") {
+        if (ioh->getWorkingLayer()->getActiveTexts().size() == 1) {
+            Layer *l = ioh->getWorkingLayer();
+            QFont font = l->getFont();
+            font.setStrikeOut(!font.strikeOut());
+            l->setFont(font);
+        }
+    }
+    else if (btnPress == "Text Area Size") {
+        if (ioh->getWorkingLayer()->getActiveTexts().size() == 1) {
+            Layer *l = ioh->getWorkingLayer();
+            QStaticText qst = l->getText();
+            bool ok = false;
+            int ret = QInputDialog::getInt(this, "Glass Opus", "Please enter text area width", qst.textWidth(), -1, 10000, 1, &ok);
+            if (ok)
+                qst.setTextWidth(ret);
+            l->setText(qst);
+        }
+    }
+    else if (btnPress == "Word Spacing") {
+        if (ioh->getWorkingLayer()->getActiveTexts().size() == 1) {
+            Layer *l = ioh->getWorkingLayer();
+            QFont font = l->getFont();
+            bool ok = false;
+            double ret = QInputDialog::getDouble(this, "Glass Opus", "Please enter word spacing", font.wordSpacing(), -100, 100.0, 1.0, &ok);
+            if (ok)
+                font.setWordSpacing(ret);
+            l->setFont(font);
+        }
+    }
+    else if (btnPress == "Letter Spacing") {
+        if (ioh->getWorkingLayer()->getActiveTexts().size() == 1) {
+            Layer *l = ioh->getWorkingLayer();
+            QFont font = l->getFont();
+            bool ok = false;
+            double ret = QInputDialog::getDouble(this, "Glass Opus", "Please enter letter spacing", font.letterSpacing(), -100, 100.0, 1.0, &ok);
+            if (ok)
+                font.setLetterSpacing(QFont::AbsoluteSpacing, ret);
+            l->setFont(font);
+        }
+    }
     else if (btnPress == "Brightness Adjustment") {
         Layer *l = ioh->getWorkingLayer();
         QImage *img = l->getRaster().isNull() ? l->getCanvas() : l->getRasterPtr();
@@ -805,29 +1005,50 @@ void MainWindow::doSomething(string btnPress) {
         setSamplePt(QPoint(-1000, -1000));
         ioh->getWorkingLayer()->deselect();
     }
+    else if (btnPress == "Polygon Mode") {
+        ioh->getWorkingLayer()->deselect();
+        sr->setSamplePt(QPoint(-1000, -1000));
+        setMode(Polygon_Mode);
+    }
+    else if (btnPress == "Text Mode") {
+        ioh->getWorkingLayer()->deselect();
+        setMode(Text_Mode);
+    }
+    else if (btnPress == "3D Mode") {
+        ioh->getWorkingLayer()->deselect();
+        setMode(Mode_3D);
+    }
     else if (btnPress == "Copy") {
         if (mode == Spline_Mode)
             ioh->copyVectors();
         else if (mode == Raster_Mode)
             ioh->copyRaster();
+        else if (mode == Polygon_Mode)
+            ioh->copyPolygons();
+        else if (mode == Text_Mode)
+            ioh->copyText();
     }
     else if (btnPress == "Cut") {
         if (mode == Spline_Mode)
             ioh->cutVectors();
         else if (mode == Raster_Mode)
             ioh->cutRaster();
+        else if (mode == Polygon_Mode)
+            ioh->cutPolygons();
+        else if (mode == Text_Mode)
+            ioh->cutText();
     }
-    else if (btnPress == "Delete") {
-        if (mode == Spline_Mode)
-            ioh->deleteVectors();
-        else if (mode == Raster_Mode)
-            ioh->deleteRaster();
-    }
+    else if (btnPress == "Delete")
+        ioh->getWorkingLayer()->deleteSelected();
     else if (btnPress == "Paste") {
         if (mode == Spline_Mode)
             ioh->pasteVectors();
         else if (mode == Raster_Mode)
             ioh->pasteRaster();
+        else if (mode == Polygon_Mode)
+            ioh->pastePolygons();
+        else if (mode == Text_Mode)
+            ioh->pasteText();
     }
     else if (btnPress == "Select All")
         ioh->getWorkingLayer()->selectAll();
@@ -962,6 +1183,13 @@ void MainWindow::changeVectorFilter(string s) {
     refresh();
 }
 
+void MainWindow::changePolygonFilter(string s) {
+    if (ioh->getWorkingLayer() == nullptr || ioh->getWorkingLayer()->getActiveGons().size() == 0)
+        return;
+    ioh->getWorkingLayer()->setPolygonFilter(s);
+    refresh();
+}
+
 void MainWindow::changeScreenFilter(string filterName) {
     if (ioh->getWorkingLayer() == nullptr)
         return;
@@ -991,6 +1219,18 @@ void MainWindow::changeBrushMethod(string method) {
     bh.setAppMethod(method);
 }
 
+void MainWindow::textChanged() {
+    if (ioh->getNumLayers() > 0) {
+        Layer *l = ioh->getWorkingLayer();
+        if (l->getActiveTexts().size() == 1) {
+            QStaticText text = l->getText();
+            text.setText(qte.toPlainText());
+            l->setText(text);
+            refresh();
+        }
+    }
+}
+
 void MainWindow::log(string title, QObject *obj) {
     objFetch[title] = obj;
     toDel.push_front(obj);
@@ -999,7 +1239,16 @@ void MainWindow::log(string title, QObject *obj) {
 void MainWindow::keyPressEvent(QKeyEvent *event) {
     if (ioh->getWorkingLayer() == nullptr)
         return;
-    switch (event->key()) {
+    Qt::Key key = Qt::Key(event->key());
+    Layer *layer = ioh->getWorkingLayer();
+    if (mode == Text_Mode && !ctrlFlag && !altFlag && layer->getActiveTexts().size() == 1) {
+        Layer *layer = ioh->getWorkingLayer();
+        bool ret = layer->updateText(key, shiftFlag);
+        refresh();
+        if (ret)
+            return;
+    }
+    switch (key) {
     case Key_Up:
         sr->zoomIn();
         break;
@@ -1022,7 +1271,13 @@ void MainWindow::keyPressEvent(QKeyEvent *event) {
             }
         }
         else if (mode == Spline_Mode)
-            ioh->getWorkingLayer()->widthDown();
+            layer->widthDown();
+        else if (mode == Polygon_Mode) {
+            if (layer->getActiveGons().size() == 1) {
+                layer->setEdgeSize(layer->getEdgeSize() - 1);
+                statusBar()->showMessage(("Edge Size: " + to_string(layer->getEdgeSize())).c_str(), 1000);
+            }
+        }
         break;
     case Key_Right:
         if (mode == Brush_Mode) {
@@ -1040,7 +1295,13 @@ void MainWindow::keyPressEvent(QKeyEvent *event) {
             }
         }
         else if (mode == Spline_Mode)
-            ioh->getWorkingLayer()->widthUp();
+            layer->widthUp();
+        else if (mode == Polygon_Mode) {
+            if (layer->getActiveGons().size() == 1) {
+                layer->setEdgeSize(layer->getEdgeSize() + 1);
+                statusBar()->showMessage(("Edge Size: " + to_string(layer->getEdgeSize())).c_str(), 1000);
+            }
+        }
         break;
     case Key_Control:
         if (!shiftFlag)
@@ -1054,15 +1315,15 @@ void MainWindow::keyPressEvent(QKeyEvent *event) {
         }
         break;
     case Key_Alt:
-        if (mode == Brush_Mode || mode == Spline_Mode)
+        if (mode == Brush_Mode || mode == Spline_Mode || mode == Polygon_Mode)
             altFlag = true;
         break;
     case Key_Escape:
-        ioh->getWorkingLayer()->deselect();
+        layer->deselect();
         break;
     case Key_Backspace:
     case Key_Delete:
-        ioh->getWorkingLayer()->deleteSelected();
+        layer->deleteSelected();
         break;
     case Key_X:
         if (ctrlFlag) {
@@ -1070,6 +1331,10 @@ void MainWindow::keyPressEvent(QKeyEvent *event) {
                 ioh->cutVectors();
             else if (mode == Raster_Mode)
                 ioh->cutRaster();
+            else if (mode == Polygon_Mode)
+                ioh->cutPolygons();
+            else if (mode == Text_Mode)
+                ioh->cutText();
         }
         break;
     case Key_C:
@@ -1078,6 +1343,10 @@ void MainWindow::keyPressEvent(QKeyEvent *event) {
                 ioh->copyVectors();
             else if (mode == Raster_Mode)
                 ioh->copyRaster();
+            else if (mode == Polygon_Mode)
+                ioh->copyPolygons();
+            else if (mode == Text_Mode)
+                ioh->copyText();
         }
         break;
     case Key_V:
@@ -1086,11 +1355,15 @@ void MainWindow::keyPressEvent(QKeyEvent *event) {
                 ioh->pasteVectors();
             else if (mode == Raster_Mode)
                 ioh->pasteRaster();
+            else if (mode == Polygon_Mode)
+                ioh->pastePolygons();
+            else if (mode == Text_Mode)
+                ioh->pasteText();
         }
         break;
     case Key_A:
         if (ctrlFlag)
-            ioh->getWorkingLayer()->selectAll();
+            layer->selectAll();
         break;
     }
 }

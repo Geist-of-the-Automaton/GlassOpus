@@ -165,11 +165,11 @@ void DataIOHandler::renderLayer(QProgressDialog *fqpd, QProgressDialog *qpd, QIm
                     color = ca.rgba();
                     for (Triangle &t : *dTris[i]) {
                         if (styler >= 0) {
-                            if (t.A().x() < 0 || t.A().x() >= w || t.A().y() < 0 || t.A().y() >= h)
+                            if (t.a.x() < 0 || t.a.x() >= w || t.a.y() < 0 || t.a.y() >= h)
                                 fillTriSafe(toProcess, t, color);
-                            else if (t.B().x() < 0 || t.B().x() >= w || t.B().y() < 0 || t.B().y() >= h)
+                            else if (t.b.x() < 0 || t.b.x() >= w || t.b.y() < 0 || t.b.y() >= h)
                                 fillTriSafe(toProcess, t, color);
-                            else if (t.C().x() < 0 || t.C().x() >= w || t.C().y() < 0 || t.C().y() >= h)
+                            else if (t.c.x() < 0 || t.c.x() >= w || t.c.y() < 0 || t.c.y() >= h)
                                 fillTriSafe(toProcess, t, color);
                             else
                                 fillTri(toProcess, t, color);
@@ -189,11 +189,11 @@ void DataIOHandler::renderLayer(QProgressDialog *fqpd, QProgressDialog *qpd, QIm
                         int b = static_cast<int>((ccc * static_cast<float>(ca.blue())) + ((1.0 - ccc) * static_cast<float>(cb.blue())));
                         color = QColor(r, g, b).rgba();
                         if (styler >= 0) {
-                            if (t.A().x() < 0 || t.A().x() >= w || t.A().y() < 0 || t.A().y() >= h)
+                            if (t.a.x() < 0 || t.a.x() >= w || t.a.y() < 0 || t.a.y() >= h)
                                 fillTriSafe(toProcess, t, color);
-                            else if (t.B().x() < 0 || t.B().x() >= w || t.B().y() < 0 || t.B().y() >= h)
+                            else if (t.b.x() < 0 || t.b.x() >= w || t.b.y() < 0 || t.b.y() >= h)
                                 fillTriSafe(toProcess, t, color);
-                            else if (t.C().x() < 0 || t.C().x() >= w || t.C().y() < 0 || t.C().y() >= h)
+                            else if (t.c.x() < 0 || t.c.x() >= w || t.c.y() < 0 || t.c.y() >= h)
                                 fillTriSafe(toProcess, t, color);
                             else
                                 fillTri(toProcess, t, color);
@@ -218,11 +218,11 @@ void DataIOHandler::renderLayer(QProgressDialog *fqpd, QProgressDialog *qpd, QIm
             else  // safe draw
                 for (Triangle &t : *dTris[i]) {
                     if (styler >= 0) {
-                        if (t.A().x() < 0 || t.A().x() >= w || t.A().y() < 0 || t.A().y() >= h)
+                        if (t.a.x() < 0 || t.a.x() >= w || t.a.y() < 0 || t.a.y() >= h)
                             filterTriSafe(toProcess, t, vf);
-                        else if (t.B().x() < 0 || t.B().x() >= w || t.B().y() < 0 || t.B().y() >= h)
+                        else if (t.b.x() < 0 || t.b.x() >= w || t.b.y() < 0 || t.b.y() >= h)
                             filterTriSafe(toProcess, t, vf);
-                        else if (t.C().x() < 0 || t.C().x() >= w || t.C().y() < 0 || t.C().y() >= h)
+                        else if (t.c.x() < 0 || t.c.x() >= w || t.c.y() < 0 || t.c.y() >= h)
                             filterTriSafe(toProcess, t, vf);
                         else
                             filterTri(toProcess, t, vf);
@@ -328,7 +328,7 @@ void DataIOHandler::calcLine(SplineVector sv, list<Triangle> *tris) {
 }
 
 void DataIOHandler::fillTri(QImage *toProcess, Triangle t, QRgb color) {
-    QPoint a = t.A(), b = t.B(), c = t.C();
+    QPoint a = t.a, b = t.b, c = t.c;
     if (a.y() > b.y()) {
         QPoint tmp = a;
         a = b;
@@ -356,7 +356,7 @@ void DataIOHandler::fillTri(QImage *toProcess, Triangle t, QRgb color) {
 }
 
 void DataIOHandler::fillTriSafe(QImage *toProcess, Triangle t, QRgb color) {
-    QPoint a = t.A(), b = t.B(), c = t.C();
+    QPoint a = t.a, b = t.b, c = t.c;
     if (a.y() > b.y()) {
         QPoint tmp = a;
         a = b;
@@ -462,7 +462,7 @@ void DataIOHandler::fillTTriSafe(QImage *toProcess, QPoint a, QPoint b, QPoint c
 }
 
 void DataIOHandler::filterTri(QImage *toProcess, Triangle t, Filter f) {
-    QPoint a = t.A(), b = t.B(), c = t.C();
+    QPoint a = t.a, b = t.b, c = t.c;
     if (a.y() > b.y()) {
         QPoint tmp = a;
         a = b;
@@ -490,7 +490,7 @@ void DataIOHandler::filterTri(QImage *toProcess, Triangle t, Filter f) {
 }
 
 void DataIOHandler::filterTriSafe(QImage *toProcess, Triangle t, Filter f) {
-    QPoint a = t.A(), b = t.B(), c = t.C();
+    QPoint a = t.a, b = t.b, c = t.c;
     if (a.y() > b.y()) {
         QPoint tmp = a;
         a = b;
@@ -740,6 +740,28 @@ QImage DataIOHandler::getForeground() {
     return qi;
 }
 
+void DataIOHandler::copyText() {
+    textCopySlot.clear();
+    Layer *layer = getWorkingLayer();
+    vector <unsigned char> activeTexts = layer->getActiveTexts();
+    vector <DrawText> texts = layer->getTexts();
+    for (unsigned char i : activeTexts)
+        textCopySlot.push_back(texts[i]);
+}
+
+void DataIOHandler::cutText() {
+    copyText();
+    deleteText();
+}
+
+void DataIOHandler::pasteText() {
+    getWorkingLayer()->pasteText(textCopySlot);
+}
+
+void DataIOHandler::deleteText() {
+    getWorkingLayer()->deleteSelected();
+}
+
 void DataIOHandler::copyVectors() {
     vectorCopySlot.clear();
     Layer *layer = getWorkingLayer();
@@ -760,6 +782,28 @@ void DataIOHandler::deleteVectors() {
 
 void DataIOHandler::pasteVectors() {
     getWorkingLayer()->pasteVectors(vectorCopySlot);
+}
+
+void DataIOHandler::copyPolygons() {
+    polygonCopySlot.clear();
+    Layer *layer = getWorkingLayer();
+    vector <unsigned char> activeGons = layer->getActiveGons();
+    vector <Polygon> gons = layer->getPolgons();
+    for (unsigned char i : activeGons)
+        polygonCopySlot.push_back(gons[i]);
+}
+
+void DataIOHandler::cutPolygons() {
+    copyPolygons();
+    deletePolygons();
+}
+
+void DataIOHandler::deletePolygons() {
+    getWorkingLayer()->deleteSelected();
+}
+
+void DataIOHandler::pastePolygons() {
+    getWorkingLayer()->pastePolygons(polygonCopySlot);
 }
 
 void DataIOHandler::copyRaster() {
@@ -877,6 +921,33 @@ void DataIOHandler::save(QString projectName) {
             out << static_cast<unsigned short>(sv.getBand());
             out << static_cast<unsigned short>(sv.getGap());
         }
+
+        vector <Polygon> gons = frame[i]->getPolgons();
+        out << static_cast<unsigned char>(gons.size());
+        for (size_t j = 0; j < gons.size(); ++j) {
+            vector <QPoint> pts = gons[j].getPts();
+            out << static_cast<int>(pts.size());
+            for (int k = 0; k < pts.size(); ++k)
+                out << pts[k];
+            out << static_cast<unsigned char>(gons[j].getFilter().getFilterIndex());
+            out << static_cast<unsigned char>(gons[j].getFilter().getStrength());
+            out << gons[j].getPolyColor();
+            out << gons[j].getEdgeColor();
+            out << static_cast<short>(gons[j].getEdgeSize());
+            out << static_cast<unsigned char>(gons[j].getPolyMode());
+            out << static_cast<unsigned char>(gons[j].getShowDivs());
+        }
+
+        vector <DrawText> texts = frame[i]->getTexts();
+        out << static_cast<unsigned char>(texts.size());
+        for (size_t j = 0; j < texts.size(); ++j) {
+            out << texts[j].getFont();
+            out << texts[j].getColor();
+            out << texts[j].getText().textWidth();
+            out << texts[i].getCorner();
+            out << texts[i].getVals();
+            out << texts[i].getText().text();
+        }
     }
     if (QFile::exists(backupName.c_str()))
         QFile::remove(backupName.c_str());
@@ -986,6 +1057,13 @@ int DataIOHandler::load(QString projectName) {
                     sv.setGap(uShortTemp);
                     svs.push_back(sv);
                 }
+
+
+
+
+
+
+
                 if (retCode == 0) {
                     qi = qi.convertToFormat(QImage::Format_ARGB32);
                     Layer *layer = new Layer(qi, alpha);

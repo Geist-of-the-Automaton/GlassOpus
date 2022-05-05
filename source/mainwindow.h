@@ -31,6 +31,7 @@
 #include <QMimeData>
 #include <QDragEnterEvent>
 #include <QProgressDialog>
+#include <QTextEdit>
 
 #include <dataIOHandler.h>
 #include <brushhandler.h>
@@ -133,6 +134,7 @@ public:
 
 public slots:
     void changeVectorFilter(string s);
+    void changePolygonFilter(string s);
     void changeScreenFilter(string s);
     void changeBrushFilter(string s);
     void changeBrushMethod(string s);
@@ -140,6 +142,7 @@ public slots:
     void doSomething(string btnPress);
     void downloadFinished();
     void downloadTimeout();
+    void textChanged();
 
 private:
     void log(string title, QObject *obj);
@@ -180,6 +183,8 @@ private:
     bool lock;
     QLabel *histograms;
     SymDialog *symDialog;
+    QPoint lastPos;
+    QTextEdit qte;
 
 };
 

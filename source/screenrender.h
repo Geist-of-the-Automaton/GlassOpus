@@ -29,6 +29,7 @@ using graphics::ImgSupport;
 
 const int flashSpeed = 1000;
 static mutex hoverLock;
+static bool isDrawing = false;
 
 class screenRender : public QWidget {
 
@@ -64,12 +65,6 @@ private:
     void filterTri(Triangle t);
     void filterBTri(QPoint a, QPoint b, QPoint c);
     void filterTTri(QPoint a, QPoint b, QPoint c);
-    void fillTriSafe(Triangle t);
-    void fillBTriSafe(QPoint a, QPoint b, QPoint c);
-    void fillTTriSafe(QPoint a, QPoint b, QPoint c);
-    void filterTriSafe(Triangle t);
-    void filterBTriSafe(QPoint a, QPoint b, QPoint c);
-    void filterTTriSafe(QPoint a, QPoint b, QPoint c);
     void doZoom();
 
     QPoint brushLoc;
@@ -80,7 +75,7 @@ private:
     bool flashFlag, fgVisible;
     QColor flashColor;
     float adder;
-    QColor color;
+    QRgb color;
     QPoint samplePoint;
     ImgSupport screenZoom;
     Filter filter;
