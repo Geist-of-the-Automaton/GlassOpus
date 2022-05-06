@@ -284,7 +284,7 @@ void screenRender::paintEvent(QPaintEvent *event) {
     else if (mode == Spline_Mode) {
         if (activeVects.size() > 0) {
             for (unsigned char i = 0; i < static_cast<unsigned char>(symCreate ? 1 : activeVects.size()); ++i)
-                ptsToDraw.push_back(vects[activeVects[0]].getControls());
+                ptsToDraw.push_back(vects[activeVects[i]].getControls());
         }
     }
     else if (mode == Text_Mode)

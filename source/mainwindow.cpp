@@ -1091,6 +1091,16 @@ void MainWindow::doSomething(string btnPress) {
         ioh->compileLayer();
     else if (btnPress == "Compile Frame")
         ioh->compileFrame();
+    else if (btnPress == "Clear Vectors")
+        ioh->getWorkingLayer()->clearVectors();
+    else if (btnPress == "Clear Polygons")
+        ioh->getWorkingLayer()->clearPolygons();
+    else if (btnPress == "Clear Texts")
+        ioh->getWorkingLayer()->clearTexts();
+    else if (btnPress == "Clear Canvas")
+        ioh->getWorkingLayer()->getCanvas()->fill(0x00000000);
+    else if (btnPress == "Clear All")
+        ioh->getWorkingLayer()->wipe();
     else if (btnPress == "Zoom 100%")
         sr->setZoom(1.0);
     else if (btnPress == "Set Zoom") {

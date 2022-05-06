@@ -50,16 +50,10 @@ public:
     DataIOHandler(QProgressDialog *progress);
     ~DataIOHandler();
     static void renderFrame(QProgressDialog *fqpd, QImage *ret, vector <Layer *> layers);
-    static void renderLayer(QProgressDialog *fqpd, QProgressDialog *qpd, QImage *toProcess, int alpha, Filter filter, vector <SplineVector> vects, vector<list <Triangle> > tris = vector <list <Triangle> > ());
+    static void renderLayer(QProgressDialog *fqpd, QProgressDialog *qpd, QImage *toProcess, Layer *layer);
     static void calcLine(SplineVector sv, list <Triangle> *tris);
     static void fillTri(QImage *toProcess, Triangle t, QRgb color);
-    static void fillTriSafe(QImage *toProcess, Triangle t, QRgb color);
     static void filterTri(QImage *toProcess, Triangle t, Filter f);
-    static void filterTriSafe(QImage *toProcess, Triangle t, Filter f);
-    static void fillBTriSafe(QImage *toProcess, QPoint a, QPoint b, QPoint c, QRgb color);
-    static void fillTTriSafe(QImage *toProcess, QPoint a, QPoint b, QPoint c, QRgb color);
-    static void filterBTriSafe(QImage *toProcess, QPoint a, QPoint b, QPoint c, Filter f);
-    static void filterTTriSafe(QImage *toProcess, QPoint a, QPoint b, QPoint c, Filter f);
     static void fillBTri(QImage *toProcess, QPoint a, QPoint b, QPoint c, QRgb color);
     static void fillTTri(QImage *toProcess, QPoint a, QPoint b, QPoint c, QRgb color);
     static void filterBTri(QImage *toProcess, QPoint a, QPoint b, QPoint c, Filter f);

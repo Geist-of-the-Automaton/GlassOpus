@@ -25,7 +25,7 @@ void DataIOHandler::compileFrame() {
     qi->fill(0x00FFFFFF);
     progress->setLabelText("Compiling Frame");
     renderFrame(progress, qi, frame);
-    frame[activeLayer]->clearVectors();
+    frame[activeLayer]->clearAll();
     Layer *layer = frame[activeLayer];
     for (size_t i = frame.size() - 1; i > activeLayer; --i) {
         delete frame[i];
@@ -53,8 +53,8 @@ void DataIOHandler::compileLayer() {
     Layer *layer = getWorkingLayer();
     layer->deselect();
     progress->setLabelText("Compiling Layer");
-    renderLayer(nullptr, progress, layer->getCanvas(), layer->getAlpha(), layer->getFilter(), layer->getVectors(), layer->getTriangles());
-    layer->clearVectors();
+    renderLayer(nullptr, progress, layer->getCanvas(), layer);
+    layer->clearAll();
 }
 
 void DataIOHandler::renderFrame(QProgressDialog *fqpd, QImage *ret, vector <Layer *> layers) {
@@ -69,7 +69,7 @@ void DataIOHandler::renderFrame(QProgressDialog *fqpd, QImage *ret, vector <Laye
         imgs.push_back(new QImage(layers[i]->getCanvas()->copy()));
     vector <thread> imgThreads;
     for(size_t i = 0; i < layers.size(); ++i) {
-        thread th = thread(renderLayer, fqpd, nullptr, imgs[i], layers[i]->getAlpha(), layers[i]->getFilter(), layers[i]->getVectors(), layers[i]->getTriangles());
+        thread th = thread(renderLayer, fqpd, nullptr, imgs[i], layers[i]);
         imgThreads.push_back(move(th));
     }
     ++progressMarker;
@@ -90,14 +90,19 @@ void DataIOHandler::renderFrame(QProgressDialog *fqpd, QImage *ret, vector <Laye
     fqpd->hide();
 }
 
-void DataIOHandler::renderLayer(QProgressDialog *fqpd, QProgressDialog *qpd, QImage *toProcess, int alpha, Filter filter, vector<SplineVector> vects, vector<list<Triangle>> tris) {
+void DataIOHandler::renderLayer(QProgressDialog *fqpd, QProgressDialog *qpd, QImage *toProcess, Layer *layer) {
+    int alpha = layer->getAlpha();
+    vector <SplineVector> vects = layer->getVectors();
+    vector <list <Triangle>> tris = layer->getTriangles();
+    vector <Polygon> gons = layer->getPolgons();
+    vector <DrawText> texts = layer->getTexts();
+    Filter filter = layer->getFilter();
     if (qpd != nullptr) {
         qpd->setValue(0);
-        qpd->setMaximum(static_cast<int>(1 + vects.size() + (tris.size() != vects.size() ? 1 : 0)));
+        qpd->setMaximum(static_cast<int>(1 + vects.size() + gons.size() + texts.size() + (tris.size() != vects.size() ? 1 : 0)));
         qpd->show();
         QCoreApplication::processEvents();
     }
-    int w = toProcess->width(), h = toProcess->height();
     vector <list <Triangle> *> dTris;
     if (!tris.empty()) {
         for (size_t i = 0; i < vects.size(); ++i)
@@ -123,115 +128,47 @@ void DataIOHandler::renderLayer(QProgressDialog *fqpd, QProgressDialog *qpd, QIm
         Filter vf = vects[i].getFilter();
         pair <QRgb, QRgb> colors = vects[i].getColors();
         QColor ca = QColor (colors.first), cb = QColor(colors.second);
-        int width = vects[i].getWidth();
-        pair <QPoint, QPoint> bounds = vects[i].getBounds();
-        bool flag = bounds.first.x() > width && bounds.first.y() > width && bounds.second.x() < w - width && bounds.second.y() < h - width;
         short band = vects[i].getBand(), gap = vects[i].getGap();
         float totalTri = static_cast<float>(tris[i].size() / 2);
         float offset = (totalTri / static_cast<float>(band + gap));
         int styler = -static_cast<int>(((static_cast<float>(band + gap) * offset) - totalTri) / 2.0);
         if (vects[i].getMode() == ColorFill) {
-            if (flag) { //normal draw
-                if (colors.first == colors.second) {
-                    color = ca.rgba();
-                    for (Triangle &t : *dTris[i]) {
-                        if (styler >= 0)
-                            fillTri(toProcess, t, color);
-                        styler += 1;
-                        if (styler == band - 1)
-                            styler = -gap;
-                    }
-                }
-                else {
-                    float ccomp = 1.0 / static_cast<float>((*dTris[i]).size());
-                    float cnt = 0.0;
-                    for (Triangle &t : *dTris[i]) {
-                        float ccc = ccomp * cnt;
-                        int r = static_cast<int>((ccc * static_cast<float>(ca.red())) + ((1.0 - ccc) * static_cast<float>(cb.red())));
-                        int g = static_cast<int>((ccc * static_cast<float>(ca.green())) + ((1.0 - ccc) * static_cast<float>(cb.green())));
-                        int b = static_cast<int>((ccc * static_cast<float>(ca.blue())) + ((1.0 - ccc) * static_cast<float>(cb.blue())));
-                        color = QColor(r, g, b).rgba();
-                        if (styler >= 0)
-                            fillTri(toProcess, t, color);
-                        styler += 1;
-                        if (styler == band - 1)
-                            styler = -gap;
-                        cnt += 1.0;
-                    }
-                }
-            }
-            else {  // safe draw
-                if (colors.first == colors.second) {
-                    color = ca.rgba();
-                    for (Triangle &t : *dTris[i]) {
-                        if (styler >= 0) {
-                            if (t.a.x() < 0 || t.a.x() >= w || t.a.y() < 0 || t.a.y() >= h)
-                                fillTriSafe(toProcess, t, color);
-                            else if (t.b.x() < 0 || t.b.x() >= w || t.b.y() < 0 || t.b.y() >= h)
-                                fillTriSafe(toProcess, t, color);
-                            else if (t.c.x() < 0 || t.c.x() >= w || t.c.y() < 0 || t.c.y() >= h)
-                                fillTriSafe(toProcess, t, color);
-                            else
-                                fillTri(toProcess, t, color);
-                        }
-                        styler += 1;
-                        if (styler == band - 1)
-                            styler = -gap;
-                    }
-                }
-                else {
-                    float ccomp = 1.0 / static_cast<float>((*dTris[i]).size());
-                    float cnt = 0.0;
-                    for (Triangle &t : *dTris[i]) {
-                        float ccc = ccomp * cnt;
-                        int r = static_cast<int>((ccc * static_cast<float>(ca.red())) + ((1.0 - ccc) * static_cast<float>(cb.red())));
-                        int g = static_cast<int>((ccc * static_cast<float>(ca.green())) + ((1.0 - ccc) * static_cast<float>(cb.green())));
-                        int b = static_cast<int>((ccc * static_cast<float>(ca.blue())) + ((1.0 - ccc) * static_cast<float>(cb.blue())));
-                        color = QColor(r, g, b).rgba();
-                        if (styler >= 0) {
-                            if (t.a.x() < 0 || t.a.x() >= w || t.a.y() < 0 || t.a.y() >= h)
-                                fillTriSafe(toProcess, t, color);
-                            else if (t.b.x() < 0 || t.b.x() >= w || t.b.y() < 0 || t.b.y() >= h)
-                                fillTriSafe(toProcess, t, color);
-                            else if (t.c.x() < 0 || t.c.x() >= w || t.c.y() < 0 || t.c.y() >= h)
-                                fillTriSafe(toProcess, t, color);
-                            else
-                                fillTri(toProcess, t, color);
-                        }
-                        styler += 1;
-                        if (styler == band - 1)
-                            styler = -gap;
-                        cnt += 1.0;
-                    }
-                }
-            }
-        }
-        else {
-            if (flag) //normal draw
+            if (colors.first == colors.second) {
+                color = ca.rgba();
                 for (Triangle &t : *dTris[i]) {
                     if (styler >= 0)
-                        filterTri(toProcess, t, vf);
+                        fillTri(toProcess, t, color);
                     styler += 1;
                     if (styler == band - 1)
                         styler = -gap;
                 }
-            else  // safe draw
+            }
+            else {
+                float ccomp = 1.0 / static_cast<float>((*dTris[i]).size());
+                float cnt = 0.0;
                 for (Triangle &t : *dTris[i]) {
-                    if (styler >= 0) {
-                        if (t.a.x() < 0 || t.a.x() >= w || t.a.y() < 0 || t.a.y() >= h)
-                            filterTriSafe(toProcess, t, vf);
-                        else if (t.b.x() < 0 || t.b.x() >= w || t.b.y() < 0 || t.b.y() >= h)
-                            filterTriSafe(toProcess, t, vf);
-                        else if (t.c.x() < 0 || t.c.x() >= w || t.c.y() < 0 || t.c.y() >= h)
-                            filterTriSafe(toProcess, t, vf);
-                        else
-                            filterTri(toProcess, t, vf);
-                    }
+                    float ccc = ccomp * cnt;
+                    int r = static_cast<int>((ccc * static_cast<float>(ca.red())) + ((1.0 - ccc) * static_cast<float>(cb.red())));
+                    int g = static_cast<int>((ccc * static_cast<float>(ca.green())) + ((1.0 - ccc) * static_cast<float>(cb.green())));
+                    int b = static_cast<int>((ccc * static_cast<float>(ca.blue())) + ((1.0 - ccc) * static_cast<float>(cb.blue())));
+                    color = QColor(r, g, b).rgba();
+                    if (styler >= 0)
+                        fillTri(toProcess, t, color);
                     styler += 1;
                     if (styler == band - 1)
                         styler = -gap;
+                    cnt += 1.0;
                 }
+            }
         }
+        else
+            for (Triangle &t : *dTris[i]) {
+                if (styler >= 0)
+                    filterTri(toProcess, t, vf);
+                styler += 1;
+                if (styler == band - 1)
+                    styler = -gap;
+            }
         if (qpd != nullptr) {
             qpd->setValue(qpd->value() + 1);
             QCoreApplication::processEvents();
@@ -239,6 +176,56 @@ void DataIOHandler::renderLayer(QProgressDialog *fqpd, QProgressDialog *qpd, QIm
     }
     for (size_t i = 0; i < vects.size(); ++i)
         delete dTris[i];
+    QPainter painter(toProcess);
+    for (Polygon gon : gons) {
+        list <Triangle> tris = gon.getTris();
+        vector <QPoint> pts = gon.getPts();
+        color = gon.getPolyColor();
+        if (gon.getPolyMode() == ColorGon && color >= 0x01000000)
+            for (Triangle &t : tris)
+                fillTri(toProcess, t, color);
+        else if (gon.getPolyMode() == FilterGon) {
+            filter = gon.getFilter();
+            for (Triangle &t : tris)
+                filterTri(toProcess, t, color);
+        }
+        int edgeSize = gon.getEdgeSize();
+        if (edgeSize != 0) {
+            bool dispDivs = gon.getShowDivs();
+            painter.setPen(QPen(QColor(gon.getEdgeColor()), edgeSize, Qt::SolidLine, Qt::RoundCap));
+            QVector <QLine> lines;
+            if (dispDivs) {
+                for (Triangle &t : tris) {
+                    painter.drawLine(t.a, t.b);
+                    painter.drawLine(t.a, t.c);
+                    painter.drawLine(t.c, t.b);
+                }
+            }
+            else {
+                if (pts.size() >= 2) {
+                    for (int i = 1; i < pts.size(); ++i)
+                        lines.push_back(QLine(pts[i - 1], pts[i]));
+                    lines.push_back(QLine(pts[0], pts[pts.size() - 1]));
+                }
+            }
+            painter.drawLines(lines);
+        }
+        if (qpd != nullptr) {
+            qpd->setValue(qpd->value() + 1);
+            QCoreApplication::processEvents();
+        }
+    }
+    for (DrawText &dt : texts) {
+        painter.setPen(QPen(dt.getColor(), 1));
+        painter.setFont(dt.getFont());
+        painter.setTransform(dt.getTransform());
+        painter.drawStaticText(0, 0, dt.getText());
+        if (qpd != nullptr) {
+            qpd->setValue(qpd->value() + 1);
+            QCoreApplication::processEvents();
+        }
+    }
+    painter.end();
     if (qpd != nullptr) {
         qpd->setValue(qpd->value() + 1);
         QCoreApplication::processEvents();
@@ -355,68 +342,24 @@ void DataIOHandler::fillTri(QImage *toProcess, Triangle t, QRgb color) {
     }
 }
 
-void DataIOHandler::fillTriSafe(QImage *toProcess, Triangle t, QRgb color) {
-    QPoint a = t.a, b = t.b, c = t.c;
-    if (a.y() > b.y()) {
-        QPoint tmp = a;
-        a = b;
-        b = tmp;
-    }
-    if (b.y() > c.y()) {
-        QPoint tmp = b;
-        b = c;
-        c = tmp;
-        if (a.y() > b.y()) {
-            tmp = a;
-            a = b;
-            b = tmp;
-        }
-    }
-    if (b.y() == a.y())
-        fillBTriSafe(toProcess, c, b, a, color);
-    else if (b.y() == c.y())
-        fillTTriSafe(toProcess, a, b, c, color);
-    else {
-        QPoint d (a.x() + static_cast<float>(c.x() - a.x()) * (static_cast<float>(b.y() - a.y()) / static_cast<float>(c.y() - a.y())) , b.y());
-        fillBTriSafe(toProcess, c, b, d, color);
-        fillTTriSafe(toProcess, a, b, d, color);
-    }
-}
-
 void DataIOHandler::fillBTri(QImage *toProcess, QPoint a, QPoint b, QPoint c, QRgb color) {
     if (b.x() > c.x()) {
         QPoint tmp = b;
         b = c;
         c = tmp;
     }
-    float invslope1 = ipolMin * static_cast<float>(b.x() - a.x()) / static_cast<float>(b.y() - a.y());
-    float invslope2 = ipolMin * static_cast<float>(c.x() - a.x()) / static_cast<float>(c.y() - a.y());
+    int h = toProcess->height() - 1, w = toProcess->width() - 1;
+    float invslope1 = static_cast<float>(b.x() - a.x()) / static_cast<float>(b.y() - a.y());
+    float invslope2 = static_cast<float>(c.x() - a.x()) / static_cast<float>(c.y() - a.y());
     float curx1 = static_cast<float>(a.x());
     float curx2 = static_cast<float>(a.x());
-    for (float y = a.y(); y >= b.y(); y -= ipolMin)
-    {
-        for (int x = static_cast<int>(curx1); x <= static_cast<int>(curx2); ++x)
-            toProcess->setPixel(x, static_cast<int>(y), color);
-        curx1 -= invslope1;
-        curx2 -= invslope2;
-    }
-}
-
-void DataIOHandler::fillBTriSafe(QImage *toProcess, QPoint a, QPoint b, QPoint c, QRgb color) {
-    if (b.x() > c.x()) {
-        QPoint tmp = b;
-        b = c;
-        c = tmp;
-    }
-    float invslope1 = ipolMin * static_cast<float>(b.x() - a.x()) / static_cast<float>(b.y() - a.y());
-    float invslope2 = ipolMin * static_cast<float>(c.x() - a.x()) / static_cast<float>(c.y() - a.y());
-    float curx1 = static_cast<float>(a.x());
-    float curx2 = static_cast<float>(a.x());
-    float endY = b.y() < 0 ? 0 : b.y();
-    for (float y = a.y() >= toProcess->height() ? toProcess->height() - 1 : a.y(); y >= endY; y -= ipolMin)  {
-        int startX = curx1 < 0.0 ? 0 : static_cast<int>(curx1), endX = static_cast<int>(curx2) >= toProcess->width() ? toProcess->width() - 1 : static_cast<int>(curx2);
-        for (int x = startX; x <= endX; ++x)
-            toProcess->setPixel(x, static_cast<int>(y), color);
+    float offset = a.y() > h ? a.y() - h : 0;
+    curx1 -= invslope1 * offset;
+    curx2 -= invslope2 * offset;
+    for (int y = min(h, a.y()); y >= max(0, b.y()); --y) {
+        QRgb *line = reinterpret_cast<QRgb *>(toProcess->scanLine(y));
+        for (int x = max(static_cast<int>(curx1), 0); x <= min(static_cast<int>(curx2), w); ++x)
+            line[x] = color;
         curx1 -= invslope1;
         curx2 -= invslope2;
     }
@@ -428,34 +371,18 @@ void DataIOHandler::fillTTri(QImage *toProcess, QPoint a, QPoint b, QPoint c, QR
         b = c;
         c = tmp;
     }
-    float invslope1 = ipolMin * static_cast<float>(b.x() - a.x()) / static_cast<float>(b.y() - a.y());
-    float invslope2 = ipolMin * static_cast<float>(c.x() - a.x()) / static_cast<float>(c.y() - a.y());
+    float invslope1 = static_cast<float>(b.x() - a.x()) / static_cast<float>(b.y() - a.y());
+    float invslope2 = static_cast<float>(c.x() - a.x()) / static_cast<float>(c.y() - a.y());
     float curx1 = static_cast<float>(a.x());
     float curx2 = static_cast<float>(a.x());
-    for (float y = a.y(); y <= b.y(); y += ipolMin)
-    {
-        for (int x = static_cast<int>(curx1); x <= static_cast<int>(curx2); ++x)
-            toProcess->setPixel(x, static_cast<int>(y), color);//Filtering::greyscale((qi.pixel(x, static_cast<int>(y))), 255));
-        curx1 += invslope1;
-        curx2 += invslope2;
-    }
-}
-
-void DataIOHandler::fillTTriSafe(QImage *toProcess, QPoint a, QPoint b, QPoint c, QRgb color) {
-    if (b.x() > c.x()) {
-        QPoint tmp = b;
-        b = c;
-        c = tmp;
-    }
-    float invslope1 = ipolMin * static_cast<float>(b.x() - a.x()) / static_cast<float>(b.y() - a.y());
-    float invslope2 = ipolMin * static_cast<float>(c.x() - a.x()) / static_cast<float>(c.y() - a.y());
-    float curx1 = static_cast<float>(a.x());
-    float curx2 = static_cast<float>(a.x());
-    float endY = b.y() >= toProcess->height() ? toProcess->height() - 1 : b.y();
-    for (float y = a.y() < 0 ? 0 : a.y(); y <= endY; y += ipolMin) {
-        int startX = curx1 < 0.0 ? 0 : static_cast<int>(curx1), endX = static_cast<int>(curx2) >= toProcess->width() ? toProcess->width() - 1 : static_cast<int>(curx2);
-        for (int x = startX; x <= endX; ++x)
-            toProcess->setPixel(x, static_cast<int>(y), color); //qi->setPixel(x, y, 0xFF00FF00);
+    float offset = a.y() < 0 ? -a.y() : 0;
+    curx1 += invslope1 * offset;
+    curx2 += invslope2 * offset;
+    int h = toProcess->height(), w = toProcess->width() - 1;
+    for (int y = max(0, a.y()); y < min(h, b.y()); ++y) {
+        QRgb *line = reinterpret_cast<QRgb *>(toProcess->scanLine(y));
+        for (int x = max(static_cast<int>(curx1), 0); x <= min(static_cast<int>(curx2), w); ++x)
+            line[x] = color;
         curx1 += invslope1;
         curx2 += invslope2;
     }
@@ -489,72 +416,24 @@ void DataIOHandler::filterTri(QImage *toProcess, Triangle t, Filter f) {
     }
 }
 
-void DataIOHandler::filterTriSafe(QImage *toProcess, Triangle t, Filter f) {
-    QPoint a = t.a, b = t.b, c = t.c;
-    if (a.y() > b.y()) {
-        QPoint tmp = a;
-        a = b;
-        b = tmp;
-    }
-    if (b.y() > c.y()) {
-        QPoint tmp = b;
-        b = c;
-        c = tmp;
-        if (a.y() > b.y()) {
-            tmp = a;
-            a = b;
-            b = tmp;
-        }
-    }
-    if (b.y() == a.y())
-        filterBTriSafe(toProcess, c, b, a, f);
-    else if (b.y() == c.y())
-        filterTTriSafe(toProcess, a, b, c, f);
-    else {
-        QPoint d (a.x() + static_cast<float>(c.x() - a.x()) * (static_cast<float>(b.y() - a.y()) / static_cast<float>(c.y() - a.y())) , b.y());
-        filterBTriSafe(toProcess, c, b, d, f);
-        filterTTriSafe(toProcess, a, b, d, f);
-    }
-}
-
 void DataIOHandler::filterBTri(QImage *toProcess, QPoint a, QPoint b, QPoint c, Filter f) {
     if (b.x() > c.x()) {
         QPoint tmp = b;
         b = c;
         c = tmp;
     }
-    float invslope1 = ipolMin * static_cast<float>(b.x() - a.x()) / static_cast<float>(b.y() - a.y());
-    float invslope2 = ipolMin * static_cast<float>(c.x() - a.x()) / static_cast<float>(c.y() - a.y());
+    int h = toProcess->height() - 1, w = toProcess->width() - 1;
+    float invslope1 = static_cast<float>(b.x() - a.x()) / static_cast<float>(b.y() - a.y());
+    float invslope2 = static_cast<float>(c.x() - a.x()) / static_cast<float>(c.y() - a.y());
     float curx1 = static_cast<float>(a.x());
     float curx2 = static_cast<float>(a.x());
-    for (float y = a.y(); y >= b.y(); y -= ipolMin)
-    {
-        for (int x = static_cast<int>(curx1); x <= static_cast<int>(curx2); ++x) {
-            int Y = static_cast<int>(y);
-            toProcess->setPixel(x, Y, f.applyTo(toProcess->pixelColor(x, Y)));
-        }
-        curx1 -= invslope1;
-        curx2 -= invslope2;
-    }
-}
-
-void DataIOHandler::filterBTriSafe(QImage *toProcess, QPoint a, QPoint b, QPoint c, Filter f) {
-    if (b.x() > c.x()) {
-        QPoint tmp = b;
-        b = c;
-        c = tmp;
-    }
-    float invslope1 = ipolMin * static_cast<float>(b.x() - a.x()) / static_cast<float>(b.y() - a.y());
-    float invslope2 = ipolMin * static_cast<float>(c.x() - a.x()) / static_cast<float>(c.y() - a.y());
-    float curx1 = static_cast<float>(a.x());
-    float curx2 = static_cast<float>(a.x());
-    float endY = b.y() < 0 ? 0 : b.y();
-    for (float y = a.y() >= toProcess->height() ? toProcess->height() - 1 : a.y(); y >= endY; y -= ipolMin)  {
-        int startX = curx1 < 0.0 ? 0 : static_cast<int>(curx1), endX = static_cast<int>(curx2) >= toProcess->width() ? toProcess->width() - 1 : static_cast<int>(curx2);
-        for (int x = startX; x <= endX; ++x) {
-            int Y = static_cast<int>(y);
-            toProcess->setPixel(x, Y, f.applyTo(toProcess->pixelColor(x, Y)));
-        }
+    float offset = a.y() > h ? a.y() - h : 0;
+    curx1 -= invslope1 * offset;
+    curx2 -= invslope2 * offset;
+    for (int y = min(h, a.y()); y >= max(0, b.y()); --y) {
+        QRgb *line = reinterpret_cast<QRgb *>(toProcess->scanLine(y));
+        for (int x = max(static_cast<int>(curx1), 0); x <= min(static_cast<int>(curx2), w); ++x)
+            line[x] = f.applyTo(line[x]);
         curx1 -= invslope1;
         curx2 -= invslope2;
     }
@@ -566,43 +445,22 @@ void DataIOHandler::filterTTri(QImage *toProcess, QPoint a, QPoint b, QPoint c, 
         b = c;
         c = tmp;
     }
-    float invslope1 = ipolMin * static_cast<float>(b.x() - a.x()) / static_cast<float>(b.y() - a.y());
-    float invslope2 = ipolMin * static_cast<float>(c.x() - a.x()) / static_cast<float>(c.y() - a.y());
+    float invslope1 = static_cast<float>(b.x() - a.x()) / static_cast<float>(b.y() - a.y());
+    float invslope2 = static_cast<float>(c.x() - a.x()) / static_cast<float>(c.y() - a.y());
     float curx1 = static_cast<float>(a.x());
     float curx2 = static_cast<float>(a.x());
-    for (float y = a.y(); y <= b.y(); y += ipolMin)
-    {
-        for (int x = static_cast<int>(curx1); x <= static_cast<int>(curx2); ++x) {
-            int Y = static_cast<int>(y);
-            toProcess->setPixel(x, Y, f.applyTo(toProcess->pixelColor(x, Y)));
-        }
+    float offset = a.y() < 0 ? -a.y() : 0;
+    curx1 += invslope1 * offset;
+    curx2 += invslope2 * offset;
+    int h = toProcess->height(), w = toProcess->width() - 1;
+    for (int y = max(0, a.y()); y < min(h, b.y()); ++y) {
+        QRgb *line = reinterpret_cast<QRgb *>(toProcess->scanLine(y));
+        for (int x = max(static_cast<int>(curx1), 0); x <= min(static_cast<int>(curx2), w); ++x)
+            line[x] = f.applyTo(line[x]);
         curx1 += invslope1;
         curx2 += invslope2;
     }
 }
-
-void DataIOHandler::filterTTriSafe(QImage *toProcess, QPoint a, QPoint b, QPoint c, Filter f) {
-    if (b.x() > c.x()) {
-        QPoint tmp = b;
-        b = c;
-        c = tmp;
-    }
-    float invslope1 = ipolMin * static_cast<float>(b.x() - a.x()) / static_cast<float>(b.y() - a.y());
-    float invslope2 = ipolMin * static_cast<float>(c.x() - a.x()) / static_cast<float>(c.y() - a.y());
-    float curx1 = static_cast<float>(a.x());
-    float curx2 = static_cast<float>(a.x());
-    float endY = b.y() >= toProcess->height() ? toProcess->height() - 1 : b.y();
-    for (float y = a.y() < 0 ? 0 : a.y(); y <= endY; y += ipolMin) {
-        int startX = curx1 < 0.0 ? 0 : static_cast<int>(curx1), endX = static_cast<int>(curx2) >= toProcess->width() ? toProcess->width() - 1 : static_cast<int>(curx2);
-        for (int x = startX; x <= endX; ++x) {
-            int Y = static_cast<int>(y);
-            toProcess->setPixel(x, Y, f.applyTo(toProcess->pixelColor(x, Y)));
-        }
-        curx1 += invslope1;
-        curx2 += invslope2;
-    }
-}
-
 
 void DataIOHandler::setActiveLayer(int i, EditMode mode) {
     if (i > getNumLayers())
@@ -697,14 +555,14 @@ QImage DataIOHandler::getBackground() {
     progress->show();
     QCoreApplication::processEvents();
     QImage qi = frame[0]->getCanvas()->copy();
-    renderLayer(nullptr, nullptr, &qi, frame[0]->getAlpha(), frame[0]->getFilter(), frame[0]->getVectors(), frame[0]->getTriangles());
+    renderLayer(nullptr, nullptr, &qi, frame[0]);
     progress->setValue(0);
     QCoreApplication::processEvents();
     QPainter p;
     p.begin(&qi);
     for (size_t i = 0; i < activeLayer; ++i) {
         QImage temp = frame[i]->getCanvas()->copy();
-        renderLayer(nullptr, nullptr, &temp, frame[i]->getAlpha(), frame[i]->getFilter(), frame[i]->getVectors(), frame[i]->getTriangles());
+        renderLayer(nullptr, nullptr, &temp, frame[i]);
         p.drawImage(0, 0, temp);
         progress->setValue(static_cast<int>(i + 1));
         QCoreApplication::processEvents();
@@ -722,14 +580,14 @@ QImage DataIOHandler::getForeground() {
     if (frame.size() == 0 || activeLayer == frame.size() - 1)
         return QImage();
     QImage qi = frame[activeLayer + 1]->getCanvas()->copy();
-    renderLayer(nullptr, nullptr, &qi, frame[activeLayer + 1]->getAlpha(), frame[activeLayer + 1]->getFilter(), frame[activeLayer + 1]->getVectors(), frame[activeLayer + 1]->getTriangles());
+    renderLayer(nullptr, nullptr, &qi, frame[activeLayer + 1]);
     progress->setValue(progress->value() + 2);
     QCoreApplication::processEvents();
     QPainter p;
     p.begin(&qi);
     for (size_t i = activeLayer + 2; i < frame.size(); ++i) {
         QImage temp = frame[i]->getCanvas()->copy();
-        renderLayer(nullptr, nullptr, &temp, frame[i]->getAlpha(), frame[i]->getFilter(), frame[i]->getVectors(), frame[i]->getTriangles());
+        renderLayer(nullptr, nullptr, &temp, frame[i]);
         p.drawImage(0, 0, temp);
         progress->setValue(static_cast<int>(i + 1));
         QCoreApplication::processEvents();
@@ -1057,19 +915,93 @@ int DataIOHandler::load(QString projectName) {
                     sv.setGap(uShortTemp);
                     svs.push_back(sv);
                 }
-
-
-
-
-
-
-
+                unsigned char numGons;
+                in >> numGons;
+                if (numGons > maxVects) {
+                    retCode = 1;
+                    break;
+                }
+                list <Polygon> gons;
+                for (int j = 0; j < numGons; ++j) {
+                    Polygon p;
+                    int numPts;
+                    in >> numPts;
+                    for (int k = 0; k < numPts; ++k) {
+                        QPoint qp;
+                        in >> qp;
+                        p.addPt(qp);
+                    }
+                    in >> ucharTemp;
+                    p.setFilter(graphics::filterNames[ucharTemp]);
+                    in >> ucharTemp;
+                    p.setFilterStrength(ucharTemp);
+                    QRgb color;
+                    in >> color;
+                    p.setPolyColor(color);
+                    in >> color;
+                    p.setEdgeColor(color);
+                    short shortTemp;
+                    in >> shortTemp;
+                    if (shortTemp > maxEdgeSize) {
+                        retCode = 1;
+                        break;
+                    }
+                    p.setEdgeSize(shortTemp);
+                    in >> ucharTemp;
+                    p.setPolyMode(PolyMode(ucharTemp));
+                    in >> ucharTemp;
+                    p.setShowDivs(ucharTemp);
+                    gons.push_back(p);
+                }
+                unsigned char numTexts;
+                in >> numTexts;
+                if (numTexts > maxVects) {
+                    retCode = 1;
+                    break;
+                }
+                list <DrawText> texts;
+                for (int j = 0;  j < numTexts; ++j) {
+                    DrawText dt;
+                    QFont font;
+                    in >> font;
+                    QColor color;
+                    in >> color;
+                    dt.updateColor(color);
+                    QStaticText text;
+                    QString String;
+                    qreal width;
+                    in >> width;
+                    text.setTextWidth(width);
+                    QPoint corner;
+                    in >> corner;
+                    dt.updatePos(corner);
+                    QVector <float> vals;
+                    in >> vals;
+                    dt.updateRotate(vals[0]);
+                    dt.updateScale(vals[1], vals[2]);
+                    in >> String;
+                    text.setText(String);
+                    dt.updateText(text);
+                    texts.push_back(dt);
+                }
                 if (retCode == 0) {
                     qi = qi.convertToFormat(QImage::Format_ARGB32);
                     Layer *layer = new Layer(qi, alpha);
                     if (!svs.empty()) {
                         layer->setMode(Spline_Mode);
                         layer->pasteVectors(svs);
+                        layer->deselect();
+                        layer->setMode(Brush_Mode);
+                    }
+                    if (!gons.empty()) {
+                        layer->setMode(Polygon_Mode);
+                        layer->pastePolygons(gons);
+                        layer->deselect();
+                        layer->setMode(Brush_Mode);
+                    }
+                    if (!texts.empty()) {
+                        layer->setMode(Text_Mode);
+                        layer->pasteText(texts);
                         layer->deselect();
                         layer->setMode(Brush_Mode);
                     }

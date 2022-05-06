@@ -938,60 +938,35 @@ void Layer::doubleClickLeft(QPoint qp, bool ctrlFlag) {
             deselect();
     }
     else if (mode == Spline_Mode) {
-        if (activeVects.size() != 0) {
-            if (!ctrlFlag)
-                deselect();
-            else {
+        int index = -1, size = static_cast<int>(vects.size());
+        for (char i = 0; i < size; ++i) {
+            list <Triangle> tris = vectTris[i];
+            for (Triangle t : tris) {
+                if (inTri(qp, t.a, t.b, t.c)) {
+                    index = i;
+                    break;
+                }
+            }
+            if (index == i)
+                break;
+        }
+        if (index != -1) {
+            vector <unsigned char>::iterator where = std::find(activeVects.begin(), activeVects.end(), index);
+            if (where == activeVects.end()) {
                 symCreate = false;
-                int dist = INT_MAX;
-                char index = -1, size = static_cast<char>(vects.size());
-                for (char i = 0; i < size; ++i) {
-                    vector <QPoint> pts = vects[i].getControls();
-                    int tdist = stdFuncs::sqrDist(qp, pts[0]);
-                    if (tdist < dist) {
-                        dist = tdist;
-                        index = i;
-                    }
-                    tdist = stdFuncs::sqrDist(qp, pts[pts.size() - 1]);
-                    if (tdist < dist) {
-                        dist = tdist;
-                        index = i;
-                    }
-                }
-                bool flag = true;
-                for (char c : activeVects)
-                    if (c == index) {
-                        flag = false;
-                        break;
-                    }
-                if (flag)
-                    activeVects.push_back(index);
+                activeVects.push_back(index);
             }
+            else
+                activeVects.erase(std::find(activeVects.begin(), activeVects.end(), index));
         }
-        else if (vects.size() != 0) {
-            int dist = INT_MAX;
-            char index = -1, size = static_cast<char>(vects.size());
-            for (char i = 0; i < size; ++i) {
-                vector <QPoint> pts = vects[i].getControls();
-                int tdist = stdFuncs::sqrDist(qp, pts[0]);
-                if (tdist < dist) {
-                    dist = tdist;
-                    index = i;
-                }
-                tdist = stdFuncs::sqrDist(qp, pts[pts.size() - 1]);
-                if (tdist < dist) {
-                    dist = tdist;
-                    index = i;
-                }
-            }
-            activeVects.push_back(index);
-        }
+        else if (!activeVects.empty())
+            deselect();
     }
 }
 
 void Layer::doubleClickRight(QPoint qp) {
     if (mode == Text_Mode) {
-        if (activeTexts.size() == 0) {
+        if (activeTexts.empty()) {
             bool flag = false;
             for (int i = 0; i < texts.size(); ++i) {
                 QPoint  dist = texts[i].getShowPoint() - qp;
@@ -1012,26 +987,6 @@ void Layer::doubleClickRight(QPoint qp) {
                 activeTexts.push_back(index);
             }
         }
-    }
-    else if (mode == Spline_Mode && activeVects.size() != 0) {
-        int dist = INT_MAX;
-        size_t index = 0;
-        for (size_t i = 0; i < activeVects.size(); ++i) {
-            vector <QPoint> pts = vects[activeVects[i]].getControls();
-            int tdist = abs(qp.x() - pts[0].x()) + abs(qp.y() - pts[0].y());
-            if (tdist < dist) {
-                dist = tdist;
-                index = i;
-            }
-            tdist = abs(qp.x() - pts[pts.size() - 1].x()) + abs(qp.y() - pts[pts.size() - 1].y());
-            if (tdist < dist) {
-                dist = tdist;
-                index = i;
-            }
-        }
-        activeVects.erase(activeVects.begin() + index);
-        if (activeVects.size() <= 1 && symCreate)
-            symCreate = false;
     }
 }
 
@@ -1292,9 +1247,29 @@ void Layer::deselect() {
 }
 
 void Layer::clearVectors() {
+    activeVects.clear();
     vects.clear();
     vectTris.clear();
-    activeVects.clear();
+}
+
+void Layer::clearPolygons() {
+    activeGons.clear();
+    gons.clear();
+}
+
+void Layer::clearTexts() {
+    activeTexts.clear();
+    texts.clear();
+}
+
+void Layer::clearAll() {
+    clearVectors();
+    clearPolygons();
+    clearTexts();
+}
+void Layer::wipe() {
+    clearAll();
+    getCanvas()->fill(0x00000000);
 }
 
 Filter Layer::getFilter() {

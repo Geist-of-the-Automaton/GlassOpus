@@ -99,6 +99,10 @@ public:
     void deselect();
     void deleteSelected();
     void clearVectors();
+    void clearPolygons();
+    void clearTexts();
+    void clearAll();
+    void wipe();
     Filter getFilter();
     int getFilterStrength();
     void setFilterStrength(int str);
