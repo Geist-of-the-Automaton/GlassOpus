@@ -57,6 +57,8 @@ Layer& Layer::operator=(const Layer &layer) {
     selection = NoSelect;
     vects = layer.vects;
     vectTris = layer.vectTris;
+    gons = layer.gons;
+    texts = layer.texts;
     //active vects don't get copied.
     activePt = -1;
     qi = new QImage(layer.qi->copy());
@@ -1315,6 +1317,130 @@ int Layer::symActive() {
     return symCreate;
 }
 
+void Layer::polyToSelect() {
+    QPoint minPt = QPoint(qi->width(), qi->height());
+    QPoint maxPt = QPoint(0, 0);
+    for (unsigned char activeGon : activeGons) {
+        for (QPoint qp : gons[activeGon].getPts()) {
+            if (qp.x() < minPt.x())
+                minPt.setX(qp.x());
+            if (qp.y() < minPt.y())
+                minPt.setY(qp.y());
+            if (qp.x() > maxPt.x())
+                maxPt.setX(qp.x());
+            if (qp.y() > maxPt.y())
+                maxPt.setY(qp.y());
+        }
+    }
+    if (minPt.x() >= maxPt.x() || minPt.y() >= maxPt.y())
+        return;
+    rasterselectOg = QImage(2 + (maxPt.x() - minPt.x()), 2 + (maxPt.y() - minPt.y()), QImage::Format_ARGB32_Premultiplied);
+    rasterselectOg.fill(0x00000000);
+    for (unsigned char activeGon : activeGons) {
+        for (Triangle &t : gons[activeGon].getTris()) {
+            QPoint a = t.a, b = t.b, c = t.c;
+            if (a.y() > b.y()) {
+                QPoint tmp = a;
+                a = b;
+                b = tmp;
+            }
+            if (b.y() > c.y()) {
+                QPoint tmp = b;
+                b = c;
+                c = tmp;
+                if (a.y() > b.y()) {
+                    tmp = a;
+                    a = b;
+                    b = tmp;
+                }
+            }
+            QPoint A, C, B = b;
+            int flag = 0;
+            if (b.y() == a.y()) {
+                C = a;
+                flag = 1;
+            }
+            else if (b.y() == c.y()) {
+                C = c;
+                flag = 2;
+            }
+            else
+                C = QPoint(a.x() + static_cast<float>(c.x() - a.x()) * (static_cast<float>(b.y() - a.y()) / static_cast<float>(c.y() - a.y())) , b.y());
+            if (flag < 2) {
+                A = c;
+                if (B.x() > C.x()) {
+                    QPoint tmp = B;
+                    B = C;
+                    C = tmp;
+                }
+                int h = qi->height() - 1, w = qi->width() - 1;
+                float invslope1 = static_cast<float>(B.x() - A.x()) / static_cast<float>(B.y() - A.y());
+                float invslope2 = static_cast<float>(C.x() - A.x()) / static_cast<float>(C.y() - A.y());
+                float curx1 = static_cast<float>(A.x());
+                float curx2 = static_cast<float>(A.x());
+                float offset = A.y() > h ? A.y() - h : 0;
+                curx1 -= invslope1 * offset;
+                curx2 -= invslope2 * offset;
+                for (int y = min(h, A.y()); y >= max(0, B.y()); --y) {
+                    QRgb *line = reinterpret_cast<QRgb *>(qi->scanLine(y));
+                    if (y - minPt.y() < 0)
+                        cout << "less than 0 y" << endl;
+                    QRgb *line2 = reinterpret_cast<QRgb *>(rasterselectOg.scanLine(y - minPt.y() + 1));
+                    for (int x = max(static_cast<int>(curx1), 0); x <= min(static_cast<int>(curx2), w); ++x) {
+                        if (x - minPt.x() < 0)
+                            cout << "less than 0 x" << endl;
+                        if (line[x] != 0x00000000)
+                            line2[x - minPt.x() + 1] = line[x];
+                        line[x] = 0x00000000;
+                    }
+                    curx1 -= invslope1;
+                    curx2 -= invslope2;
+                }
+                if (flag == 0)
+                    flag = 2;
+            }
+            if (flag == 2) {
+                A = a;
+                if (B.x() > C.x()) {
+                    QPoint tmp = B;
+                    B = C;
+                    C = tmp;
+                }
+                float invslope1 = static_cast<float>(B.x() - A.x()) / static_cast<float>(B.y() - A.y());
+                float invslope2 = static_cast<float>(C.x() - A.x()) / static_cast<float>(C.y() - A.y());
+                float curx1 = static_cast<float>(A.x());
+                float curx2 = static_cast<float>(A.x());
+                float offset = A.y() < 0 ? -A.y() : 0;
+                curx1 += invslope1 * offset;
+                curx2 += invslope2 * offset;
+                int h = qi->height(), w = qi->width() - 1;
+                for (int y = max(0, A.y()); y < min(h, B.y()); ++y) {
+                    QRgb *line = reinterpret_cast<QRgb *>(qi->scanLine(y));
+                    QRgb *line2 = reinterpret_cast<QRgb *>(rasterselectOg.scanLine(y - minPt.y() + 1));
+                    for (int x = max(static_cast<int>(curx1), 0); x <= min(static_cast<int>(curx2), w); ++x) {
+                        if (line[x] != 0x00000000)
+                            line2[x - minPt.x() + 1] = line[x];
+                        line[x] = 0x00000000;
+                    }
+                    curx1 += invslope1;
+                    curx2 += invslope2;
+                }
+            }
+        }
+    }
+    sort(activeGons.begin(), activeGons.end());
+    for (int i = activeGons.size() - 1; i >= 0; --i) {
+        int j = activeGons[i];
+        activeGons.pop_back();
+        gons.erase(gons.begin() + j);
+    }
+    boundPt1 = minPt + QPoint(-1, -1);
+    boundPt2 = maxPt;
+    deltaMove = rotateAnchor = minPt;
+    postAngle = 0.0;
+    selectOgActive = true;
+}
+
 vector <Polygon> Layer::getPolgons() {
     return gons;
 }
@@ -1413,6 +1539,45 @@ void Layer::setTextColor(QColor color) {
 
 bool Layer::updateText(Qt::Key key, bool shiftFlag) {
     return texts[activeTexts[0]].updateText(key, shiftFlag);
+}
+
+void Layer::magicSelect(QPoint qp, vec4 vals) {
+    int hue = vals._X, sat = vals._Y, lum = vals._Z;
+    int w = qi->width(), h = qi->height();
+    QPoint minPt(qp), maxPt(qp);
+    QColor og = qi->pixelColor(qp.x(), qp.y());
+    list <QPoint> toProcess;
+    toProcess.push_back(qp);
+    QImage copy = QImage(qi->size(), QImage::Format_ARGB32_Premultiplied);
+    while (!toProcess.empty()) {
+        QPoint pt = toProcess.front();
+        toProcess.pop_front();
+        if (pt.x() >= 0 && pt.x() < w && pt.y() >= 0 && pt.y() < h) {
+            QColor qc = qi->pixelColor(pt.x(), pt.y());
+            if (copy.pixel(pt.x(), pt.y()) == 0x00000000 && abs(og.hslSaturation() - qc.hslSaturation()) <= sat && abs(og.lightness() - qc.lightness()) <= lum && (abs(og.hslHue() - qc.hslHue()) <= hue || abs(360 - (og.hslHue() - qc.hslHue())) <= hue)) {
+                copy.setPixelColor(pt.x(), pt.y(), qi->pixel(pt.x(), pt.y()));
+                qi->setPixel(pt.x(), pt.y(), 0x00000000);
+                if (pt.x() < minPt.x())
+                    minPt.setX(pt.x());
+                if (pt.y() < minPt.y())
+                    minPt.setY(pt.y());
+                if (pt.x() > maxPt.x())
+                    maxPt.setX(pt.x());
+                if (pt.y() > maxPt.y())
+                    maxPt.setY(pt.y());
+                toProcess.push_back(QPoint(pt.x() - 1, pt.y()));
+                toProcess.push_back(QPoint(pt.x() + 1, pt.y()));
+                toProcess.push_back(QPoint(pt.x(), pt.y() - 1));
+                toProcess.push_back(QPoint(pt.x(), pt.y() + 1));
+            }
+        }
+    }
+    rasterselectOg = copy.copy(minPt.x(), minPt.y(), maxPt.x() - minPt.x(), maxPt.y() - minPt.y());
+    boundPt1 = minPt;
+    boundPt2 = maxPt;
+    deltaMove = rotateAnchor = minPt;
+    postAngle = 0.0;
+    selectOgActive = true;
 }
 
 

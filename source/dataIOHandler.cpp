@@ -1042,3 +1042,34 @@ void DataIOHandler::setSym(QPoint qp, int div, int ofEvery, int skip) {
     for (Layer *l : frame)
         l->setSym(qp, div, ofEvery, skip);
 }
+
+void DataIOHandler::layerFunc(vector<int> choices) {
+    QImage qi, a, b;
+    if (choices[0] == activeLayer)
+        frame[choices[0]]->deselect();
+    if (choices[1] == activeLayer)
+        frame[choices[1]]->deselect();
+    a = frame[choices[0]]->getCanvas()->copy();
+    b = frame[choices[1]]->getCanvas()->copy();
+    progress->setLabelText("Rendering Layer A");
+    renderLayer(nullptr, progress, &a, frame[choices[0]]);
+    progress->setLabelText("Rendering Layer B");
+    renderLayer(nullptr, progress, &b, frame[choices[0]]);
+    if (choices[2] >= 7)
+        qi = graphics::ImgSupport::bitLayers(a, b, graphics::bType(choices[2] - 7));
+    else if (choices[2] == 0)
+        qi = graphics::ImgSupport::addLayers(a, b, graphics::eType(choices[3]));
+    else if (choices[2] == 1)
+        qi = graphics::ImgSupport::subLayers(a, b, graphics::eType(choices[3]));
+    else if (choices[2] == 2)
+        qi = graphics::ImgSupport::diffLayers(a, b, graphics::eType(choices[3]));
+    else if (choices[2] == 3)
+        qi = graphics::ImgSupport::maxLayers(a, b, graphics::eType(choices[3]));
+    else if (choices[2] == 4)
+        qi = graphics::ImgSupport::minLayers(a, b, graphics::eType(choices[3]));
+    else if (choices[2] == 5)
+        qi = graphics::ImgSupport::avgLayers(a, b, graphics::eType(choices[3]));
+    else if (choices[2] == 6)
+        qi = graphics::ImgSupport::remLayers(a, b, graphics::eType(choices[3]));
+    frame.push_back(new Layer(qi, 255));
+}

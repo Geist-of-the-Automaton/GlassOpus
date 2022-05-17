@@ -111,6 +111,7 @@ public:
     void applyKernalToSelection(QProgressDialog *qpd, string fileName);
     void setSym(QPoint qp, int div, int ofEvery, int skip);
     int symActive();
+    void polyToSelect();
 
     vector <Polygon> getPolgons();
     vector <unsigned char> getActiveGons();
@@ -138,6 +139,7 @@ public:
     void setText(QStaticText text);
     void setTextColor(QColor color);
     bool updateText(Qt::Key key, bool shiftFlag);
+    void magicSelect(QPoint qp, vec4 vals);
 
 
     Filter filter;

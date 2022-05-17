@@ -100,6 +100,7 @@ public:
     int load(QString projectName);
     void clearFrame();
     vector <Layer *> backup();
+    void layerFunc(vector <int> choices);
 
     vector<int> findPoints(QImage *qi);
     void vectorCheck(SplineVector sv);

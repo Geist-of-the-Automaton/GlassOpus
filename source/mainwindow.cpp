@@ -41,7 +41,7 @@ MainWindow::MainWindow(string startPath, string projectFile, QWidget *parent)
     ioh = new DataIOHandler(progress);
     sr = new screenRender(ioh, vs);
     setCentralWidget(vs);
-    setGeometry(screenRect.width() / 4, screenRect.height() / 4, screenRect.width() / 2, screenRect.height() / 2);
+    setGeometry(screenRect.width() / 8, screenRect.height() / 8, 6 * screenRect.width() / 8, 6 * screenRect.height() / 8);
     setWindowTitle("Glass Opus");
     bool exists = createMenubar();
     if (exists) {
@@ -85,6 +85,7 @@ MainWindow::MainWindow(string startPath, string projectFile, QWidget *parent)
     if (file.exists())
         setWindowIcon(QIcon(file.fileName()));
     takeFlag = false;
+    magicFlag = false;
     move(center - rect().center());
     if (projectFile == "") {
         QInputDialog resPrompt;
@@ -117,6 +118,7 @@ MainWindow::MainWindow(string startPath, string projectFile, QWidget *parent)
     sr->setHoverActive(true);
     brushProlfiler = new brushShape(this);
     pp = new patternProfiler(this);
+    mwd = new MagicWandDialog(this);
     if (projectFile != "") {
         show();
         ioh->load(QString(projectFile.c_str()));
@@ -134,12 +136,11 @@ MainWindow::MainWindow(string startPath, string projectFile, QWidget *parent)
     histograms = new QLabel();
     symDialog = new SymDialog(this);
     connect(&qte, SIGNAL(textChanged()), this, SLOT(textChanged()));
+    showMaximized();
 }
 
 void MainWindow::mouseMoveEvent(QMouseEvent *event) {
-    if (ioh->getWorkingLayer() == nullptr)
-        return;
-    if (takeFlag)
+    if (ioh->getWorkingLayer() == nullptr || takeFlag || magicFlag)
         return;
     QPoint qp = sr->getZoomCorrected(vs->getScrollCorrected(event->pos()));
     statusBar()->showMessage(("(" + to_string(qp.x()) + " , " + to_string(qp.y()) + ")").c_str(), 1000);
@@ -182,7 +183,7 @@ void MainWindow::mouseMoveEvent(QMouseEvent *event) {
 void MainWindow::mousePressEvent(QMouseEvent *event) {
     if (ioh->getWorkingLayer() == nullptr)
         return;
-    if (ctrlFlag || onePress || takeFlag)
+    if (ctrlFlag || onePress || takeFlag || magicFlag)
         return;
     onePress = true;
     if (event->button() >= 8) {
@@ -253,6 +254,11 @@ void MainWindow::mouseReleaseEvent(QMouseEvent *event) {
         refresh();
         return;
     }
+    if (magicFlag) {
+        ioh->getWorkingLayer()->magicSelect(qp, mwd->getVals());
+        magicFlag = false;
+        return;
+    }
     if (takeFlag) {
         if (mode == Brush_Mode)
             bh.setBrushColor(ioh->getWorkingLayer()->getCanvas()->pixelColor(qp.x(), qp.y()));
@@ -271,6 +277,7 @@ void MainWindow::mouseReleaseEvent(QMouseEvent *event) {
         ioh->getWorkingLayer()->release(qp, event->button());
     else if (event->button() >= 8) {
         takeFlag = false;
+        magicFlag = false;
         setShiftFlag(false);
         if (onePress)
             ioh->getWorkingLayer()->cleanUp();
@@ -772,6 +779,10 @@ void MainWindow::doSomething(string btnPress) {
         ioh->getWorkingLayer()->setShowDivs(true);
     else if (btnPress == "Hide Divisions")
         ioh->getWorkingLayer()->setShowDivs(false);
+    else if (btnPress == "Polygons to Raster Selection") {
+        ioh->getWorkingLayer()->polyToSelect();
+        setMode(Raster_Mode);
+    }
     else if (btnPress == "Edit Text") {
         if (ioh->getWorkingLayer()->getActiveTexts().size() == 1) {
             QString text = ioh->getWorkingLayer()->getText().text();
@@ -932,6 +943,13 @@ void MainWindow::doSomething(string btnPress) {
         dd.setWork(img);
         dd.exec();
     }
+    else if (btnPress == "Target Tool") {
+        Layer *l = ioh->getWorkingLayer();
+        QImage *img = l->getRaster().isNull() ? l->getCanvas() : l->getRasterPtr();
+        TargetTool tt(this);
+        tt.setWork(img);
+        tt.exec();
+    }
     else if (btnPress == "Color Transfer") {
         string formats = "";
         for (string s : acceptedImportImageFormats)
@@ -952,6 +970,14 @@ void MainWindow::doSomething(string btnPress) {
     }
     else if (btnPress == "Take Color" && (mode == Brush_Mode || mode == Raster_Mode))
         takeFlag = true;
+    else if (btnPress == "Magic Wand Selection")
+        magicFlag = true;
+    else if (btnPress == "Magic Wand Settings") {
+        vec4 settings = mwd->getVals();
+        bool ok = mwd->exec();
+        if (!ok)
+            mwd->setVals(settings);
+    }
     else if (btnPress == "Transparency Fill")
         bh.setFillColor(QColor(255, 255, 255, 0));
     else if (btnPress == "Filter") {
@@ -1101,6 +1127,15 @@ void MainWindow::doSomething(string btnPress) {
         ioh->getWorkingLayer()->getCanvas()->fill(0x00000000);
     else if (btnPress == "Clear All")
         ioh->getWorkingLayer()->wipe();
+    else if (btnPress == "Layer Functions") {
+        LayerFunc lf(this);
+        lf.setWork(ioh->getNumLayers());
+        bool ok = lf.exec();
+        if (ok) {
+            ioh->layerFunc(lf.getChoice());
+            ioh->setActiveLayer(ioh->getNumLayers() - 1, mode);
+        }
+    }
     else if (btnPress == "Zoom 100%")
         sr->setZoom(1.0);
     else if (btnPress == "Set Zoom") {

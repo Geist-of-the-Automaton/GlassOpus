@@ -47,6 +47,7 @@ const QStringList eTypes {"RGB", "HSV / HSB", "HSL / HSI"};
 enum eType {RGB, HSV, HSL};
 const QStringList mTypes {"RGB", "Hue", "Saturation", "Value", "Lightness"};
 enum mType {RGB_I, HUE, SAT, HSV_V, HSL_L};
+enum bType {NOT, AND, NAND, OR, NOR, XOR, XNOR};
 
 enum tType {sRGB, LAB};
 
@@ -174,6 +175,14 @@ public:
     static list <QImage *> resize(QSize reqSize);
     static KernelData loadKernel(string fileName);
     static void applyAlpha(QImage *qi, int *yStart, int *yEnd, unsigned int *alpha);
+    static QImage addLayers(QImage a, QImage b, eType type);
+    static QImage subLayers(QImage a, QImage b, eType type);
+    static QImage diffLayers(QImage a, QImage b, eType type);
+    static QImage maxLayers(QImage a, QImage b, eType type);
+    static QImage minLayers(QImage a, QImage b, eType type);
+    static QImage avgLayers(QImage a, QImage b, eType type);
+    static QImage remLayers(QImage a, QImage b, eType type);
+    static QImage bitLayers(QImage a, QImage b, bType type);
 
 private:
 

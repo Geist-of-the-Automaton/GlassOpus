@@ -1544,3 +1544,415 @@ void graphics::Color::matchHistogram(QImage *qi, QImage toMatch, mType type) {
     }
 
 }
+
+QImage graphics::ImgSupport::addLayers(QImage a, QImage b, eType type) {
+    int h = min(a.height(), b.height());
+    int w = min(a.width(), b.width());
+    int H = max(a.height(), b.height());
+    int W = max(a.width(), b.width());
+    QImage out(W, H, QImage::Format_ARGB32_Premultiplied);
+    for (int j = 0; j < H; ++j) {
+        QRgb *o = reinterpret_cast<QRgb *>(out.scanLine(j));
+        if (j < h) {
+            QRgb *A = reinterpret_cast<QRgb *>(a.scanLine(j));
+            QRgb *B = reinterpret_cast<QRgb *>(b.scanLine(j));
+            QImage c = a.width() > w ? a : b;
+            QRgb *C = reinterpret_cast<QRgb *>(c.scanLine(j));
+            for (int i = 0;  i < W; ++i) {
+                if (i < w) {
+                    QColor ca(A[i]), cb(B[i]), oc;
+                    if (type == RGB)
+                        oc = QColor(min(ca.red() + cb.red(), 255), min(ca.green() + cb.green(), 255), min(ca.blue() + cb.blue(), 255), 255);
+                    else if (type == HSV) {
+                        int hue = ca.hsvHue() + cb.hsvHue();
+                        if (hue < -1)
+                            hue += 360;
+                        if (hue > 359)
+                            hue -= 360;
+                        oc.setHsvF(static_cast<double>(hue) / 360.0, min(ca.saturationF() + cb.saturationF(), 1.0), min(ca.valueF() + cb.valueF(), 1.0), 1.0);
+                    }
+                    else if (type == HSL) {
+                        int hue = ca.hslHue() + cb.hslHue();
+                        if (hue < -1)
+                            hue += 360;
+                        if (hue > 359)
+                            hue -= 360;
+                        oc.setHslF(static_cast<double>(hue) / 360.0, min(ca.hslSaturationF() + cb.hslSaturationF(), 1.0), min(ca.lightnessF() + cb.lightnessF(), 1.0), 1.0);
+                    }
+                    //cout << ca.rgba() << endl;
+                    o[i] = oc.rgba();
+                }
+                else
+                    o[i] = C[i];
+            }
+        }
+        else {
+            QImage c = a.height() > h ? a : b;
+            QRgb *C = reinterpret_cast<QRgb *>(c.scanLine(j));
+            for (int i = 0; i < W; ++i)
+                o[i] = i < c.width() ? C[i] : 0x00000000;
+        }
+    }
+    // todo lab
+    return out;
+}
+
+QImage graphics::ImgSupport::subLayers(QImage a, QImage b, eType type) {
+    int h = min(a.height(), b.height());
+    int w = min(a.width(), b.width());
+    int H = max(a.height(), b.height());
+    int W = max(a.width(), b.width());
+    QImage out(W, H, QImage::Format_ARGB32_Premultiplied);
+    for (int j = 0; j < H; ++j) {
+        QRgb *o = reinterpret_cast<QRgb *>(out.scanLine(j));
+        if (j < h) {
+            QRgb *A = reinterpret_cast<QRgb *>(a.scanLine(j));
+            QRgb *B = reinterpret_cast<QRgb *>(b.scanLine(j));
+            QImage c = a.width() > w ? a : b;
+            QRgb *C = reinterpret_cast<QRgb *>(c.scanLine(j));
+            for (int i = 0;  i < W; ++i) {
+                if (i < w) {
+                    QColor ca(A[i]), cb(B[i]), oc;
+                    if (type == RGB)
+                        oc = QColor(max(ca.red() - cb.red(), 0), max(ca.green() - cb.green(), 0), max(ca.blue() - cb.blue(), 0), 255);
+                    else if (type == HSV) {
+                        int hue = ca.hsvHue() - cb.hsvHue();
+                        if (hue < -1)
+                            hue += 360;
+                        if (hue > 359)
+                            hue -= 360;
+                        oc.setHsvF(static_cast<double>(hue) / 360.0, max(ca.saturationF() - cb.saturationF(), 0.0), max(ca.valueF() - cb.valueF(), 0.0), 1.0);
+                    }
+                    else if (type == HSL) {
+                        QColor ca(A[i]), cb(B[i]), oc;
+                        int hue = ca.hslHue() - cb.hslHue();
+                        if (hue < -1)
+                            hue += 360;
+                        if (hue > 359)
+                            hue -= 360;
+                        oc.setHslF(static_cast<double>(hue) / 360.0, max(ca.hslSaturationF() - cb.hslSaturationF(), 0.0), max(ca.lightnessF() - cb.lightnessF(), 0.0), 1.0);
+                        o[i] = oc.rgba();
+                    }
+                    o[i] = oc.rgba();
+                }
+                else
+                    o[i] = C[i];
+            }
+        }
+        else {
+            QImage c = a.height() > h ? a : b;
+            QRgb *C = reinterpret_cast<QRgb *>(c.scanLine(j));
+            for (int i = 0; i < W; ++i)
+                o[i] = i < c.width() ? C[i] : 0x00000000;
+        }
+    }
+    // todo lab
+    return out;
+}
+
+QImage graphics::ImgSupport::diffLayers(QImage a, QImage b, eType type) {
+    int h = min(a.height(), b.height());
+    int w = min(a.width(), b.width());
+    int H = max(a.height(), b.height());
+    int W = max(a.width(), b.width());
+    QImage out(W, H, QImage::Format_ARGB32_Premultiplied);
+    for (int j = 0; j < H; ++j) {
+        QRgb *o = reinterpret_cast<QRgb *>(out.scanLine(j));
+        if (j < h) {
+            QRgb *A = reinterpret_cast<QRgb *>(a.scanLine(j));
+            QRgb *B = reinterpret_cast<QRgb *>(b.scanLine(j));
+            QImage c = a.width() > w ? a : b;
+            QRgb *C = reinterpret_cast<QRgb *>(c.scanLine(j));
+            for (int i = 0;  i < W; ++i) {
+                if (i < w) {
+                    QColor ca(A[i]), cb(B[i]), oc;
+                    if (type == RGB)
+                        oc = QColor(abs(ca.red() - cb.red()), abs(ca.green() - cb.green()), abs(ca.blue() - cb.blue()), 255);
+                    else if (type == HSV)
+                        oc.setHsv(abs(ca.hsvHue() - cb.hsvHue()), abs(ca.saturation() - cb.saturation()), abs(ca.value() - cb.value()), 255);
+                    else if (type == HSL)
+                        oc.setHsl(abs(ca.hslHue() - cb.hslHue()), abs(ca.hslSaturation() - cb.hslSaturation()), abs(ca.lightness() - cb.lightness()), 255);
+                    o[i] = oc.rgba();
+                }
+                else
+                    o[i] = C[i];
+            }
+        }
+        else {
+            QImage c = a.height() > h ? a : b;
+            QRgb *C = reinterpret_cast<QRgb *>(c.scanLine(j));
+            for (int i = 0; i < W; ++i)
+                o[i] = i < c.width() ? C[i] : 0x00000000;
+        }
+    }
+    // todo lab
+    return out;
+}
+
+QImage graphics::ImgSupport::maxLayers(QImage a, QImage b, eType type) {
+    int h = min(a.height(), b.height());
+    int w = min(a.width(), b.width());
+    int H = max(a.height(), b.height());
+    int W = max(a.width(), b.width());
+    QImage out(W, H, QImage::Format_ARGB32_Premultiplied);
+    for (int j = 0; j < H; ++j) {
+        QRgb *o = reinterpret_cast<QRgb *>(out.scanLine(j));
+        if (j < h) {
+            QRgb *A = reinterpret_cast<QRgb *>(a.scanLine(j));
+            QRgb *B = reinterpret_cast<QRgb *>(b.scanLine(j));
+            QImage c = a.width() > w ? a : b;
+            QRgb *C = reinterpret_cast<QRgb *>(c.scanLine(j));
+            for (int i = 0;  i < W; ++i) {
+                if (i < w) {
+                    QColor ca(A[i]), cb(B[i]), oc;
+                    if (type == RGB)
+                        oc = QColor(max(ca.red(), cb.red()), max(ca.green(), cb.green()), max(ca.blue(), cb.blue()), 255);
+                    else if (type == HSV)
+                        oc.setHsv((ca.hsvHue() + cb.hsvHue()) / 2, max(ca.hsvSaturation(), cb.hsvSaturation()), max(ca.value(), cb.value()), 255);
+                    else if (type == HSL)
+                        oc.setHsl((ca.hslHue() + cb.hslHue()) / 2, max(ca.hslSaturation(), cb.hslSaturation()), max(ca.lightness(), cb.lightness()), 255);
+                    o[i] = oc.rgba();
+                }
+                else
+                    o[i] = C[i];
+            }
+        }
+        else {
+            QImage c = a.height() > h ? a : b;
+            QRgb *C = reinterpret_cast<QRgb *>(c.scanLine(j));
+            for (int i = 0; i < W; ++i)
+                o[i] = i < c.width() ? C[i] : 0x00000000;
+        }
+    }
+    return out;
+    //todo lab
+}
+
+QImage graphics::ImgSupport::minLayers(QImage a, QImage b, eType type) {
+    int h = min(a.height(), b.height());
+    int w = min(a.width(), b.width());
+    int H = max(a.height(), b.height());
+    int W = max(a.width(), b.width());
+    QImage out(W, H, QImage::Format_ARGB32_Premultiplied);
+    for (int j = 0; j < H; ++j) {
+        QRgb *o = reinterpret_cast<QRgb *>(out.scanLine(j));
+        if (j < h) {
+            QRgb *A = reinterpret_cast<QRgb *>(a.scanLine(j));
+            QRgb *B = reinterpret_cast<QRgb *>(b.scanLine(j));
+            QImage c = a.width() > w ? a : b;
+            QRgb *C = reinterpret_cast<QRgb *>(c.scanLine(j));
+            for (int i = 0;  i < W; ++i) {
+                if (i < w) {
+                    QColor ca(A[i]), cb(B[i]), oc;
+                    if (type == RGB)
+                        oc = QColor(min(ca.red(), cb.red()), min(ca.green(), cb.green()), min(ca.blue(), cb.blue()), 255);
+                    else if (type == HSV)
+                        oc.setHsv((ca.hsvHue() + cb.hsvHue()) / 2, min(ca.hsvSaturation(), cb.hsvSaturation()), min(ca.value(), cb.value()), 255);
+                    else if (type == HSL)
+                        oc.setHsl((ca.hslHue() + cb.hslHue()) / 2, min(ca.hslSaturation(), cb.hslSaturation()), min(ca.lightness(), cb.lightness()), 255);
+                    o[i] = oc.rgba();
+                }
+                else
+                    o[i] = C[i];
+            }
+        }
+        else {
+            QImage c = a.height() > h ? a : b;
+            QRgb *C = reinterpret_cast<QRgb *>(c.scanLine(j));
+            for (int i = 0; i < W; ++i)
+                o[i] = i < c.width() ? C[i] : 0x00000000;
+        }
+    }
+    return out;
+    //todo lab
+}
+
+QImage graphics::ImgSupport::avgLayers(QImage a, QImage b, eType type) {
+    int h = min(a.height(), b.height());
+    int w = min(a.width(), b.width());
+    int H = max(a.height(), b.height());
+    int W = max(a.width(), b.width());
+    QImage out(W, H, QImage::Format_ARGB32_Premultiplied);
+    for (int j = 0; j < H; ++j) {
+        QRgb *o = reinterpret_cast<QRgb *>(out.scanLine(j));
+        if (j < h) {
+            QRgb *A = reinterpret_cast<QRgb *>(a.scanLine(j));
+            QRgb *B = reinterpret_cast<QRgb *>(b.scanLine(j));
+            QImage c = a.width() > w ? a : b;
+            QRgb *C = reinterpret_cast<QRgb *>(c.scanLine(j));
+            for (int i = 0;  i < W; ++i) {
+                if (i < w) {
+                    QColor ca(A[i]), cb(B[i]), oc;
+                    if (type == RGB)
+                        oc = QColor((ca.red() + cb.red()) / 2, (ca.green() + cb.green()) / 2, (ca.blue() + cb.blue()) / 2, 255);
+                    else if (type == HSV) {
+                        bool flag = abs(ca.hsvHue() - cb.hsvHue()) > 180;
+                        int hue;
+                        if (flag) {
+                            if (ca.hsvHue() < cb.hsvHue())
+                                hue = ca.hsvHue() > 360 - cb.hsvHue() ? (ca.hsvHue() + (cb.hsvHue() - 360)) : (cb.hsvHue() + (ca.hsvHue() + 360));
+                            else
+                                hue = cb.hsvHue() > 360 - cb.hsvHue() ? (cb.hsvHue() + (ca.hsvHue() - 360)) : (ca.hsvHue() + (cb.hsvHue() + 360));
+                        }
+                        else
+                            hue = ca.hsvHue() + cb.hsvHue();
+                        hue /= 2;
+                        oc.setHsv(hue, (ca.hsvSaturation() + cb.hsvSaturation()) / 2, (ca.value() + cb.value()) / 2, 255);
+                    }
+                    else if (type == HSL) {
+                        bool flag = abs(ca.hslHue() - cb.hslHue()) > 180;
+                        int hue;
+                        if (flag) {
+                            if (ca.hslHue() < cb.hslHue())
+                                hue = ca.hslHue() > 360 - cb.hslHue() ? (ca.hslHue() + (cb.hslHue() - 360)) : (cb.hslHue() + (ca.hslHue() + 360));
+                            else
+                                hue = cb.hslHue() > 360 - cb.hslHue() ? (cb.hslHue() + (ca.hslHue() - 360)) : (ca.hslHue() + (cb.hslHue() + 360));
+                        }
+                        else
+                            hue = ca.hslHue() + cb.hslHue();
+                        hue /= 2;
+                        oc.setHsl(hue, (ca.hslSaturation() + cb.hslSaturation()) / 2, (ca.lightness() + cb.lightness()) / 2, 255);
+                    }
+                    o[i] = oc.rgba();
+                }
+                else
+                    o[i] = C[i];
+            }
+        }
+        else {
+            QImage c = a.height() > h ? a : b;
+            QRgb *C = reinterpret_cast<QRgb *>(c.scanLine(j));
+            for (int i = 0; i < W; ++i)
+                o[i] = i < c.width() ? C[i] : 0x00000000;
+        }
+    }
+    // todo lab
+    return out;
+}
+
+QImage graphics::ImgSupport::remLayers(QImage a, QImage b, eType type) {
+    QImage diff = diffLayers(a, b, type);
+    float histogram[256] = {0.0};
+    float sum = 0.0;
+    vector <vector <int> > remMap(diff.width(), vector <int> (diff.height(), 0));
+    for (int i = 0; i < diff.width(); ++i)
+        for (int j = 0; j < diff.height(); ++j) {
+            QColor qc = diff.pixelColor(i, j);
+            float f = static_cast<float>(qc.red() + qc.green() + qc.blue()) / 3.0;
+            int val = static_cast<int>(f + 0.4);
+            remMap[i][j] = val;
+            sum += val;
+            ++histogram[val];
+        }
+    float probability[256];
+    float invSize = 1.0 / (diff.width() * diff.height());
+    for (int i = 0; i < 256; ++i)
+        probability[i] = histogram[i] * invSize;
+    float p1 = probability[0];
+    float q1 = p1, mu1 = 0.0, mu2 = 0.0;
+    float mu = sum * invSize;
+    float q1prev = q1, maxbetweenvariance = 0.0, optimizedthresh = 0.0;
+    for (int t = 1; t < 255; ++t){
+        float q1next = q1prev + probability[t + 1];
+        float mu1next = (q1prev * mu1 + (t + 1) * (probability[t + 1])) / q1next;
+        float mu2next = (mu - q1next * mu1next) / (1 - q1next);
+        float betweenvariance = q1prev * (1 - q1prev) * ((mu1 - mu2) * (mu1 - mu2));
+        if (betweenvariance > maxbetweenvariance){
+            maxbetweenvariance = betweenvariance;
+            optimizedthresh = t;
+        }
+        q1prev = q1next;
+        mu1 = mu1next;
+        mu2 = mu2next;
+        if(q1next == 0)
+            mu1 = 0;
+    }
+    QImage out(a.size(), QImage::Format_ARGB32_Premultiplied);
+    for (int j = 0; j < out.height(); ++j) {
+        QRgb *o = reinterpret_cast<QRgb *>(out.scanLine(j));
+        QRgb *A = reinterpret_cast<QRgb *>(a.scanLine(j));
+        for (int i = 0; i < diff.width(); ++i)
+            o[i] = remMap[i][j] >= optimizedthresh ? A[i] : 0x00000000;
+    }
+    return out;
+}
+
+QImage graphics::ImgSupport::bitLayers(QImage a, QImage b, bType type) {
+    int h = min(a.height(), b.height());
+    int w = min(a.width(), b.width());
+    int H = max(a.height(), b.height());
+    int W = max(a.width(), b.width());
+    QImage out(W, H, QImage::Format_ARGB32_Premultiplied);
+    for (int j = 0; j < H; ++j) {
+        QRgb *o = reinterpret_cast<QRgb *>(out.scanLine(j));
+        if (j < h) {
+            QRgb *A = reinterpret_cast<QRgb *>(a.scanLine(j));
+            QRgb *B = reinterpret_cast<QRgb *>(b.scanLine(j));
+            QImage c = a.width() > w ? a : b;
+            QRgb *C = reinterpret_cast<QRgb *>(c.scanLine(j));
+            for (int i = 0;  i < W; ++i) {
+                if (i < w) {
+                    if (type == NOT)
+                        o[i] = ~A[i];
+                    else if (type == AND)
+                        o[i] = A[i] & B[i];
+                    else if (type == NAND)
+                        o[i] = ~(A[i] & B[i]);
+                    else if (type == OR)
+                        o[i] = A[i] | B[i];
+                    else if (type == NOR)
+                        o[i] = ~(A[i] | B[i]);
+                    else if (type == XOR)
+                        o[i] = A[i] ^ B[i];
+                    else if (type == XNOR)
+                        o[i] = ~(A[i] ^ B[i]);
+                }
+                else {
+                    o[i] = 0x00000000;
+                    if (type == NOT)
+                        o[i] = ~C[i];
+                    else if (type == AND)
+                        o[i] = C[i] & o[i];
+                    else if (type == NAND)
+                        o[i] = ~(C[i] & o[i]);
+                    else if (type == OR)
+                        o[i] = C[i] | o[i];
+                    else if (type == NOR)
+                        o[i] = ~(C[i] | o[i]);
+                    else if (type == XOR)
+                        o[i] = C[i] ^ o[i];
+                    else if (type == XNOR)
+                        o[i] = ~(C[i] ^ o[i]);
+                }
+                o[i] = o[i] | 0xFF000000;
+            }
+        }
+        else {
+            QImage c = a.height() > h ? a : b;
+            QRgb *C = reinterpret_cast<QRgb *>(c.scanLine(j));
+            for (int i = 0; i < W; ++i) {
+                o[i] = 0x00000000;
+                if (i < c.width()) {
+                    if (type == NOT)
+                        o[i] = ~C[i];
+                    else if (type == AND)
+                        o[i] = C[i] & o[i];
+                    else if (type == NAND)
+                        o[i] = ~(C[i] & o[i]);
+                    else if (type == OR)
+                        o[i] = C[i] | o[i];
+                    else if (type == NOR)
+                        o[i] = ~(C[i] | o[i]);
+                    else if (type == XOR)
+                        o[i] = C[i] ^ o[i];
+                    else if (type == XNOR)
+                        o[i] = ~(C[i] ^ o[i]);
+                }
+                o[i] = o[i] | 0xFF000000;
+            }
+        }
+    }
+    return out;
+    //todo lab
+}
+

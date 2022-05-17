@@ -36,9 +36,12 @@ HEADERS = \
     histodialog.h \
     hueshift.h \
     kerneldialog.h \
+    layerfunc.h \
+    magicwanddialog.h \
     polygon.h \
     saturationadj.h \
     symdialog.h \
+    targettool.h \
     transferdialog.h \
     ui_brightnessadj.h \
     ui_contrastadj.h \
@@ -48,8 +51,11 @@ HEADERS = \
     ui_histodialog.h \
     ui_hueshift.h \
     ui_kerneldialog.h \
+    ui_layerfunc.h \
+    ui_magicwanddialog.h \
     ui_saturationadj.h \
     ui_symdialog.h \
+    ui_targetdialog.h \
     ui_transfer.h \
     vec_mat_maths.h
 
@@ -80,9 +86,12 @@ SOURCES = \
     histodialog.cpp \
     hueshift.cpp \
     kerneldialog.cpp \
+    layerfunc.cpp \
+    magicwanddialog.cpp \
     polygon.cpp \
     saturationadj.cpp \
     symdialog.cpp \
+    targettool.cpp \
     transferdialog.cpp
 
 # Default rules for deployment

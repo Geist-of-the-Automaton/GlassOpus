@@ -55,6 +55,9 @@
 #include <filterdialog.h>
 #include <kerneldialog.h>
 #include <histodialog.h>
+#include <targettool.h>
+#include <magicwanddialog.h>
+#include <layerfunc.h>
 #include <Windows.h>
 
 using std::string;
@@ -174,7 +177,7 @@ private:
     list <QObject *> toDel;
     QString dSubfolder, dFileName;
     downloadAction dAction;
-    bool takeFlag;
+    bool takeFlag, magicFlag;
     QString saveFileName;
     appMethod tempMethod = overwrite;
     QProgressDialog *progress;
@@ -185,6 +188,7 @@ private:
     SymDialog *symDialog;
     QPoint lastPos;
     QTextEdit qte;
+    MagicWandDialog *mwd;
 
 };
 
