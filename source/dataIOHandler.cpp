@@ -21,31 +21,16 @@ QSize DataIOHandler::getdims() {
 }
 
 void DataIOHandler::compileFrame() {
-    QImage *qi = new QImage(frame[0]->getCanvas()->size(), QImage::Format_ARGB32);
-    qi->fill(0x00FFFFFF);
+    QSize size = frame[0]->render().size();
+    QImage qi = QImage(size, QImage::Format_ARGB32);
     progress->setLabelText("Compiling Frame");
-    renderFrame(progress, qi, frame);
-    frame[activeLayer]->clearAll();
-    Layer *layer = frame[activeLayer];
-    for (size_t i = frame.size() - 1; i > activeLayer; --i) {
-        delete frame[i];
+    renderFrame(progress, &qi, frame);
+    *frame[0] = Layer(qi, 255);
+    setActiveLayer(0, Brush_Mode);
+    while (frame.size() > 1) {
+        delete frame.back();
         frame.pop_back();
     }
-    frame.pop_back();
-    for (int i = static_cast<int>(frame.size() - 1); i >= 0; --i) {
-        delete frame[i];
-        frame.pop_back();
-    }
-    frame.push_back(layer);
-    activeLayer = 0;
-    layer->setAlpha(255);
-    QImage *img = layer->getCanvas();
-    img->fill(0x00FFFFFF);
-    QPainter qp;
-    qp.begin(img);
-    qp.drawImage(0, 0, *qi);
-    qp.end();
-    delete qi;
     updated = true;
 }
 
@@ -53,418 +38,34 @@ void DataIOHandler::compileLayer() {
     Layer *layer = getWorkingLayer();
     layer->deselect();
     progress->setLabelText("Compiling Layer");
-    renderLayer(nullptr, progress, layer->getCanvas(), layer);
+    *(layer->getCanvas()) = layer->render(1, progress);
     layer->clearAll();
 }
 
 void DataIOHandler::renderFrame(QProgressDialog *fqpd, QImage *ret, vector <Layer *> layers) {
     progressMarker = 0;
     fqpd->setValue(0);
-    fqpd->setMaximum(static_cast<int>(layers.size() + 2));
+    fqpd->setMaximum(static_cast<int>(layers.size()));
     fqpd->show();
     QCoreApplication::processEvents();
-    ret->fill(0xFFFFFFFF);
-    vector <QImage *> imgs;
-    for (size_t i = 0; i < layers.size(); ++i)
-        imgs.push_back(new QImage(layers[i]->getCanvas()->copy()));
-    vector <thread> imgThreads;
-    for(size_t i = 0; i < layers.size(); ++i) {
-        thread th = thread(renderLayer, fqpd, nullptr, imgs[i], layers[i]);
-        imgThreads.push_back(move(th));
-    }
-    ++progressMarker;
-    fqpd->setValue(progressMarker);
-    QCoreApplication::processEvents();
-    for(auto &th : imgThreads)
-        th.join();
+    ret->fill(0x00000000);
     QPainter qp;
     qp.begin(ret);
-    for (size_t i = 0; i < imgs.size(); ++i) {
-        qp.drawImage(0, 0, *imgs[i]);
-        delete imgs[i];
+    for (Layer *layer : layers) {
+        if (layer->isVisible())
+            qp.drawImage(0, 0, layer->render());
+        qp.drawImage(0, 0, layer->render());
+        fqpd->setValue(++progressMarker);
     }
     qp.end();
-    ++progressMarker;
-    fqpd->setValue(progressMarker);
     fqpd->close();
     fqpd->hide();
-}
-
-void DataIOHandler::renderLayer(QProgressDialog *fqpd, QProgressDialog *qpd, QImage *toProcess, Layer *layer) {
-    int alpha = layer->getAlpha();
-    vector <SplineVector> vects = layer->getVectors();
-    vector <list <Triangle>> tris = layer->getTriangles();
-    vector <Polygon> gons = layer->getPolgons();
-    vector <DrawText> texts = layer->getTexts();
-    Filter filter = layer->getFilter();
-    if (qpd != nullptr) {
-        qpd->setValue(0);
-        qpd->setMaximum(static_cast<int>(1 + vects.size() + gons.size() + texts.size() + (tris.size() != vects.size() ? 1 : 0)));
-        qpd->show();
-        QCoreApplication::processEvents();
-    }
-    vector <list <Triangle> *> dTris;
-    if (!tris.empty()) {
-        for (size_t i = 0; i < vects.size(); ++i)
-            dTris.push_back(new list <Triangle> (tris[i]));
-    }
-    else if (vects.size() != 0) {
-        for (size_t i = 0; i < vects.size(); ++i)
-            dTris.push_back( new list <Triangle> ());
-        vector <thread> splineThreads;
-        for(size_t i = 0; i < dTris.size(); ++i) {
-            thread th = thread(calcLine, vects[i], dTris[i]);
-            splineThreads.push_back(move(th));
-        }
-        for(auto &th : splineThreads)
-            th.join();
-        if (qpd != nullptr) {
-            qpd->setValue(qpd->value() + 1);
-            QCoreApplication::processEvents();
-        }
-    }
-    QRgb color;
-    for (size_t i = 0; i < dTris.size(); ++i) {
-        Filter vf = vects[i].getFilter();
-        pair <QRgb, QRgb> colors = vects[i].getColors();
-        QColor ca = QColor (colors.first), cb = QColor(colors.second);
-        short band = vects[i].getBand(), gap = vects[i].getGap();
-        float totalTri = static_cast<float>(tris[i].size() / 2);
-        float offset = (totalTri / static_cast<float>(band + gap));
-        int styler = -static_cast<int>(((static_cast<float>(band + gap) * offset) - totalTri) / 2.0);
-        if (vects[i].getMode() == ColorFill) {
-            if (colors.first == colors.second) {
-                color = ca.rgba();
-                for (Triangle &t : *dTris[i]) {
-                    if (styler >= 0)
-                        fillTri(toProcess, t, color);
-                    styler += 1;
-                    if (styler == band - 1)
-                        styler = -gap;
-                }
-            }
-            else {
-                float ccomp = 1.0 / static_cast<float>((*dTris[i]).size());
-                float cnt = 0.0;
-                for (Triangle &t : *dTris[i]) {
-                    float ccc = ccomp * cnt;
-                    int r = static_cast<int>((ccc * static_cast<float>(ca.red())) + ((1.0 - ccc) * static_cast<float>(cb.red())));
-                    int g = static_cast<int>((ccc * static_cast<float>(ca.green())) + ((1.0 - ccc) * static_cast<float>(cb.green())));
-                    int b = static_cast<int>((ccc * static_cast<float>(ca.blue())) + ((1.0 - ccc) * static_cast<float>(cb.blue())));
-                    color = QColor(r, g, b).rgba();
-                    if (styler >= 0)
-                        fillTri(toProcess, t, color);
-                    styler += 1;
-                    if (styler == band - 1)
-                        styler = -gap;
-                    cnt += 1.0;
-                }
-            }
-        }
-        else
-            for (Triangle &t : *dTris[i]) {
-                if (styler >= 0)
-                    filterTri(toProcess, t, vf);
-                styler += 1;
-                if (styler == band - 1)
-                    styler = -gap;
-            }
-        if (qpd != nullptr) {
-            qpd->setValue(qpd->value() + 1);
-            QCoreApplication::processEvents();
-        }
-    }
-    for (size_t i = 0; i < vects.size(); ++i)
-        delete dTris[i];
-    QPainter painter(toProcess);
-    for (Polygon gon : gons) {
-        list <Triangle> tris = gon.getTris();
-        vector <QPoint> pts = gon.getPts();
-        color = gon.getPolyColor();
-        if (gon.getPolyMode() == ColorGon && color >= 0x01000000)
-            for (Triangle &t : tris)
-                fillTri(toProcess, t, color);
-        else if (gon.getPolyMode() == FilterGon) {
-            filter = gon.getFilter();
-            for (Triangle &t : tris)
-                filterTri(toProcess, t, color);
-        }
-        int edgeSize = gon.getEdgeSize();
-        if (edgeSize != 0) {
-            bool dispDivs = gon.getShowDivs();
-            painter.setPen(QPen(QColor(gon.getEdgeColor()), edgeSize, Qt::SolidLine, Qt::RoundCap));
-            QVector <QLine> lines;
-            if (dispDivs) {
-                for (Triangle &t : tris) {
-                    painter.drawLine(t.a, t.b);
-                    painter.drawLine(t.a, t.c);
-                    painter.drawLine(t.c, t.b);
-                }
-            }
-            else {
-                if (pts.size() >= 2) {
-                    for (int i = 1; i < pts.size(); ++i)
-                        lines.push_back(QLine(pts[i - 1], pts[i]));
-                    lines.push_back(QLine(pts[0], pts[pts.size() - 1]));
-                }
-            }
-            painter.drawLines(lines);
-        }
-        if (qpd != nullptr) {
-            qpd->setValue(qpd->value() + 1);
-            QCoreApplication::processEvents();
-        }
-    }
-    for (DrawText &dt : texts) {
-        painter.setPen(QPen(dt.getColor(), 1));
-        painter.setFont(dt.getFont());
-        painter.setTransform(dt.getTransform());
-        painter.drawStaticText(0, 0, dt.getText());
-        if (qpd != nullptr) {
-            qpd->setValue(qpd->value() + 1);
-            QCoreApplication::processEvents();
-        }
-    }
-    painter.end();
-    if (qpd != nullptr) {
-        qpd->setValue(qpd->value() + 1);
-        QCoreApplication::processEvents();
-    }
-    filter.applyTo(toProcess);
-    *toProcess = toProcess->convertToFormat(QImage::Format_ARGB32);
-    unsigned int alphaVal = static_cast<unsigned int>(alpha) << 24;
-    int yStart = 0, yEnd = toProcess->height();
-    graphics::ImgSupport::applyAlpha(toProcess, &yStart, &yEnd, &alphaVal);
-    if (qpd != nullptr) {
-        qpd->close();
-        qpd->hide();
-    }
-    if (fqpd != nullptr) {
-        ++progressMarker;
-        locker.lock();
-        fqpd->setValue(progressMarker);
-        QCoreApplication::processEvents();
-        locker.unlock();
-    }
-}
-
-void DataIOHandler::calcLine(SplineVector sv, list<Triangle> *tris) {
-    vector <QPointF> workPts;
-    vector <QPoint> controlPts = sv.getControls();
-    char numpts = static_cast<char>(controlPts.size()) - 1;
-    for (char i = 0; i < numpts + 1; ++i)
-        workPts.push_back(QPointF(controlPts[i]));
-    list <pair <QPoint, QPoint> > pairs;
-    pair <unsigned char, unsigned char> taper = sv.getTaper();
-    float taper1 = taper.first == 0 ? 0.0 : 1.0 / static_cast<float>((9 - (taper.first - 1)) + 1), taper2 = taper.second == 0 ? 0.0 : 1.0 / static_cast<float>((9 - (taper.second - 1)) + 1);
-    for (float ipol = 0.0; ipol <= 1.0; ipol += ipolMin) {
-        float twidth = static_cast<float>(sv.getWidth());
-        if (taper.first != 0 || taper.second != 0) {
-            if (sv.getTaperType() == Single)
-                twidth *= pow(ipol, taper1);
-            else {
-                float f = 2.0 * abs(abs(ipol - 0.5) - 0.5);
-                twidth *= pow(f, ipol <= 0.5 ? taper1 : taper2);
-            }
-        }
-        for (int max = numpts; max > 1; --max) {    // og  > 0
-            for (char i = 0; i < max; ++i) {
-                workPts[i].setX(Layer::getipol(workPts[i].x(), workPts[i + 1].x(), ipol));
-                workPts[i].setY(Layer::getipol(workPts[i].y(), workPts[i + 1].y(), ipol));
-            }
-            workPts[max] = controlPts[max];
-        }
-        float dx = workPts[1].x() - workPts[0].x(), dy = workPts[1].y() - workPts[0].y();
-        workPts[0].setX(Layer::getipol(workPts[0].x(), workPts[1].x(), ipol));
-        workPts[0].setY(Layer::getipol(workPts[0].y(), workPts[1].y(), ipol));
-        workPts[1] = controlPts[1];
-        float slope = dx / dy;
-        float sqrSlope = slope * slope;
-        QPointF midPt = workPts[0];
-        float dist = twidth;
-        float inverter = slope < 0.0 ? 1.0 : -1.0;
-        int x1 = static_cast<int>(((inverter * dist) / sqrt(1 + sqrSlope)) + midPt.x());
-        int y1 = static_cast<int>((dist / sqrt(1 + (1 / sqrSlope))) + midPt.y());
-        int x2 = midPt.x() + (midPt.x() - x1);
-        int y2 = midPt.y() + (midPt.y() - y1);
-        pairs.push_back(pair <QPoint, QPoint> (QPoint(x1, y1), QPoint(x2, y2)));
-        workPts[0] = controlPts[0];
-    }
-    pair <QPoint, QPoint> first = pairs.front();
-    pairs.pop_front();
-    int x, y;
-    while (pairs.size() > 0) {
-        pair <QPoint, QPoint> second = pairs.front();
-        pairs.pop_front();
-        x = first.first.x() - second.second.x();
-        y = first.first.y() - second.second.y();
-        int dist1 = x * x + y * y;
-        x = first.second.x() - second.first.x();
-        y = first.second.y() - second.first.y();
-        int dist2 = x * x + y * y;
-        if (dist1 > dist2) {
-            tris->push_back(Triangle(first.first, second.second, first.second));
-            tris->push_back(Triangle(first.first, second.second, second.first));
-        }
-        else {
-            tris->push_back(Triangle(first.second, second.first, first.first));
-            tris->push_back(Triangle(first.second, second.first, second.second));
-        }
-        first = second;
-    }
-}
-
-void DataIOHandler::fillTri(QImage *toProcess, Triangle t, QRgb color) {
-    QPoint a = t.a, b = t.b, c = t.c;
-    if (a.y() > b.y()) {
-        QPoint tmp = a;
-        a = b;
-        b = tmp;
-    }
-    if (b.y() > c.y()) {
-        QPoint tmp = b;
-        b = c;
-        c = tmp;
-        if (a.y() > b.y()) {
-            tmp = a;
-            a = b;
-            b = tmp;
-        }
-    }
-    if (b.y() == a.y())
-        fillBTri(toProcess, c, b, a, color);
-    else if (b.y() == c.y())
-        fillTTri(toProcess, a, b, c, color);
-    else {
-        QPoint d (a.x() + static_cast<float>(c.x() - a.x()) * (static_cast<float>(b.y() - a.y()) / static_cast<float>(c.y() - a.y())) , b.y());
-        fillBTri(toProcess, c, b, d, color);
-        fillTTri(toProcess, a, b, d, color);
-    }
-}
-
-void DataIOHandler::fillBTri(QImage *toProcess, QPoint a, QPoint b, QPoint c, QRgb color) {
-    if (b.x() > c.x()) {
-        QPoint tmp = b;
-        b = c;
-        c = tmp;
-    }
-    int h = toProcess->height() - 1, w = toProcess->width() - 1;
-    float invslope1 = static_cast<float>(b.x() - a.x()) / static_cast<float>(b.y() - a.y());
-    float invslope2 = static_cast<float>(c.x() - a.x()) / static_cast<float>(c.y() - a.y());
-    float curx1 = static_cast<float>(a.x());
-    float curx2 = static_cast<float>(a.x());
-    float offset = a.y() > h ? a.y() - h : 0;
-    curx1 -= invslope1 * offset;
-    curx2 -= invslope2 * offset;
-    for (int y = min(h, a.y()); y >= max(0, b.y()); --y) {
-        QRgb *line = reinterpret_cast<QRgb *>(toProcess->scanLine(y));
-        for (int x = max(static_cast<int>(curx1), 0); x <= min(static_cast<int>(curx2), w); ++x)
-            line[x] = color;
-        curx1 -= invslope1;
-        curx2 -= invslope2;
-    }
-}
-
-void DataIOHandler::fillTTri(QImage *toProcess, QPoint a, QPoint b, QPoint c, QRgb color) {
-    if (b.x() > c.x()) {
-        QPoint tmp = b;
-        b = c;
-        c = tmp;
-    }
-    float invslope1 = static_cast<float>(b.x() - a.x()) / static_cast<float>(b.y() - a.y());
-    float invslope2 = static_cast<float>(c.x() - a.x()) / static_cast<float>(c.y() - a.y());
-    float curx1 = static_cast<float>(a.x());
-    float curx2 = static_cast<float>(a.x());
-    float offset = a.y() < 0 ? -a.y() : 0;
-    curx1 += invslope1 * offset;
-    curx2 += invslope2 * offset;
-    int h = toProcess->height(), w = toProcess->width() - 1;
-    for (int y = max(0, a.y()); y < min(h, b.y()); ++y) {
-        QRgb *line = reinterpret_cast<QRgb *>(toProcess->scanLine(y));
-        for (int x = max(static_cast<int>(curx1), 0); x <= min(static_cast<int>(curx2), w); ++x)
-            line[x] = color;
-        curx1 += invslope1;
-        curx2 += invslope2;
-    }
-}
-
-void DataIOHandler::filterTri(QImage *toProcess, Triangle t, Filter f) {
-    QPoint a = t.a, b = t.b, c = t.c;
-    if (a.y() > b.y()) {
-        QPoint tmp = a;
-        a = b;
-        b = tmp;
-    }
-    if (b.y() > c.y()) {
-        QPoint tmp = b;
-        b = c;
-        c = tmp;
-        if (a.y() > b.y()) {
-            tmp = a;
-            a = b;
-            b = tmp;
-        }
-    }
-    if (b.y() == a.y())
-        filterBTri(toProcess, c, b, a, f);
-    else if (b.y() == c.y())
-        filterTTri(toProcess, a, b, c, f);
-    else {
-        QPoint d (a.x() + static_cast<float>(c.x() - a.x()) * (static_cast<float>(b.y() - a.y()) / static_cast<float>(c.y() - a.y())) , b.y());
-        filterBTri(toProcess, c, b, d, f);
-        filterTTri(toProcess, a, b, d, f);
-    }
-}
-
-void DataIOHandler::filterBTri(QImage *toProcess, QPoint a, QPoint b, QPoint c, Filter f) {
-    if (b.x() > c.x()) {
-        QPoint tmp = b;
-        b = c;
-        c = tmp;
-    }
-    int h = toProcess->height() - 1, w = toProcess->width() - 1;
-    float invslope1 = static_cast<float>(b.x() - a.x()) / static_cast<float>(b.y() - a.y());
-    float invslope2 = static_cast<float>(c.x() - a.x()) / static_cast<float>(c.y() - a.y());
-    float curx1 = static_cast<float>(a.x());
-    float curx2 = static_cast<float>(a.x());
-    float offset = a.y() > h ? a.y() - h : 0;
-    curx1 -= invslope1 * offset;
-    curx2 -= invslope2 * offset;
-    for (int y = min(h, a.y()); y >= max(0, b.y()); --y) {
-        QRgb *line = reinterpret_cast<QRgb *>(toProcess->scanLine(y));
-        for (int x = max(static_cast<int>(curx1), 0); x <= min(static_cast<int>(curx2), w); ++x)
-            line[x] = f.applyTo(line[x]);
-        curx1 -= invslope1;
-        curx2 -= invslope2;
-    }
-}
-
-void DataIOHandler::filterTTri(QImage *toProcess, QPoint a, QPoint b, QPoint c, Filter f) {
-    if (b.x() > c.x()) {
-        QPoint tmp = b;
-        b = c;
-        c = tmp;
-    }
-    float invslope1 = static_cast<float>(b.x() - a.x()) / static_cast<float>(b.y() - a.y());
-    float invslope2 = static_cast<float>(c.x() - a.x()) / static_cast<float>(c.y() - a.y());
-    float curx1 = static_cast<float>(a.x());
-    float curx2 = static_cast<float>(a.x());
-    float offset = a.y() < 0 ? -a.y() : 0;
-    curx1 += invslope1 * offset;
-    curx2 += invslope2 * offset;
-    int h = toProcess->height(), w = toProcess->width() - 1;
-    for (int y = max(0, a.y()); y < min(h, b.y()); ++y) {
-        QRgb *line = reinterpret_cast<QRgb *>(toProcess->scanLine(y));
-        for (int x = max(static_cast<int>(curx1), 0); x <= min(static_cast<int>(curx2), w); ++x)
-            line[x] = f.applyTo(line[x]);
-        curx1 += invslope1;
-        curx2 += invslope2;
-    }
 }
 
 void DataIOHandler::setActiveLayer(int i, EditMode mode) {
     if (i > getNumLayers())
         return;
+    frame[activeLayer]->render(1, progress);
     activeLayer = static_cast<unsigned char>(i);
     getWorkingLayer()->setMode(mode);
     updated = true;
@@ -490,6 +91,12 @@ Layer * DataIOHandler::getWorkingLayer() {
 
 void DataIOHandler::addLayer() {
     frame.push_back(new Layer(dims));
+    connect(frame.back(), &Layer::visUpdated, this, [this] {
+         updated = true;
+         emit(hasUpdate());
+    });
+    if (frame.size() != 1)
+        frame[activeLayer]->render(1, progress);
     updated = true;
     activeLayer = static_cast<unsigned char>(frame.size() - 1);
 }
@@ -502,8 +109,15 @@ void DataIOHandler::pasteLayer() {
     if (layerCopySlot.getCanvas()->isNull())
         return;
     frame.push_back(new Layer(layerCopySlot));
+    connect(frame.back(), &Layer::visUpdated, this, [this] {
+         updated = true;
+         emit(DataIOHandler::hasUpdate());
+    });
+    if (frame.size() != 1)
+        frame[activeLayer]->render(1, progress);
     updated = true;
     activeLayer = static_cast<unsigned char>(frame.size() - 1);
+    frame[activeLayer]->render(1, progress);
 }
 
 void DataIOHandler::deleteLayer() {
@@ -547,6 +161,16 @@ void DataIOHandler::moveToBack() {
     updated = true;
 }
 
+void DataIOHandler::swapLayers(int a, int b) {
+    int c = a;
+    int adder = c < b ? 1 : -1;
+    while (c != b) {
+        swap(frame[c], frame[c + adder]);
+        c += adder;
+    }
+    updated = true;
+}
+
 QImage DataIOHandler::getBackground() {
     if (activeLayer == 0)
         return QImage();
@@ -554,16 +178,17 @@ QImage DataIOHandler::getBackground() {
     progress->setMaximum(static_cast<int>(frame.size()));
     progress->show();
     QCoreApplication::processEvents();
-    QImage qi = frame[0]->getCanvas()->copy();
-    renderLayer(nullptr, nullptr, &qi, frame[0]);
+    QImage qi = QImage(frame[0]->render().size(), QImage::Format_ARGB32);
+    qi.fill(0x00000000);
     progress->setValue(0);
     QCoreApplication::processEvents();
     QPainter p;
     p.begin(&qi);
     for (size_t i = 0; i < activeLayer; ++i) {
-        QImage temp = frame[i]->getCanvas()->copy();
-        renderLayer(nullptr, nullptr, &temp, frame[i]);
-        p.drawImage(0, 0, temp);
+        if (frame[i]->isVisible()) {
+            QImage temp = frame[i]->render();
+            p.drawImage(0, 0, temp);
+        }
         progress->setValue(static_cast<int>(i + 1));
         QCoreApplication::processEvents();
     }
@@ -579,16 +204,17 @@ QImage DataIOHandler::getForeground() {
     progress->setLabelText("Updating Foreground View");
     if (frame.size() == 0 || activeLayer == frame.size() - 1)
         return QImage();
-    QImage qi = frame[activeLayer + 1]->getCanvas()->copy();
-    renderLayer(nullptr, nullptr, &qi, frame[activeLayer + 1]);
+    QImage qi = QImage(frame[activeLayer + 1]->render().size(), QImage::Format_ARGB32);
+    qi.fill(0x00000000);
     progress->setValue(progress->value() + 2);
     QCoreApplication::processEvents();
     QPainter p;
     p.begin(&qi);
-    for (size_t i = activeLayer + 2; i < frame.size(); ++i) {
-        QImage temp = frame[i]->getCanvas()->copy();
-        renderLayer(nullptr, nullptr, &temp, frame[i]);
-        p.drawImage(0, 0, temp);
+    for (size_t i = activeLayer + 1; i < frame.size(); ++i) {
+        if (frame[i]->isVisible()) {
+            QImage temp = frame[i]->render();
+            p.drawImage(0, 0, temp);
+        }
         progress->setValue(static_cast<int>(i + 1));
         QCoreApplication::processEvents();
     }
@@ -688,7 +314,6 @@ void DataIOHandler::deleteRaster() {
 
 bool DataIOHandler::importImage(QString fileName) {
     importImg = QImage(fileName).convertToFormat(QImage::Format_ARGB32);
-    importType = image;
     bool match = importImg.width() == dims.width() && importImg.height() == dims.height();
     if (match)
         scale(dontScale);
@@ -732,11 +357,16 @@ void DataIOHandler::scale(scaleType type) {
     qp.drawImage(0, 0, toDraw);
     qp.end();
     importImg = toLayer;
-    if (importType == image) {
-        frame.push_back(new Layer(importImg, 255));
-        updated = true;
-        activeLayer = static_cast<unsigned char>(frame.size() - 1);
-    }
+    if (frame.size() != 0)
+        frame[activeLayer]->render(1, progress);
+    frame.push_back(new Layer(importImg, 255));
+    connect(frame.back(), &Layer::visUpdated, this, [this] {
+         updated = true;
+         emit(DataIOHandler::hasUpdate());
+    });
+    updated = true;
+    activeLayer = static_cast<unsigned char>(frame.size() - 1);
+    frame[activeLayer]->render(1, progress);
 }
 
 void DataIOHandler::save(QString projectName) {
@@ -1045,16 +675,18 @@ void DataIOHandler::setSym(QPoint qp, int div, int ofEvery, int skip) {
 
 void DataIOHandler::layerFunc(vector<int> choices) {
     QImage qi, a, b;
-    if (choices[0] == activeLayer)
+    if (choices[0] == activeLayer) {
         frame[choices[0]]->deselect();
-    if (choices[1] == activeLayer)
+        progress->setLabelText("Rendering Layer A");
+        frame[choices[0]]->render(1, progress);
+    }
+    if (choices[1] == activeLayer) {
         frame[choices[1]]->deselect();
-    a = frame[choices[0]]->getCanvas()->copy();
-    b = frame[choices[1]]->getCanvas()->copy();
-    progress->setLabelText("Rendering Layer A");
-    renderLayer(nullptr, progress, &a, frame[choices[0]]);
-    progress->setLabelText("Rendering Layer B");
-    renderLayer(nullptr, progress, &b, frame[choices[0]]);
+        progress->setLabelText("Rendering Layer B");
+        frame[choices[1]]->render(1, progress);
+    }
+    a = frame[choices[0]]->render();
+    b = frame[choices[1]]->render();
     if (choices[2] >= 7)
         qi = graphics::ImgSupport::bitLayers(a, b, graphics::bType(choices[2] - 7));
     else if (choices[2] == 0)

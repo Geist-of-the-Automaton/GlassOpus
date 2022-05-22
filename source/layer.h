@@ -5,6 +5,7 @@
 #include <list>
 #include <QImage>
 #include <QPainter>
+#include <QProgressDialog>
 #include <splinevector.h>
 #include <triangle.h>
 #include <polygon.h>
@@ -29,7 +30,9 @@ const unsigned char maxVects = UCHAR_MAX;
 const int maxSymDiv = 36;
 const int minSymDiv = 1;
 
-class Layer {
+class Layer : public QWidget {
+
+        Q_OBJECT
 
 public:
 
@@ -41,6 +44,7 @@ public:
     Layer& operator = (const Layer &layer);
     QImage *getCanvas();
     QImage getRenderCanvas();
+    QImage render(int rerender = 0, QProgressDialog *progress = nullptr);
     vector <QPoint> getRasterEdges();
     void applyFilterToRaster(Filter f);
     vector <list <Triangle> > getTriangles();
@@ -141,9 +145,15 @@ public:
     bool updateText(Qt::Key key, bool shiftFlag);
     void magicSelect(QPoint qp, vec4 vals);
 
+    void setVisibility(bool vis);
+    bool isVisible();
+
 
     Filter filter;
 
+signals:
+    void visUpdated();
+    void viewUpdated();
 
 private:
 
@@ -162,14 +172,24 @@ private:
     vector <unsigned char> activeGons;
     vector <unsigned char> activeTexts;
     int activePt;
-    QImage *qi, alphaLayer, rasterselectOg;
+    QImage *qi, alphaLayer, rasterselectOg, rendered;
     float ipolPts, limiter = ipolMin, limitCnt = 2.0, postAngle;
     int alpha;
-    bool shiftFlag, selectOgActive, selecting, symCreate, dragDraw, addOrSub;
+    bool shiftFlag, selectOgActive, selecting, symCreate, dragDraw, addOrSub, visible;
     QPoint deltaMove, boundPt1, boundPt2, rotateAnchor;
     QPoint symPt;
     int symDiv, symOfEvery, symSkip;
 
 };
+
+
+static void renderLayer(QProgressDialog *qpd, QImage *toProcess, Layer *layer);
+static void calcLine(SplineVector sv, list <Triangle> *tris);
+static void fillTri(QImage *toProcess, Triangle t, QRgb color);
+static void filterTri(QImage *toProcess, Triangle t, Filter f);
+static void fillBTri(QImage *toProcess, QPoint a, QPoint b, QPoint c, QRgb color);
+static void fillTTri(QImage *toProcess, QPoint a, QPoint b, QPoint c, QRgb color);
+static void filterBTri(QImage *toProcess, QPoint a, QPoint b, QPoint c, Filter f);
+static void filterTTri(QImage *toProcess, QPoint a, QPoint b, QPoint c, Filter f);
 
 #endif // LAYER_H

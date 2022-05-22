@@ -13,6 +13,7 @@
 #include <stdfuncs.h>
 #include <vec_mat_maths.h>
 #include <cmath>
+#include <thread>
 
 using std::max;
 using std::min;
@@ -26,6 +27,7 @@ using std::pair;
 using std::to_string;
 using std::string;
 using std::atan;
+using std::thread;
 
 typedef vector<vector<float>> Kernel;
 typedef pair<bool,Kernel> KernelData;
@@ -50,7 +52,6 @@ enum mType {RGB_I, HUE, SAT, HSV_V, HSL_L};
 enum bType {NOT, AND, NAND, OR, NOR, XOR, XNOR};
 
 enum tType {sRGB, LAB};
-
 
 class Filter {
 
@@ -190,6 +191,7 @@ private:
 
     double zoom;
 };
+
 
 const function <QRgb (QColor, int)> filters[] = {Filtering::rgb, Filtering::greyscale, Filtering::polarize, Filtering::negative, Filtering::burn, Filtering::dodge, Filtering::enshadow, Filtering::redChannel, Filtering::greenChannel, Filtering::blueChannel, Filtering::yellowChannel, Filtering::cyanChannel, Filtering::magentaChannel, Filtering::hueChannel, Filtering::satChannel, Filtering::valChannel, Filtering::litChannel, Filtering::redPass, Filtering::greenPass, Filtering::bluePass, Filtering::yellowPass, Filtering::cyanPass, Filtering::magentaPass, Filtering::redFilter, Filtering::greenFilter, Filtering::blueFilter, Filtering::yellowFilter, Filtering::cyanFilter, Filtering::magentaFilter, Filtering::burnRed, Filtering::burnGreen, Filtering::burnBlue, Filtering::burnYellow, Filtering::burnCyan, Filtering::burnMagenta, Filtering::dodgeRed, Filtering::dodgeGreen, Filtering::dodgeBlue, Filtering::dodgeYellow, Filtering::dodgeCyan, Filtering::dodgeMagenta, Filtering::rbg, Filtering::grb, Filtering::gbr, Filtering::brg, Filtering::bgr, Filtering::colorFilmGrain, Filtering::greyFilmGrain};
 }

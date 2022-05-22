@@ -32,6 +32,7 @@ HEADERS = \
     ditherdialog.h \
     drawtext.h \
     filterdialog.h \
+    frametab.h \
     gammaadj.h \
     histodialog.h \
     hueshift.h \
@@ -40,6 +41,7 @@ HEADERS = \
     magicwanddialog.h \
     polygon.h \
     saturationadj.h \
+    sidepanel.h \
     symdialog.h \
     targettool.h \
     transferdialog.h \
@@ -82,6 +84,7 @@ SOURCES = \
     ditherdialog.cpp \
     drawtext.cpp \
     filterdialog.cpp \
+    frametab.cpp \
     gammaadj.cpp \
     histodialog.cpp \
     hueshift.cpp \
@@ -90,6 +93,7 @@ SOURCES = \
     magicwanddialog.cpp \
     polygon.cpp \
     saturationadj.cpp \
+    sidepanel.cpp \
     symdialog.cpp \
     targettool.cpp \
     transferdialog.cpp

@@ -32,6 +32,8 @@
 #include <QDragEnterEvent>
 #include <QProgressDialog>
 #include <QTextEdit>
+#include <QToolBar>
+#include <QDockWidget>
 
 #include <dataIOHandler.h>
 #include <brushhandler.h>
@@ -58,6 +60,7 @@
 #include <targettool.h>
 #include <magicwanddialog.h>
 #include <layerfunc.h>
+#include <sidepanel.h>
 #include <Windows.h>
 
 using std::string;
@@ -152,12 +155,14 @@ private:
     bool createMenubar();
     void addItems(QMenu *menu, string items);
     void addAction(QMenu *menu, string s);
+    void addItems(QToolBar *toolbar, string items);
     void refresh();
     void setShiftFlag(bool b);
     void setSamplePt(QPoint qp);
     void downloadItem(QString subfolder, QString fileName, downloadAction action, QString promptTitle, QString promptText);
     void createDocImgs();
     void setMode(EditMode emode);
+    void changeOffsets();
 
     Ui::MainWindow *ui;
     screenRender *sr;
@@ -177,7 +182,7 @@ private:
     list <QObject *> toDel;
     QString dSubfolder, dFileName;
     downloadAction dAction;
-    bool takeFlag, magicFlag;
+    bool takeFlag, magicFlag, layerMenuInteract;
     QString saveFileName;
     appMethod tempMethod = overwrite;
     QProgressDialog *progress;
@@ -189,6 +194,10 @@ private:
     QPoint lastPos;
     QTextEdit qte;
     MagicWandDialog *mwd;
+    QToolBar *toolbar;
+    QMenuBar *menubar;
+    SidePanel *LayerMenu;
+    QDockWidget *objDetails;
 
 };
 

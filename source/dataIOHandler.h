@@ -31,7 +31,6 @@ using std::getline;
 using graphics::Filter;
 
 enum scaleType {dontScale, bestFit, aspectRatio, toWidth, toHeight};
-enum importType {image, video};
 
 struct RGB {
     unsigned char blue;
@@ -43,21 +42,15 @@ static mutex locker;
 static atomic_int progressMarker;
 const unsigned char maxLayer = 64;
 
-class DataIOHandler {
+class DataIOHandler : public QWidget {
+
+    Q_OBJECT
 
 public:
 
     DataIOHandler(QProgressDialog *progress);
     ~DataIOHandler();
     static void renderFrame(QProgressDialog *fqpd, QImage *ret, vector <Layer *> layers);
-    static void renderLayer(QProgressDialog *fqpd, QProgressDialog *qpd, QImage *toProcess, Layer *layer);
-    static void calcLine(SplineVector sv, list <Triangle> *tris);
-    static void fillTri(QImage *toProcess, Triangle t, QRgb color);
-    static void filterTri(QImage *toProcess, Triangle t, Filter f);
-    static void fillBTri(QImage *toProcess, QPoint a, QPoint b, QPoint c, QRgb color);
-    static void fillTTri(QImage *toProcess, QPoint a, QPoint b, QPoint c, QRgb color);
-    static void filterBTri(QImage *toProcess, QPoint a, QPoint b, QPoint c, Filter f);
-    static void filterTTri(QImage *toProcess, QPoint a, QPoint b, QPoint c, Filter f);
     void setDims(QSize size);
     QSize getdims();
     void scale(scaleType option);
@@ -93,6 +86,7 @@ public:
     void moveForward();
     void moveToBack();
     void moveToFront();
+    void swapLayers(int a, int b);
     Layer *getWorkingLayer();
     QImage getBackground();
     QImage getForeground();
@@ -107,6 +101,9 @@ public:
 
     void setSym(QPoint qp, int div, int ofEvery, int skip);
 
+signals:
+    void hasUpdate();
+
 private:
 
     QSize dims;
@@ -118,7 +115,6 @@ private:
     QString file;
     unsigned char activeLayer;
     QImage importImg, rasterCopySlot;
-    importType importType;
     bool updated;
     double angleCopySlot;
     pair <QPoint, QPoint> boundCopySlot;

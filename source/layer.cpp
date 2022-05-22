@@ -14,6 +14,7 @@ Layer::Layer() {
     symDiv = 1;
     symOfEvery = 1;
     symSkip = 0;
+    visible = true;
 }
 
 Layer::Layer(QSize qs) {
@@ -30,6 +31,7 @@ Layer::Layer(QSize qs) {
     symDiv = 1;
     symOfEvery = 1;
     symSkip = 0;
+    visible = true;
 }
 
 Layer::Layer(QImage in, int alphaValue) {
@@ -46,6 +48,7 @@ Layer::Layer(QImage in, int alphaValue) {
     symDiv = 1;
     symOfEvery = 1;
     symSkip = 0;
+    visible = true;
 }
 
 Layer::Layer(const Layer &layer) {
@@ -77,6 +80,7 @@ Layer& Layer::operator=(const Layer &layer) {
     symSkip = layer.symSkip;
     symOfEvery = layer.symOfEvery;
     symPt = layer.symPt;
+    visible = layer.visible;
     return *this;
 }
 
@@ -147,6 +151,16 @@ QImage Layer::getRenderCanvas() {
     if (selectOgActive)
         drawRasterSelection(&img, FastTransformation);
     return img.convertToFormat(QImage::Format_ARGB32);
+}
+
+QImage Layer::render(int rerender, QProgressDialog *progress) {
+    if (rerender) {
+        QImage img = getRenderCanvas();
+        renderLayer(progress, &img, this);
+        rendered = img;
+        emit(Layer::viewUpdated());
+    }
+    return rendered;
 }
 
 vector <QPoint> Layer::getRasterEdges() {
@@ -1334,7 +1348,7 @@ void Layer::polyToSelect() {
     }
     if (minPt.x() >= maxPt.x() || minPt.y() >= maxPt.y())
         return;
-    rasterselectOg = QImage(2 + (maxPt.x() - minPt.x()), 2 + (maxPt.y() - minPt.y()), QImage::Format_ARGB32_Premultiplied);
+    rasterselectOg = QImage(2 + (maxPt.x() - minPt.x()), 2 + (maxPt.y() - minPt.y()), QImage::Format_ARGB32);
     rasterselectOg.fill(0x00000000);
     for (unsigned char activeGon : activeGons) {
         for (Triangle &t : gons[activeGon].getTris()) {
@@ -1548,7 +1562,7 @@ void Layer::magicSelect(QPoint qp, vec4 vals) {
     QColor og = qi->pixelColor(qp.x(), qp.y());
     list <QPoint> toProcess;
     toProcess.push_back(qp);
-    QImage copy = QImage(qi->size(), QImage::Format_ARGB32_Premultiplied);
+    QImage copy = QImage(qi->size(), QImage::Format_ARGB32);
     while (!toProcess.empty()) {
         QPoint pt = toProcess.front();
         toProcess.pop_front();
@@ -1578,6 +1592,391 @@ void Layer::magicSelect(QPoint qp, vec4 vals) {
     deltaMove = rotateAnchor = minPt;
     postAngle = 0.0;
     selectOgActive = true;
+}
+
+void Layer::setVisibility(bool vis) {
+    visible = vis;
+    emit(Layer::visUpdated());
+}
+
+bool Layer::isVisible() {
+    return visible;
+}
+
+//---------------------------------------------------------------------------------------
+
+
+void renderLayer(QProgressDialog *qpd, QImage *toProcess, Layer *layer) {
+    int alpha = layer->getAlpha();
+    vector <SplineVector> vects = layer->getVectors();
+    vector <list <Triangle>> tris = layer->getTriangles();
+    vector <Polygon> gons = layer->getPolgons();
+    vector <DrawText> texts = layer->getTexts();
+    Filter filter = layer->getFilter();
+    if (qpd != nullptr) {
+        qpd->setValue(0);
+        qpd->setMaximum(static_cast<int>(1 + vects.size() + gons.size() + texts.size() + (tris.size() != vects.size() ? 1 : 0)));
+        qpd->show();
+        QCoreApplication::processEvents();
+    }
+    vector <list <Triangle> *> dTris;
+    if (!tris.empty()) {
+        for (size_t i = 0; i < vects.size(); ++i)
+            dTris.push_back(new list <Triangle> (tris[i]));
+    }
+    else if (vects.size() != 0) {
+        for (size_t i = 0; i < vects.size(); ++i)
+            dTris.push_back( new list <Triangle> ());
+        vector <thread> splineThreads;
+        for(size_t i = 0; i < dTris.size(); ++i) {
+            thread th = thread(calcLine, vects[i], dTris[i]);
+            splineThreads.push_back(move(th));
+        }
+        for(auto &th : splineThreads)
+            th.join();
+        if (qpd != nullptr) {
+            qpd->setValue(qpd->value() + 1);
+            QCoreApplication::processEvents();
+        }
+    }
+    QRgb color;
+    for (size_t i = 0; i < dTris.size(); ++i) {
+        Filter vf = vects[i].getFilter();
+        pair <QRgb, QRgb> colors = vects[i].getColors();
+        QColor ca = QColor (colors.first), cb = QColor(colors.second);
+        short band = vects[i].getBand(), gap = vects[i].getGap();
+        float totalTri = static_cast<float>(tris[i].size() / 2);
+        float offset = (totalTri / static_cast<float>(band + gap));
+        int styler = -static_cast<int>(((static_cast<float>(band + gap) * offset) - totalTri) / 2.0);
+        if (vects[i].getMode() == ColorFill) {
+            if (colors.first == colors.second) {
+                color = ca.rgba();
+                for (Triangle &t : *dTris[i]) {
+                    if (styler >= 0)
+                        fillTri(toProcess, t, color);
+                    styler += 1;
+                    if (styler == band - 1)
+                        styler = -gap;
+                }
+            }
+            else {
+                float ccomp = 1.0 / static_cast<float>((*dTris[i]).size());
+                float cnt = 0.0;
+                for (Triangle &t : *dTris[i]) {
+                    float ccc = ccomp * cnt;
+                    int r = static_cast<int>((ccc * static_cast<float>(ca.red())) + ((1.0 - ccc) * static_cast<float>(cb.red())));
+                    int g = static_cast<int>((ccc * static_cast<float>(ca.green())) + ((1.0 - ccc) * static_cast<float>(cb.green())));
+                    int b = static_cast<int>((ccc * static_cast<float>(ca.blue())) + ((1.0 - ccc) * static_cast<float>(cb.blue())));
+                    color = QColor(r, g, b).rgba();
+                    if (styler >= 0)
+                        fillTri(toProcess, t, color);
+                    styler += 1;
+                    if (styler == band - 1)
+                        styler = -gap;
+                    cnt += 1.0;
+                }
+            }
+        }
+        else
+            for (Triangle &t : *dTris[i]) {
+                if (styler >= 0)
+                    filterTri(toProcess, t, vf);
+                styler += 1;
+                if (styler == band - 1)
+                    styler = -gap;
+            }
+        if (qpd != nullptr) {
+            qpd->setValue(qpd->value() + 1);
+            QCoreApplication::processEvents();
+        }
+    }
+    for (size_t i = 0; i < vects.size(); ++i)
+        delete dTris[i];
+    QPainter painter(toProcess);
+    for (Polygon gon : gons) {
+        list <Triangle> tris = gon.getTris();
+        vector <QPoint> pts = gon.getPts();
+        color = gon.getPolyColor();
+        if (gon.getPolyMode() == ColorGon && color >= 0x01000000)
+            for (Triangle &t : tris)
+                fillTri(toProcess, t, color);
+        else if (gon.getPolyMode() == FilterGon) {
+            filter = gon.getFilter();
+            for (Triangle &t : tris)
+                filterTri(toProcess, t, filter);
+        }
+        int edgeSize = gon.getEdgeSize();
+        if (edgeSize != 0) {
+            bool dispDivs = gon.getShowDivs();
+            painter.setPen(QPen(QColor(gon.getEdgeColor()), edgeSize, Qt::SolidLine, Qt::RoundCap));
+            QVector <QLine> lines;
+            if (dispDivs) {
+                for (Triangle &t : tris) {
+                    painter.drawLine(t.a, t.b);
+                    painter.drawLine(t.a, t.c);
+                    painter.drawLine(t.c, t.b);
+                }
+            }
+            else {
+                if (pts.size() >= 2) {
+                    for (int i = 1; i < pts.size(); ++i)
+                        lines.push_back(QLine(pts[i - 1], pts[i]));
+                    lines.push_back(QLine(pts[0], pts[pts.size() - 1]));
+                }
+            }
+            painter.drawLines(lines);
+        }
+        if (qpd != nullptr) {
+            qpd->setValue(qpd->value() + 1);
+            QCoreApplication::processEvents();
+        }
+    }
+    for (DrawText &dt : texts) {
+        painter.setPen(QPen(dt.getColor(), 1));
+        painter.setFont(dt.getFont());
+        painter.setTransform(dt.getTransform());
+        painter.drawStaticText(0, 0, dt.getText());
+        if (qpd != nullptr) {
+            qpd->setValue(qpd->value() + 1);
+            QCoreApplication::processEvents();
+        }
+    }
+    painter.end();
+    if (qpd != nullptr) {
+        qpd->setValue(qpd->value() + 1);
+        QCoreApplication::processEvents();
+    }
+    filter.applyTo(toProcess);
+    *toProcess = toProcess->convertToFormat(QImage::Format_ARGB32);
+    unsigned int alphaVal = static_cast<unsigned int>(alpha) << 24;
+    int yStart = 0, yEnd = toProcess->height();
+    while (yStart < yEnd) {
+        QRgb *line = reinterpret_cast<QRgb *>(toProcess->scanLine(yStart));
+        for (int x = 0; x < toProcess->width(); ++x)
+            if (line[x] & 0xFF000000)
+                line[x] = alphaVal | (line[x] & 0x00FFFFFF);
+        ++yStart;
+        //--*yStart&=++*yStart+++!ys;     // gross
+    }
+    if (qpd != nullptr) {
+        qpd->close();
+        qpd->hide();
+    }
+}
+
+
+void calcLine(SplineVector sv, list<Triangle> *tris) {
+    vector <QPointF> workPts;
+    vector <QPoint> controlPts = sv.getControls();
+    char numpts = static_cast<char>(controlPts.size()) - 1;
+    for (char i = 0; i < numpts + 1; ++i)
+        workPts.push_back(QPointF(controlPts[i]));
+    list <pair <QPoint, QPoint> > pairs;
+    pair <unsigned char, unsigned char> taper = sv.getTaper();
+    float taper1 = taper.first == 0 ? 0.0 : 1.0 / static_cast<float>((9 - (taper.first - 1)) + 1), taper2 = taper.second == 0 ? 0.0 : 1.0 / static_cast<float>((9 - (taper.second - 1)) + 1);
+    for (float ipol = 0.0; ipol <= 1.0; ipol += ipolMin) {
+        float twidth = static_cast<float>(sv.getWidth());
+        if (taper.first != 0 || taper.second != 0) {
+            if (sv.getTaperType() == Single)
+                twidth *= pow(ipol, taper1);
+            else {
+                float f = 2.0 * abs(abs(ipol - 0.5) - 0.5);
+                twidth *= pow(f, ipol <= 0.5 ? taper1 : taper2);
+            }
+        }
+        for (int max = numpts; max > 1; --max) {    // og  > 0
+            for (char i = 0; i < max; ++i) {
+                workPts[i].setX(Layer::getipol(workPts[i].x(), workPts[i + 1].x(), ipol));
+                workPts[i].setY(Layer::getipol(workPts[i].y(), workPts[i + 1].y(), ipol));
+            }
+            workPts[max] = controlPts[max];
+        }
+        float dx = workPts[1].x() - workPts[0].x(), dy = workPts[1].y() - workPts[0].y();
+        workPts[0].setX(Layer::getipol(workPts[0].x(), workPts[1].x(), ipol));
+        workPts[0].setY(Layer::getipol(workPts[0].y(), workPts[1].y(), ipol));
+        workPts[1] = controlPts[1];
+        float slope = dx / dy;
+        float sqrSlope = slope * slope;
+        QPointF midPt = workPts[0];
+        float dist = twidth;
+        float inverter = slope < 0.0 ? 1.0 : -1.0;
+        int x1 = static_cast<int>(((inverter * dist) / sqrt(1 + sqrSlope)) + midPt.x());
+        int y1 = static_cast<int>((dist / sqrt(1 + (1 / sqrSlope))) + midPt.y());
+        int x2 = midPt.x() + (midPt.x() - x1);
+        int y2 = midPt.y() + (midPt.y() - y1);
+        pairs.push_back(pair <QPoint, QPoint> (QPoint(x1, y1), QPoint(x2, y2)));
+        workPts[0] = controlPts[0];
+    }
+    pair <QPoint, QPoint> first = pairs.front();
+    pairs.pop_front();
+    int x, y;
+    while (pairs.size() > 0) {
+        pair <QPoint, QPoint> second = pairs.front();
+        pairs.pop_front();
+        x = first.first.x() - second.second.x();
+        y = first.first.y() - second.second.y();
+        int dist1 = x * x + y * y;
+        x = first.second.x() - second.first.x();
+        y = first.second.y() - second.first.y();
+        int dist2 = x * x + y * y;
+        if (dist1 > dist2) {
+            tris->push_back(Triangle(first.first, second.second, first.second));
+            tris->push_back(Triangle(first.first, second.second, second.first));
+        }
+        else {
+            tris->push_back(Triangle(first.second, second.first, first.first));
+            tris->push_back(Triangle(first.second, second.first, second.second));
+        }
+        first = second;
+    }
+}
+
+void fillTri(QImage *toProcess, Triangle t, QRgb color) {
+    QPoint a = t.a, b = t.b, c = t.c;
+    if (a.y() > b.y()) {
+        QPoint tmp = a;
+        a = b;
+        b = tmp;
+    }
+    if (b.y() > c.y()) {
+        QPoint tmp = b;
+        b = c;
+        c = tmp;
+        if (a.y() > b.y()) {
+            tmp = a;
+            a = b;
+            b = tmp;
+        }
+    }
+    if (b.y() == a.y())
+        fillBTri(toProcess, c, b, a, color);
+    else if (b.y() == c.y())
+        fillTTri(toProcess, a, b, c, color);
+    else {
+        QPoint d (a.x() + static_cast<float>(c.x() - a.x()) * (static_cast<float>(b.y() - a.y()) / static_cast<float>(c.y() - a.y())) , b.y());
+        fillBTri(toProcess, c, b, d, color);
+        fillTTri(toProcess, a, b, d, color);
+    }
+}
+
+void fillBTri(QImage *toProcess, QPoint a, QPoint b, QPoint c, QRgb color) {
+    if (b.x() > c.x()) {
+        QPoint tmp = b;
+        b = c;
+        c = tmp;
+    }
+    int h = toProcess->height() - 1, w = toProcess->width() - 1;
+    float invslope1 = static_cast<float>(b.x() - a.x()) / static_cast<float>(b.y() - a.y());
+    float invslope2 = static_cast<float>(c.x() - a.x()) / static_cast<float>(c.y() - a.y());
+    float curx1 = static_cast<float>(a.x());
+    float curx2 = static_cast<float>(a.x());
+    float offset = a.y() > h ? a.y() - h : 0;
+    curx1 -= invslope1 * offset;
+    curx2 -= invslope2 * offset;
+    for (int y = min(h, a.y()); y >= max(0, b.y()); --y) {
+        QRgb *line = reinterpret_cast<QRgb *>(toProcess->scanLine(y));
+        for (int x = max(static_cast<int>(curx1), 0); x <= min(static_cast<int>(curx2), w); ++x)
+            line[x] = color;
+        curx1 -= invslope1;
+        curx2 -= invslope2;
+    }
+}
+
+void fillTTri(QImage *toProcess, QPoint a, QPoint b, QPoint c, QRgb color) {
+    if (b.x() > c.x()) {
+        QPoint tmp = b;
+        b = c;
+        c = tmp;
+    }
+    float invslope1 = static_cast<float>(b.x() - a.x()) / static_cast<float>(b.y() - a.y());
+    float invslope2 = static_cast<float>(c.x() - a.x()) / static_cast<float>(c.y() - a.y());
+    float curx1 = static_cast<float>(a.x());
+    float curx2 = static_cast<float>(a.x());
+    float offset = a.y() < 0 ? -a.y() : 0;
+    curx1 += invslope1 * offset;
+    curx2 += invslope2 * offset;
+    int h = toProcess->height(), w = toProcess->width() - 1;
+    for (int y = max(0, a.y()); y < min(h, b.y()); ++y) {
+        QRgb *line = reinterpret_cast<QRgb *>(toProcess->scanLine(y));
+        for (int x = max(static_cast<int>(curx1), 0); x <= min(static_cast<int>(curx2), w); ++x)
+            line[x] = color;
+        curx1 += invslope1;
+        curx2 += invslope2;
+    }
+}
+
+void filterTri(QImage *toProcess, Triangle t, Filter f) {
+    QPoint a = t.a, b = t.b, c = t.c;
+    if (a.y() > b.y()) {
+        QPoint tmp = a;
+        a = b;
+        b = tmp;
+    }
+    if (b.y() > c.y()) {
+        QPoint tmp = b;
+        b = c;
+        c = tmp;
+        if (a.y() > b.y()) {
+            tmp = a;
+            a = b;
+            b = tmp;
+        }
+    }
+    if (b.y() == a.y())
+        filterBTri(toProcess, c, b, a, f);
+    else if (b.y() == c.y())
+        filterTTri(toProcess, a, b, c, f);
+    else {
+        QPoint d (a.x() + static_cast<float>(c.x() - a.x()) * (static_cast<float>(b.y() - a.y()) / static_cast<float>(c.y() - a.y())) , b.y());
+        filterBTri(toProcess, c, b, d, f);
+        filterTTri(toProcess, a, b, d, f);
+    }
+}
+
+void filterBTri(QImage *toProcess, QPoint a, QPoint b, QPoint c, Filter f) {
+    if (b.x() > c.x()) {
+        QPoint tmp = b;
+        b = c;
+        c = tmp;
+    }
+    int h = toProcess->height() - 1, w = toProcess->width() - 1;
+    float invslope1 = static_cast<float>(b.x() - a.x()) / static_cast<float>(b.y() - a.y());
+    float invslope2 = static_cast<float>(c.x() - a.x()) / static_cast<float>(c.y() - a.y());
+    float curx1 = static_cast<float>(a.x());
+    float curx2 = static_cast<float>(a.x());
+    float offset = a.y() > h ? a.y() - h : 0;
+    curx1 -= invslope1 * offset;
+    curx2 -= invslope2 * offset;
+    for (int y = min(h, a.y()); y >= max(0, b.y()); --y) {
+        QRgb *line = reinterpret_cast<QRgb *>(toProcess->scanLine(y));
+        for (int x = max(static_cast<int>(curx1), 0); x <= min(static_cast<int>(curx2), w); ++x)
+            line[x] = f.applyTo(line[x]);
+        curx1 -= invslope1;
+        curx2 -= invslope2;
+    }
+}
+
+void filterTTri(QImage *toProcess, QPoint a, QPoint b, QPoint c, Filter f) {
+    if (b.x() > c.x()) {
+        QPoint tmp = b;
+        b = c;
+        c = tmp;
+    }
+    float invslope1 = static_cast<float>(b.x() - a.x()) / static_cast<float>(b.y() - a.y());
+    float invslope2 = static_cast<float>(c.x() - a.x()) / static_cast<float>(c.y() - a.y());
+    float curx1 = static_cast<float>(a.x());
+    float curx2 = static_cast<float>(a.x());
+    float offset = a.y() < 0 ? -a.y() : 0;
+    curx1 += invslope1 * offset;
+    curx2 += invslope2 * offset;
+    int h = toProcess->height(), w = toProcess->width() - 1;
+    for (int y = max(0, a.y()); y < min(h, b.y()); ++y) {
+        QRgb *line = reinterpret_cast<QRgb *>(toProcess->scanLine(y));
+        for (int x = max(static_cast<int>(curx1), 0); x <= min(static_cast<int>(curx2), w); ++x)
+            line[x] = f.applyTo(line[x]);
+        curx1 += invslope1;
+        curx2 += invslope2;
+    }
 }
 
 

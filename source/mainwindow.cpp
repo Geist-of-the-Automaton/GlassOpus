@@ -40,6 +40,14 @@ MainWindow::MainWindow(string startPath, string projectFile, QWidget *parent)
     progress->close();
     ioh = new DataIOHandler(progress);
     sr = new screenRender(ioh, vs);
+    LayerMenu = new SidePanel(this);
+    layerMenuInteract = false;
+    connect(LayerMenu, &SidePanel::isMoving, this, [this] {
+        layerMenuInteract = true;
+    });
+    connect(LayerMenu, &SidePanel::notMoving, this, [this] {
+        layerMenuInteract = false;
+    });
     setCentralWidget(vs);
     setGeometry(screenRect.width() / 8, screenRect.height() / 8, 6 * screenRect.width() / 8, 6 * screenRect.height() / 8);
     setWindowTitle("Glass Opus");
@@ -133,16 +141,51 @@ MainWindow::MainWindow(string startPath, string projectFile, QWidget *parent)
             std::this_thread::sleep_for(std::chrono::milliseconds(t > 2000 ? 0 : 2000 - t));
         logo.hide();
     }
+    ioh->addLayer();
     histograms = new QLabel();
     symDialog = new SymDialog(this);
     connect(&qte, SIGNAL(textChanged()), this, SLOT(textChanged()));
     showMaximized();
+    LayerMenu->setOffsets(menubar->height() + toolbar->height(), ui->statusbar->height(), 0);
+    connect(toolbar, &QToolBar::topLevelChanged, this, [this] {
+        changeOffsets();
+    });
+    objDetails = new QDockWidget(this);
+    objDetails->setAllowedAreas(Qt::LeftDockWidgetArea);
+    objDetails->setCursor(Qt::ArrowCursor);
+    addDockWidget(Qt::LeftDockWidgetArea, objDetails);
+    objDetails->setFeatures(objDetails->features() & ~QDockWidget::DockWidgetClosable);
+    objDetails->setContextMenuPolicy (Qt::PreventContextMenu);
+    toolbar->setContextMenuPolicy (Qt::PreventContextMenu);
+    connect(LayerMenu, &SidePanel::layerSet, this, [this] {
+        ioh->getWorkingLayer()->deselect();
+        ioh->setActiveLayer(LayerMenu->getActive(), mode);
+        ioh->getWorkingLayer();
+        LayerMenu->setActive(ioh->getActiveLayer());
+    });
+    connect(LayerMenu, &SidePanel::layerMoved, this, [this] {
+        ioh->getWorkingLayer()->deselect();
+        pair <int, int> toSwap = LayerMenu->getToSwap();
+        ioh->swapLayers(toSwap.first, toSwap.second);
+        int active = ioh->getActiveLayer();
+        if (active == toSwap.first)
+            ioh->setActiveLayer(toSwap.second, mode);
+        ioh->getWorkingLayer();
+    });
+    QTimer::singleShot(100, [this] {
+        changeOffsets();
+        ioh->addLayer();
+        changeOffsets();
+        ioh->deleteLayer();
+        changeOffsets();
+        ioh->deleteLayer();
+    });
 }
 
 void MainWindow::mouseMoveEvent(QMouseEvent *event) {
-    if (ioh->getWorkingLayer() == nullptr || takeFlag || magicFlag)
+    if (layerMenuInteract || ioh->getWorkingLayer() == nullptr || takeFlag || magicFlag)
         return;
-    QPoint qp = sr->getZoomCorrected(vs->getScrollCorrected(event->pos()));
+    QPoint qp = sr->getZoomCorrected(vs->getScrollCorrected(event->pos() - QPoint(objDetails->width() + 5,toolbar->height())));
     statusBar()->showMessage(("(" + to_string(qp.x()) + " , " + to_string(qp.y()) + ")").c_str(), 1000);
     if (altFlag) {
         sr->setSamplePt(qp);
@@ -181,7 +224,7 @@ void MainWindow::mouseMoveEvent(QMouseEvent *event) {
 }
 
 void MainWindow::mousePressEvent(QMouseEvent *event) {
-    if (ioh->getWorkingLayer() == nullptr)
+    if (layerMenuInteract || ioh->getWorkingLayer() == nullptr)
         return;
     if (ctrlFlag || onePress || takeFlag || magicFlag)
         return;
@@ -193,7 +236,7 @@ void MainWindow::mousePressEvent(QMouseEvent *event) {
         return;
     }
     lastButton = event->button();
-    QPoint qp = lastPos = sr->getZoomCorrected(vs->getScrollCorrected(event->pos()));
+    QPoint qp = lastPos = sr->getZoomCorrected(vs->getScrollCorrected(event->pos() - QPoint(objDetails->width() + 5,toolbar->height())));
     if (altFlag) {
         onePress = false;
         sr->setSamplePt(qp);
@@ -229,9 +272,13 @@ void MainWindow::mousePressEvent(QMouseEvent *event) {
 }
 
 void MainWindow::mouseReleaseEvent(QMouseEvent *event) {
+    if (layerMenuInteract) {
+        layerMenuInteract = false;
+        LayerMenu->stopMoving();
+    }
     if (ioh->getWorkingLayer() == nullptr)
         return;
-    QPoint qp = sr->getZoomCorrected(vs->getScrollCorrected(event->pos()));
+    QPoint qp = sr->getZoomCorrected(vs->getScrollCorrected(event->pos() - QPoint(objDetails->width() + 5,toolbar->height())));
     if (altFlag) {
         if (bh.getMethodIndex() == appMethod::sample) {
             sr->setSamplePt(qp);
@@ -287,9 +334,9 @@ void MainWindow::mouseReleaseEvent(QMouseEvent *event) {
 }
 
 void MainWindow::mouseDoubleClickEvent(QMouseEvent *event) {
-    if (ioh->getWorkingLayer() == nullptr)
+    if (layerMenuInteract || ioh->getWorkingLayer() == nullptr)
         return;
-    QPoint qp = sr->getZoomCorrected(vs->getScrollCorrected(event->pos()));
+    QPoint qp = sr->getZoomCorrected(vs->getScrollCorrected(event->pos() - QPoint(objDetails->width() + 5,toolbar->height())));
     MouseButton button = event->button();
     if (mode == Spline_Mode || mode == Polygon_Mode || mode == Text_Mode) {
         if (shiftFlag)
@@ -306,7 +353,7 @@ void MainWindow::mouseDoubleClickEvent(QMouseEvent *event) {
 
 void MainWindow::wheelEvent(QWheelEvent *event) {
     scrollLock.lock();
-    if (ioh->getWorkingLayer() == nullptr) {
+    if (layerMenuInteract || ioh->getWorkingLayer() == nullptr) {
         scrollLock.unlock();
         return;
     }
@@ -318,6 +365,9 @@ void MainWindow::wheelEvent(QWheelEvent *event) {
         double c = (dx < 0 ? 1.0 : -1.0) / pow(graphics::maxZoom - zoom, (graphics::maxZoom - zoom) / 3.0);
         if ((zoom + c > graphics::minZoom && dx > 0 ) || (zoom + c < graphics::maxZoom && dx < 0))
             sr->setZoom(zoom + c);
+        changeOffsets();
+        cout << vs->verticalScrollBar()->isVisible() << " " << vs->horizontalScrollBar()->isVisible() << endl;
+        cout << vs->verticalScrollBar()->minimum() << " " << vs->verticalScrollBar()->maximum() << endl;
     }
     else if (mode == Brush_Mode) {
         if (shiftFlag) {
@@ -373,27 +423,59 @@ void MainWindow::setShiftFlag(bool b) {
     ioh->getWorkingLayer()->setShiftFlag(b);
 }
 
+void MainWindow::changeOffsets() {
+    bool maxFlag = isMaximized();
+    QRect reset = geometry();
+    int left = 0, top = menubar->height(), bottom = ui->statusbar->height();
+    if (vs->verticalScrollBar()->isVisible())
+        left += vs->horizontalScrollBar()->height();
+    if (vs->horizontalScrollBar()->isVisible())
+        bottom += vs->horizontalScrollBar()->height();
+    if (!toolbar->isFloating()) {
+        Qt::ToolBarArea area = toolBarArea(toolbar);
+        if (area == Qt::ToolBarArea::TopToolBarArea)
+            top += toolbar->height();
+        else if (area == Qt::ToolBarArea::BottomToolBarArea)
+            bottom += toolbar->height();
+    }
+    LayerMenu->setOffsets(top, bottom, left);
+    setGeometry(reset);
+    if (maxFlag)
+        this->showMaximized();
+}
+
 bool MainWindow::createMenubar() {
     QFile qf(QDir::currentPath() + UI_Loc + UI_FileName);
     bool exists = qf.exists();
     if (exists) {
-        QMenuBar *menubar = new QMenuBar(this);
+        toolbar = new QToolBar(this);
+        toolbar->setAllowedAreas(Qt::TopToolBarArea | Qt::BottomToolBarArea);
+        toolbar->setFloatable(false);
+        log("toolbar", toolbar);
+        this->addToolBar(toolbar);
+        menubar = new QMenuBar(this);
         menubar->setGeometry(QRect(0, 0, 800, 20));
         log(UI_FileName.toStdString(), menubar);
         fstream uiFile;
         uiFile.open((QDir::currentPath() + UI_Loc + UI_FileName).toStdString(), ios::in);
+        int line = 0;
         if (uiFile.is_open()){
             string fromFile;
             while(getline(uiFile, fromFile)) {
-                string item = "";
-                size_t i;
-                for (i = 0; fromFile[i] != ';'; ++i)
-                    item += fromFile[i];
-                QMenu *menu = menubar->addMenu(item.c_str());
-                log(item, menu);
-                ++i;
-                fromFile = fromFile.substr(i, fromFile.length() - i);
-                addItems(menu, fromFile);
+                if (line == 0 && fromFile[0] == '#')
+                    addItems(toolbar, fromFile.substr(1));
+                else {
+                    string item = "";
+                    size_t i;
+                    for (i = 0; fromFile[i] != ';'; ++i)
+                        item += fromFile[i];
+                    ++i;
+                    fromFile = fromFile.substr(i, fromFile.length() - i);
+                    QMenu *menu = menubar->addMenu(item.c_str());
+                    log(item, menu);
+                    addItems(menu, fromFile);
+                }
+                ++line;
             }
             uiFile.close();
         }
@@ -401,10 +483,41 @@ bool MainWindow::createMenubar() {
     return exists;
 }
 
+void MainWindow::addItems(QToolBar *qtb, string menuItems) {
+    string item = "";
+    for (size_t i = 0; i < menuItems.length(); ++i) {
+        if (menuItems[i] == '|') {
+            qtb->addSeparator();
+            ++i;
+        }
+        else if (menuItems[i] == '~') {
+            QWidget* empty = new QWidget();
+            empty->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+            qtb->addWidget(empty);
+            ++i;
+        }
+        else if (menuItems[i] == ',') {
+            QAction *action = qtb->addAction(item.c_str());
+            QFile qf(QDir::currentPath() + Icon_Loc + QString(item.c_str()) + ".png");
+            if (qf.exists())
+                action->setIcon(QIcon(qf.fileName()));
+            connect(action, &QAction::triggered, this, [=]() { this->doSomething(item); });
+            log(item + "_toolbar", action);
+            item = "";
+        }
+        else
+            item += menuItems[i];
+    }
+}
+
 void MainWindow::addItems(QMenu *menu, string menuItems) {
     string item = "";
     for (size_t i = 0; i < menuItems.length(); ++i) {
-        if (menuItems[i] == ',') {
+        if (menuItems[i] == '|') {
+            menu->addSeparator();
+            ++i;
+        }
+        else if (menuItems[i] == ',') {
             addAction(menu, item);
             item = "";
         }
@@ -470,12 +583,17 @@ void MainWindow::doSomething(string btnPress) {
                 this->showMaximized();
             if (flag)
                 resizeCheck->showRelative();
+            ioh->getWorkingLayer()->setSym(bh.getSymPt(), symDialog->getDiv(), symDialog->getOfEvery(), symDialog->getSkip());
+            changeOffsets();
+            setMode(mode);
+            LayerMenu->add(ioh->getWorkingLayer());
         }
         refresh();
         setGeometry(reset);
         if (maxFlag)
             this->showMaximized();
         sr->setMode(mode);
+        changeOffsets();
     }
     else if (btnPress == "Open") {
         QMessageBox::StandardButton prompt = QMessageBox::question(this, "Open Project File", "Opening a project file will replace the current work. Continue?", QMessageBox::Yes|QMessageBox::No);
@@ -532,6 +650,9 @@ void MainWindow::doSomething(string btnPress) {
         sr->setMode(mode);
         ioh->addLayer();
         ioh->getWorkingLayer()->setSym(bh.getSymPt(), symDialog->getDiv(), symDialog->getOfEvery(), symDialog->getSkip());
+        changeOffsets();
+        setMode(mode);
+        LayerMenu->add(ioh->getWorkingLayer());
     }
     if (ioh->getWorkingLayer() == nullptr)
         return;
@@ -1085,6 +1206,7 @@ void MainWindow::doSomething(string btnPress) {
             ioh->getWorkingLayer()->deselect();
             ioh->setActiveLayer(ret, mode);
             ioh->getWorkingLayer();
+            LayerMenu->setActive(ioh->getActiveLayer());
         }
     }
     else if (btnPress == "Move Backward")
@@ -1098,6 +1220,7 @@ void MainWindow::doSomething(string btnPress) {
     else if (btnPress == "Copy Layer")
         ioh->copyLayer();
     else if (btnPress == "Cut Layer") {
+        LayerMenu->remove(ioh->getActiveLayer());
         ioh->copyLayer();
         ioh->deleteLayer();
         if (ioh->getNumLayers() == 0)
@@ -1106,17 +1229,25 @@ void MainWindow::doSomething(string btnPress) {
     else if (btnPress == "Paste Layer") {
         ioh->pasteLayer();
         ioh->getWorkingLayer()->setSym(bh.getSymPt(), symDialog->getDiv(), symDialog->getOfEvery(), symDialog->getSkip());
-        sr->setMode(mode);
+        changeOffsets();
+        setMode(mode);
+        LayerMenu->add(ioh->getWorkingLayer());
+
     }
     else if (btnPress == "Delete Layer") {
+        LayerMenu->remove(ioh->getActiveLayer());
         ioh->deleteLayer();
-        if (ioh->getNumLayers() == 0)
+        if (ioh->getNumLayers() == 0) {
             sr->setCursor(Qt::ArrowCursor);
+            changeOffsets();
+        }
     }
     else if (btnPress == "Compile Layer")
         ioh->compileLayer();
-    else if (btnPress == "Compile Frame")
+    else if (btnPress == "Compile Frame") {
         ioh->compileFrame();
+        setMode(mode);
+    }
     else if (btnPress == "Clear Vectors")
         ioh->getWorkingLayer()->clearVectors();
     else if (btnPress == "Clear Polygons")
@@ -1134,20 +1265,31 @@ void MainWindow::doSomething(string btnPress) {
         if (ok) {
             ioh->layerFunc(lf.getChoice());
             ioh->setActiveLayer(ioh->getNumLayers() - 1, mode);
+            ioh->getWorkingLayer()->setSym(bh.getSymPt(), symDialog->getDiv(), symDialog->getOfEvery(), symDialog->getSkip());
+            changeOffsets();
+            ioh->getWorkingLayer()->render(1, progress);
+            LayerMenu->add(ioh->getWorkingLayer());
         }
     }
-    else if (btnPress == "Zoom 100%")
+    else if (btnPress == "Zoom 100%") {
         sr->setZoom(1.0);
+        changeOffsets();
+    }
     else if (btnPress == "Set Zoom") {
         bool ok = false;
         double ret = QInputDialog::getDouble(this, "Glass Opus", "Select a layer to edit", sr->getZoom(), graphics::minZoom, graphics::maxZoom, 2, &ok);
         if (ok)
             sr->setZoom(ret);
+        changeOffsets();
     }
-    else if (btnPress == "Zoom In")
+    else if (btnPress == "Zoom In") {
         sr->zoomIn();
-    else if (btnPress == "Zoom Out")
+        changeOffsets();
+    }
+    else if (btnPress == "Zoom Out") {
         sr->zoomOut();
+        changeOffsets();
+    }
     else if (btnPress == "Shape Profiler") {
         brushProlfiler->exec();
         bh.setShape(brushShapes[bh.getBrushShape()], brushProlfiler->getShapeSize(bh.getSize()));
@@ -1464,6 +1606,10 @@ void MainWindow::dropEvent(QDropEvent *event) {
                     while (resizeCheck->isVisible())
                         QCoreApplication::processEvents();
                 }
+                ioh->getWorkingLayer()->setSym(bh.getSymPt(), symDialog->getDiv(), symDialog->getOfEvery(), symDialog->getSkip());
+                changeOffsets();
+                setMode(mode);
+                LayerMenu->add(ioh->getWorkingLayer());
             }
         }
         refresh();
