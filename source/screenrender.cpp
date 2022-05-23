@@ -124,7 +124,7 @@ void screenRender::doZoom() {
     else
         fgLayers = QPixmap();
     if (!bgPrescaled.isNull())
-        bgLayers.convertFromImage(screenZoom.zoomImg(bgPrescaled));
+        bgLayers.convertFromImage(bgPrescaled);//bgLayers.convertFromImage(screenZoom.zoomImg(bgPrescaled));
     else
         bgLayers = QPixmap();
     if (!isDrawing)
@@ -163,177 +163,179 @@ void screenRender::paintEvent(QPaintEvent *event) {
         updateViews();
     if (workLayer == nullptr)
         return;
-    QPainter qp(this);
+    qi = QImage(workLayer->getRenderCanvas().size(), QImage::Format_ARGB32);
+    QPainter qp;
+    qp.begin(&qi);
     if (!bgLayers.isNull())
         qp.drawPixmap(0, 0, bgLayers);
-    qi = workLayer->getRenderCanvas();
-    alphaVal = static_cast<unsigned int>(workLayer->getAlpha()) << 24;
-    setFixedSize(screenZoom.getZoomCorrected(qi.size()));
-    int w = qi.width(), h = qi.height();
-    vector <list <Triangle> > tris = workLayer->getTriangles();
-    vector <SplineVector> vects = workLayer->getVectors();
-    vector <unsigned char> activeVects = workLayer->getActiveVectors();
-    int alpha = workLayer->getAlpha();
-    for (size_t i = 0; i < tris.size(); ++i) {
-        pair <QRgb, QRgb> colors = vects[i].getColors();
-        QColor ca = QColor (colors.first), cb = QColor(colors.second);
-        ca.setAlpha(alpha);
-        short band = vects[i].getBand(), gap = vects[i].getGap();
-        float totalTri = static_cast<float>(tris[i].size() / 2);
-        float offset = (totalTri / static_cast<float>(band + gap));
-        int styler = -static_cast<int>(((static_cast<float>(band + gap) * offset) - totalTri) / 2.0);
-        if (vects[i].getMode() == ColorFill) {
-            if (colors.first == colors.second) {
-                color = ca.rgba();
-                for (Triangle &t : tris[i]) {
-                    if (styler >= 0)
-                        fillTri(t);
-                    styler += 1;
-                    if (styler == band - 1)
-                        styler = -gap;
+    if (workLayer->isVisible()) {
+        qp.drawImage(0, 0, workLayer->getRenderCanvas());
+        alphaVal = static_cast<unsigned int>(workLayer->getAlpha()) << 24;
+        setFixedSize(screenZoom.getZoomCorrected(qi.size()));
+        int w = qi.width(), h = qi.height();
+        vector <list <Triangle> > tris = workLayer->getTriangles();
+        vector <SplineVector> vects = workLayer->getVectors();
+        vector <unsigned char> activeVects = workLayer->getActiveVectors();
+        int alpha = workLayer->getAlpha();
+        for (size_t i = 0; i < tris.size(); ++i) {
+            pair <QRgb, QRgb> colors = vects[i].getColors();
+            QColor ca = QColor (colors.first), cb = QColor(colors.second);
+            ca.setAlpha(alpha);
+            short band = vects[i].getBand(), gap = vects[i].getGap();
+            float totalTri = static_cast<float>(tris[i].size() / 2);
+            float offset = (totalTri / static_cast<float>(band + gap));
+            int styler = -static_cast<int>(((static_cast<float>(band + gap) * offset) - totalTri) / 2.0);
+            if (vects[i].getMode() == ColorFill) {
+                if (colors.first == colors.second) {
+                    color = ca.rgba();
+                    for (Triangle &t : tris[i]) {
+                        if (styler >= 0)
+                            fillTri(t);
+                        styler += 1;
+                        if (styler == band - 1)
+                            styler = -gap;
+                    }
+                }
+                else {
+                    cb.setAlpha(alpha);
+                    float ccomp = 1.0 / static_cast<float>(tris[i].size());
+                    float cnt = 0.0;
+                    for (Triangle &t : tris[i]) {
+                        float ccc = ccomp * cnt;
+                        int r = static_cast<int>((ccc * static_cast<float>(ca.red())) + ((1.0 - ccc) * static_cast<float>(cb.red())));
+                        int g = static_cast<int>((ccc * static_cast<float>(ca.green())) + ((1.0 - ccc) * static_cast<float>(cb.green())));
+                        int b = static_cast<int>((ccc * static_cast<float>(ca.blue())) + ((1.0 - ccc) * static_cast<float>(cb.blue())));
+                        color = QColor(r, g, b, alpha).rgba();
+                        if (styler >= 0)
+                            fillTri(t);
+                        styler += 1;
+                        if (styler == band - 1)
+                            styler = -gap;
+                        cnt += 1.0;
+                    }
                 }
             }
             else {
-                cb.setAlpha(alpha);
-                float ccomp = 1.0 / static_cast<float>(tris[i].size());
-                float cnt = 0.0;
+                filter = vects[i].getFilter();
                 for (Triangle &t : tris[i]) {
-                    float ccc = ccomp * cnt;
-                    int r = static_cast<int>((ccc * static_cast<float>(ca.red())) + ((1.0 - ccc) * static_cast<float>(cb.red())));
-                    int g = static_cast<int>((ccc * static_cast<float>(ca.green())) + ((1.0 - ccc) * static_cast<float>(cb.green())));
-                    int b = static_cast<int>((ccc * static_cast<float>(ca.blue())) + ((1.0 - ccc) * static_cast<float>(cb.blue())));
-                    color = QColor(r, g, b, alpha).rgba();
                     if (styler >= 0)
-                        fillTri(t);
+                        filterTri(t);
                     styler += 1;
                     if (styler == band - 1)
                         styler = -gap;
-                    cnt += 1.0;
                 }
             }
         }
-        else {
-            filter = vects[i].getFilter();
-            for (Triangle &t : tris[i]) {
-                if (styler >= 0)
+        int symCreate = workLayer->symActive();
+        vector <Polygon> gons = workLayer->getPolgons();
+        vector <unsigned char> activeGons = workLayer->getActiveGons();
+        int index = 0;
+        for (Polygon gon : gons) {
+            list <Triangle> tris = gon.getTris();
+            vector <QPoint> pts = gon.getPts();
+            color = gon.getPolyColor();
+            if (gon.getPolyMode() == ColorGon && color >= 0x01000000)
+                for (Triangle &t : tris)
+                    fillTri(t);
+            else if (gon.getPolyMode() == FilterGon) {
+                filter = gon.getFilter();
+                for (Triangle &t : tris)
                     filterTri(t);
-                styler += 1;
-                if (styler == band - 1)
-                    styler = -gap;
             }
-        }
-    }
-    int symCreate = workLayer->symActive();
-    vector <Polygon> gons = workLayer->getPolgons();
-    vector <unsigned char> activeGons = workLayer->getActiveGons();
-    int index = 0;
-    qp.end();
-    qp.begin(&qi);
-    for (Polygon gon : gons) {
-        list <Triangle> tris = gon.getTris();
-        vector <QPoint> pts = gon.getPts();
-        color = gon.getPolyColor();
-        if (gon.getPolyMode() == ColorGon && color >= 0x01000000)
-            for (Triangle &t : tris)
-                fillTri(t);
-        else if (gon.getPolyMode() == FilterGon) {
-            filter = gon.getFilter();
-            for (Triangle &t : tris)
-                filterTri(t);
-        }
-        int edgeSize = gon.getEdgeSize();
-        if (edgeSize != 0) {
-            bool dispDivs = gon.getShowDivs();
-            qp.setPen(QPen(QColor(gon.getEdgeColor()), edgeSize, Qt::SolidLine, Qt::RoundCap));
-            QVector <QLine> lines;
-            if (dispDivs) {
-                for (Triangle &t : tris) {
-                    qp.drawLine(t.a, t.b);
-                    qp.drawLine(t.a, t.c);
-                    qp.drawLine(t.c, t.b);
+            int edgeSize = gon.getEdgeSize();
+            if (edgeSize != 0) {
+                bool dispDivs = gon.getShowDivs();
+                qp.setPen(QPen(QColor(gon.getEdgeColor()), edgeSize, Qt::SolidLine, Qt::RoundCap));
+                QVector <QLine> lines;
+                if (dispDivs) {
+                    for (Triangle &t : tris) {
+                        qp.drawLine(t.a, t.b);
+                        qp.drawLine(t.a, t.c);
+                        qp.drawLine(t.c, t.b);
+                    }
                 }
-            }
-            else {
-                if (pts.size() >= 2) {
-                    for (int i = 1; i < pts.size(); ++i)
-                        lines.push_back(QLine(pts[i - 1], pts[i]));
-                    lines.push_back(QLine(pts[0], pts[pts.size() - 1]));
+                else {
+                    if (pts.size() >= 2) {
+                        for (int i = 1; i < pts.size(); ++i)
+                            lines.push_back(QLine(pts[i - 1], pts[i]));
+                        lines.push_back(QLine(pts[0], pts[pts.size() - 1]));
+                    }
                 }
+                qp.drawLines(lines);
             }
-            qp.drawLines(lines);
+            ++index;
         }
-        ++index;
-    }
-    vector <DrawText> texts = workLayer->getTexts();
-    vector <unsigned char> activeTexts = workLayer->getActiveTexts();
-    for (DrawText &dt : texts) {
-        qp.setPen(QPen(dt.getColor(), 1));
-        qp.setFont(dt.getFont());
-        qp.setTransform(dt.getTransform());
-        qp.drawStaticText(0, 0, dt.getText());
-    }
-    if (mode == Polygon_Mode && samplePoint != QPoint(-1000, -1000)) {
-        qp.setPen(QPen(QColor(128, 128, 128), 5));
-        qp.drawEllipse(samplePoint, samplePoint.x() - 2, samplePoint.y() - 2);
-    }
-    qp.end();
-    list <vector<QPoint>> ptsToDraw;
-    if (mode == Polygon_Mode)
-        for (unsigned char i : activeGons)
-            ptsToDraw.push_back(gons[i].getPts());
-    else if (mode == Spline_Mode) {
-        if (activeVects.size() > 0) {
-            for (unsigned char i = 0; i < static_cast<unsigned char>(symCreate ? 1 : activeVects.size()); ++i)
-                ptsToDraw.push_back(vects[activeVects[i]].getControls());
+        vector <DrawText> texts = workLayer->getTexts();
+        vector <unsigned char> activeTexts = workLayer->getActiveTexts();
+        for (DrawText &dt : texts) {
+            qp.setPen(QPen(dt.getColor(), 1));
+            qp.setFont(dt.getFont());
+            qp.setTransform(dt.getTransform());
+            qp.drawStaticText(0, 0, dt.getText());
         }
-    }
-    else if (mode == Text_Mode)
-        for (unsigned char i : activeTexts)
-            ptsToDraw.push_back(vector<QPoint>(1, texts[i].getShowPoint()));
-    else if (mode == Raster_Mode)
-        ptsToDraw.push_back(workLayer->getRasterEdges());
-    ptsToDraw.push_back(vector<QPoint>(1, samplePoint));
-    for (vector <QPoint> &pts : ptsToDraw) {
-        for (QPoint pt : pts) {
-            for (int j = max(0, pt.y() - ptSize); j <= min(pt.y() + ptSize, h - 1); ++j) {
-                QRgb *line = reinterpret_cast<QRgb *>(qi.scanLine(j));
-                for (int i = max(pt.x() - ptSize, 0); i <= min(pt.x() + ptSize, w - 1); ++i) {
-                    int dist = abs(i - pt.x()) + abs(j - pt.y());
-                    if ((flashFlag || dist >= ptSize - 1) && dist <= ptSize) {
-                        QRgb c = line[i];
-                        if (!(c & 0xFF000000))
-                            c = 0xFFFFFFFF;
-                        else
-                            c |= 0xFF000000;
-                        line[i] = graphics::Filtering::negative(graphics::Filtering::polarize(c, 128), 255);
+        if (mode == Polygon_Mode && samplePoint != QPoint(-1000, -1000)) {
+            qp.setPen(QPen(QColor(128, 128, 128), 5));
+            qp.drawEllipse(samplePoint, samplePoint.x() - 2, samplePoint.y() - 2);
+        }
+        list <vector<QPoint>> ptsToDraw;
+        if (mode == Polygon_Mode)
+            for (unsigned char i : activeGons)
+                ptsToDraw.push_back(gons[i].getPts());
+        else if (mode == Spline_Mode) {
+            if (activeVects.size() > 0) {
+                for (unsigned char i = 0; i < static_cast<unsigned char>(symCreate ? 1 : activeVects.size()); ++i)
+                    ptsToDraw.push_back(vects[activeVects[i]].getControls());
+            }
+        }
+        else if (mode == Text_Mode)
+            for (unsigned char i : activeTexts)
+                ptsToDraw.push_back(vector<QPoint>(1, texts[i].getShowPoint()));
+        else if (mode == Raster_Mode)
+            ptsToDraw.push_back(workLayer->getRasterEdges());
+        ptsToDraw.push_back(vector<QPoint>(1, samplePoint));
+        for (vector <QPoint> &pts : ptsToDraw) {
+            for (QPoint pt : pts) {
+                for (int j = max(0, pt.y() - ptSize); j <= min(pt.y() + ptSize, h - 1); ++j) {
+                    QRgb *line = reinterpret_cast<QRgb *>(qi.scanLine(j));
+                    for (int i = max(pt.x() - ptSize, 0); i <= min(pt.x() + ptSize, w - 1); ++i) {
+                        int dist = abs(i - pt.x()) + abs(j - pt.y());
+                        if ((flashFlag || dist >= ptSize - 1) && dist <= ptSize) {
+                            QRgb c = line[i];
+                            if (!(c & 0xFF000000))
+                                c = 0xFFFFFFFF;
+                            else
+                                c |= 0xFF000000;
+                            line[i] = graphics::Filtering::negative(graphics::Filtering::polarize(c, 128), 255);
+                        }
                     }
                 }
             }
         }
-    }
-    if (underMouse() && hoverActive && mode == Brush_Mode && hoverLock.try_lock()) {
-        QPoint qp = brushLoc;
-        brushLoc = QPoint(brushLoc.x() + 1, brushLoc.y() + 7);
-        int x = brushLoc.x() < radius ? radius - brushLoc.x() - 1 : 0, yStarter = brushLoc.y() < radius ? radius - brushLoc.y() : 0;
-        for (int i = max(0, brushLoc.x() - radius); i <= min(qi.width() - 1, brushLoc.x() + radius + (brushLoc.x() < radius ? 1 : 0)); ++i) {
-            int y = yStarter;
-            for (int j = max(0, brushLoc.y() - radius); j <= min(qi.height() - 1, brushLoc.y() + radius); ++j) {
-                if (hoverMap[x][y] == 1) {
-                    QRgb c = qi.pixel(i, j);
-                    if (!(c & 0xFF000000))
-                        c = 0xFFFFFFFF;
-                    else
-                        c |= 0xFF000000;
-                    qi.setPixel(i, j, graphics::Filtering::negative(graphics::Filtering::polarize(c, 128), 255));
+        if (underMouse() && hoverActive && mode == Brush_Mode && hoverLock.try_lock()) {
+            QPoint qp = brushLoc;
+            brushLoc = QPoint(brushLoc.x() + 1, brushLoc.y() + 7);
+            int x = brushLoc.x() < radius ? radius - brushLoc.x() - 1 : 0, yStarter = brushLoc.y() < radius ? radius - brushLoc.y() : 0;
+            for (int i = max(0, brushLoc.x() - radius); i <= min(qi.width() - 1, brushLoc.x() + radius + (brushLoc.x() < radius ? 1 : 0)); ++i) {
+                int y = yStarter;
+                for (int j = max(0, brushLoc.y() - radius); j <= min(qi.height() - 1, brushLoc.y() + radius); ++j) {
+                    if (hoverMap[x][y] == 1) {
+                        QRgb c = qi.pixel(i, j);
+                        if (!(c & 0xFF000000))
+                            c = 0xFFFFFFFF;
+                        else
+                            c |= 0xFF000000;
+                        qi.setPixel(i, j, graphics::Filtering::negative(graphics::Filtering::polarize(c, 128), 255));
+                    }
+                    ++y;
                 }
-                ++y;
+                ++x;
             }
-            ++x;
+            hoverLock.unlock();
+            brushLoc = qp;
         }
-        hoverLock.unlock();
-        brushLoc = qp;
+        graphics::ImgSupport::applyAlpha(&qi, &yStart, &yEnd, &alphaVal);
     }
-    graphics::ImgSupport::applyAlpha(&qi, &yStart, &yEnd, &alphaVal);
+    qp.end();
     qp.begin(this);
     qp.drawImage(0, 0, screenZoom.zoomImg(qi));
     if (fgVisible && !fgLayers.isNull())

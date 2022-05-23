@@ -148,6 +148,8 @@ public:
     void setVisibility(bool vis);
     bool isVisible();
 
+    bool hasFilterItems();
+
 
     Filter filter;
 
@@ -175,7 +177,7 @@ private:
     QImage *qi, alphaLayer, rasterselectOg, rendered;
     float ipolPts, limiter = ipolMin, limitCnt = 2.0, postAngle;
     int alpha;
-    bool shiftFlag, selectOgActive, selecting, symCreate, dragDraw, addOrSub, visible;
+    bool shiftFlag, selectOgActive, selecting, symCreate, dragDraw, addOrSub, visible, hasFiltItems;
     QPoint deltaMove, boundPt1, boundPt2, rotateAnchor;
     QPoint symPt;
     int symDiv, symOfEvery, symSkip;
@@ -183,13 +185,13 @@ private:
 };
 
 
-static void renderLayer(QProgressDialog *qpd, QImage *toProcess, Layer *layer);
-static void calcLine(SplineVector sv, list <Triangle> *tris);
-static void fillTri(QImage *toProcess, Triangle t, QRgb color);
-static void filterTri(QImage *toProcess, Triangle t, Filter f);
-static void fillBTri(QImage *toProcess, QPoint a, QPoint b, QPoint c, QRgb color);
-static void fillTTri(QImage *toProcess, QPoint a, QPoint b, QPoint c, QRgb color);
-static void filterBTri(QImage *toProcess, QPoint a, QPoint b, QPoint c, Filter f);
-static void filterTTri(QImage *toProcess, QPoint a, QPoint b, QPoint c, Filter f);
+void renderLayer(QProgressDialog *qpd, QImage *toProcess, Layer *layer);
+void calcLine(SplineVector sv, list <Triangle> *tris);
+void fillTri(QImage *toProcess, Triangle t, QRgb color);
+void filterTri(QImage *toProcess, Triangle t, Filter f);
+void fillBTri(QImage *toProcess, QPoint a, QPoint b, QPoint c, QRgb color);
+void fillTTri(QImage *toProcess, QPoint a, QPoint b, QPoint c, QRgb color);
+void filterBTri(QImage *toProcess, QPoint a, QPoint b, QPoint c, Filter f);
+void filterTTri(QImage *toProcess, QPoint a, QPoint b, QPoint c, Filter f);
 
 #endif // LAYER_H

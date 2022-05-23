@@ -423,7 +423,10 @@ void SidePanel::mouseDoubleClickEvent(QMouseEvent *event) {
 }
 
 void SidePanel::setActive(int layer) {
-    tabs[activeLayer]->setActive(false);
+    for (int i = 0; i < layer; ++i)
+        tabs[i]->setActive(false);
+    for (int i = layer + 1; i < tabs.size(); ++i)
+        tabs[i]->setActive(false);
     tabs[layer]->setActive(true);
     activeLayer = layer;
 }

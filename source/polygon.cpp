@@ -6,7 +6,7 @@ Polygon::Polygon() {
     pColor = 0xFF000000;
     pm = ColorGon;
     showDivs = false;
-    f.setFilter("Negative");
+    f.setFilter("Greyscale");
 }
 
 Polygon::Polygon(const Polygon &gon) {

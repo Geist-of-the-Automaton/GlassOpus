@@ -26,6 +26,7 @@ void DataIOHandler::compileFrame() {
     progress->setLabelText("Compiling Frame");
     renderFrame(progress, &qi, frame);
     *frame[0] = Layer(qi, 255);
+    //either just set canvas or use old active layer's editing mode through method
     setActiveLayer(0, Brush_Mode);
     while (frame.size() > 1) {
         delete frame.back();
@@ -52,9 +53,16 @@ void DataIOHandler::renderFrame(QProgressDialog *fqpd, QImage *ret, vector <Laye
     QPainter qp;
     qp.begin(ret);
     for (Layer *layer : layers) {
-        if (layer->isVisible())
-            qp.drawImage(0, 0, layer->render());
-        qp.drawImage(0, 0, layer->render());
+        if (layer->isVisible()) {
+            if (layer->hasFilterItems()) {
+                qp.drawImage(0, 0, layer->getRenderCanvas());
+                qp.end();
+                renderLayer(nullptr, ret, layer);
+                qp.begin(ret);
+            }
+            else
+                qp.drawImage(0, 0, layer->render());
+        }
         fqpd->setValue(++progressMarker);
     }
     qp.end();
@@ -186,8 +194,14 @@ QImage DataIOHandler::getBackground() {
     p.begin(&qi);
     for (size_t i = 0; i < activeLayer; ++i) {
         if (frame[i]->isVisible()) {
-            QImage temp = frame[i]->render();
-            p.drawImage(0, 0, temp);
+            if (frame[i]->hasFilterItems()) {
+                p.drawImage(0, 0, frame[i]->getRenderCanvas());
+                p.end();
+                renderLayer(nullptr, &qi, frame[i]);
+                p.begin(&qi);
+            }
+            else
+                p.drawImage(0, 0, frame[i]->render());
         }
         progress->setValue(static_cast<int>(i + 1));
         QCoreApplication::processEvents();
@@ -212,8 +226,14 @@ QImage DataIOHandler::getForeground() {
     p.begin(&qi);
     for (size_t i = activeLayer + 1; i < frame.size(); ++i) {
         if (frame[i]->isVisible()) {
-            QImage temp = frame[i]->render();
-            p.drawImage(0, 0, temp);
+            if (frame[i]->hasFilterItems()) {
+                p.drawImage(0, 0, frame[i]->getRenderCanvas());
+                p.end();
+                renderLayer(nullptr, &qi, frame[i]);
+                p.begin(&qi);
+            }
+            else
+                p.drawImage(0, 0, frame[i]->render());
         }
         progress->setValue(static_cast<int>(i + 1));
         QCoreApplication::processEvents();

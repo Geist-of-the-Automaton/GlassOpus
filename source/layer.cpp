@@ -158,9 +158,26 @@ QImage Layer::render(int rerender, QProgressDialog *progress) {
         QImage img = getRenderCanvas();
         renderLayer(progress, &img, this);
         rendered = img;
+        bool flag = false;
+        for (SplineVector &sv : vects)
+            if (sv.getMode() == Filtered) {
+                flag = true;
+                break;
+            }
+        if (!false)
+            for (Polygon &gon : gons)
+                if (gon.getPolyMode() == FilterGon) {
+                    flag = true;
+                    break;
+                }
+        hasFiltItems = flag;
         emit(Layer::viewUpdated());
     }
     return rendered;
+}
+
+bool Layer::hasFilterItems() {
+    return hasFiltItems;
 }
 
 vector <QPoint> Layer::getRasterEdges() {
@@ -1746,6 +1763,7 @@ void renderLayer(QProgressDialog *qpd, QImage *toProcess, Layer *layer) {
         qpd->setValue(qpd->value() + 1);
         QCoreApplication::processEvents();
     }
+    filter = layer->getFilter();
     filter.applyTo(toProcess);
     *toProcess = toProcess->convertToFormat(QImage::Format_ARGB32);
     unsigned int alphaVal = static_cast<unsigned int>(alpha) << 24;
@@ -1756,7 +1774,6 @@ void renderLayer(QProgressDialog *qpd, QImage *toProcess, Layer *layer) {
             if (line[x] & 0xFF000000)
                 line[x] = alphaVal | (line[x] & 0x00FFFFFF);
         ++yStart;
-        //--*yStart&=++*yStart+++!ys;     // gross
     }
     if (qpd != nullptr) {
         qpd->close();
