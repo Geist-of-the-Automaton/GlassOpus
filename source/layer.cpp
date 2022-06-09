@@ -14,6 +14,7 @@ Layer::Layer() {
     symDiv = 1;
     symOfEvery = 1;
     symSkip = 0;
+    symCreate = false;
     visible = true;
 }
 
@@ -31,6 +32,7 @@ Layer::Layer(QSize qs) {
     symDiv = 1;
     symOfEvery = 1;
     symSkip = 0;
+    symCreate = false;
     visible = true;
 }
 
@@ -48,6 +50,7 @@ Layer::Layer(QImage in, int alphaValue) {
     symDiv = 1;
     symOfEvery = 1;
     symSkip = 0;
+    symCreate = false;
     visible = true;
 }
 
@@ -80,6 +83,7 @@ Layer& Layer::operator=(const Layer &layer) {
     symSkip = layer.symSkip;
     symOfEvery = layer.symOfEvery;
     symPt = layer.symPt;
+    symCreate = layer.symCreate;
     visible = layer.visible;
     return *this;
 }
@@ -1065,19 +1069,17 @@ void Layer::widthDown() {
 }
 
 void Layer::setVectorColor1(QRgb a) {
-    if (activeVects.size() == 1 && !symCreate)
+    if (activeVects.size() > 1 && !symCreate)
         return;
     for (unsigned char i : activeVects)
         vects[i].setColor1(a);
-    calcLine();
 }
 
 void Layer::setVectorColor2(QRgb b) {
-    if (activeVects.size() == 1 && !symCreate)
+    if (activeVects.size() > 1 && !symCreate)
         return;
     for (unsigned char i : activeVects)
         vects[i].setColor2(b);
-    calcLine();
 }
 
 pair <QRgb, QRgb> Layer::getVectorColors() {

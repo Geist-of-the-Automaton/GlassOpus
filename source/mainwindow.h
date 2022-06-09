@@ -61,6 +61,11 @@
 #include <magicwanddialog.h>
 #include <layerfunc.h>
 #include <sidepanel.h>
+#include <brushpanel.h>
+#include <vectpanel.h>
+#include <polypanel.h>
+#include <rasterpanel.h>
+#include <textpanel.h>
 #include <Windows.h>
 
 using std::string;
@@ -163,10 +168,11 @@ private:
     void createDocImgs();
     void setMode(EditMode emode);
     void changeOffsets();
+    void setupDock(QDockWidget *qdw, viewScroller *vsw, QWidget *qw);
 
     Ui::MainWindow *ui;
     screenRender *sr;
-    viewScroller *vs;
+    viewScroller *vs, *objScroller, *brushScroller, *vectScroller, *polyScroller, *rasterScroller, *textScroller;
     EditMode mode;
     bool shiftFlag, ctrlFlag, onePress, altFlag;
     MouseButton lastButton;
@@ -197,7 +203,13 @@ private:
     QToolBar *toolbar;
     QMenuBar *menubar;
     SidePanel *LayerMenu;
-    QDockWidget *objDetails;
+    QDockWidget *objDetails, *brushDetails, *vectDetails, *polyDetails, *rasterDetails, *textDetails, *statBarTest;
+    BrushPanel *brushPanel;
+    VectPanel *vectPanel;
+    PolyPanel *polyPanel;
+    RasterPanel *rasterPanel;
+    TextPanel *textPanel;
+
 
 };
 

@@ -6,7 +6,7 @@ HistoDialog::HistoDialog(QWidget *parent) :
     ui(new Ui::HistoDialog)
 {
     ui->setupUi(this);
-    setWindowTitle("Dither Selection");
+    setWindowTitle("Histograms");
     connect(ui->qcb1, SIGNAL(currentIndexChanged(int)), this, SLOT(process()));
     connect(ui->qcb2, SIGNAL(currentIndexChanged(int)), this, SLOT(process()));
     connect(ui->qcb3, SIGNAL(currentIndexChanged(int)), this, SLOT(matchChanged()));
@@ -21,7 +21,7 @@ void HistoDialog::setWork(QImage *toProcess) {
     //processed = qi->scaled(qi->width() / 3, qi->height() / 3, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
     //proDisp = processed.copy();
     ui->qcb3->setEnabled(false);
-    for (int i = 0; i < 3; ++i)
+    for (int i = 0; i < 4; ++i)
         histos[i] = graphics::Color::Histogram(qi, graphics::eType(i));
     ui->label->setPixmap(QPixmap::fromImage(histos[0]));
 }

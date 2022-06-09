@@ -41,6 +41,8 @@ brushHandler::~brushHandler() {
 }
 
 void brushHandler::setAppMethod(string type) {
+    if (method == appMethod::filter)
+        setStrength(255);
     resetPoint();
     int i = 0;
     for (i = 0; i < numMethods; ++i)
@@ -49,6 +51,8 @@ void brushHandler::setAppMethod(string type) {
     if (i == numMethods)
         i = 0;
     method = appMethod(i);
+    if (method == appMethod::filter)
+        setStrength(graphics::filterPresets[brushFilter.getFilterIndex()]);
 }
 
 void brushHandler::setFilter(string filterName) {
@@ -142,14 +146,6 @@ void brushHandler::strengthDown() {
 
 int brushHandler::getStength() {
     return strength;
-}
-
-int brushHandler::getFilterStrength() {
-    return brushFilter.getStrength();
-}
-
-void brushHandler::setFilterStrength(int val) {
-    brushFilter.setStrength(val);
 }
 
 void brushHandler::setSize(int size) {

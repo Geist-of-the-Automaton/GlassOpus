@@ -28,6 +28,7 @@ HEADERS = \
     $$PWD/brushShape.h\
     $$PWD/patternprofiler.h \
     brightnessadj.h \
+    brushpanel.h \
     contrastadj.h \
     ditherdialog.h \
     drawtext.h \
@@ -40,12 +41,16 @@ HEADERS = \
     layerfunc.h \
     magicwanddialog.h \
     polygon.h \
+    polypanel.h \
+    rasterpanel.h \
     saturationadj.h \
     sidepanel.h \
     symdialog.h \
     targettool.h \
+    textpanel.h \
     transferdialog.h \
     ui_brightnessadj.h \
+    ui_brushpanel.h \
     ui_contrastadj.h \
     ui_ditherdialog.h \
     ui_filterdialog.h \
@@ -55,11 +60,16 @@ HEADERS = \
     ui_kerneldialog.h \
     ui_layerfunc.h \
     ui_magicwanddialog.h \
+    ui_polypanel.h \
+    ui_rasterpanel.h \
     ui_saturationadj.h \
     ui_symdialog.h \
     ui_targetdialog.h \
+    ui_textpanel.h \
     ui_transfer.h \
-    vec_mat_maths.h
+    ui_vectpanel.h \
+    vec_mat_maths.h \
+    vectpanel.h
 
 SOURCES = \
     $$PWD/brush.cpp \
@@ -80,6 +90,7 @@ SOURCES = \
     $$PWD/brushShape.cpp\
     $$PWD/patternprofiler.cpp \
     brightnessadj.cpp \
+    brushpanel.cpp \
     contrastadj.cpp \
     ditherdialog.cpp \
     drawtext.cpp \
@@ -92,11 +103,15 @@ SOURCES = \
     layerfunc.cpp \
     magicwanddialog.cpp \
     polygon.cpp \
+    polypanel.cpp \
+    rasterpanel.cpp \
     saturationadj.cpp \
     sidepanel.cpp \
     symdialog.cpp \
     targettool.cpp \
-    transferdialog.cpp
+    textpanel.cpp \
+    transferdialog.cpp \
+    vectpanel.cpp
 
 # Default rules for deployment
 qnx: target.path = /tmp/$${TARGET}/bin

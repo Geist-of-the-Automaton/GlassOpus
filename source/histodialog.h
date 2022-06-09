@@ -30,7 +30,7 @@ private slots:
 private:
     Ui::HistoDialog *ui;
     QImage *qi, processed, toMatch;
-    QImage histos[3];
+    QImage histos[4];
 
 };
 

@@ -516,15 +516,20 @@ void graphics::Color::ditherRandom(QImage *qi, int bpp) {
 }
 
 void graphics::Color::paletteReduction(QImage *qi, int bpp) {
+    long time = stdFuncs::getTime();
     int bitShift = 8 - bpp;
-    for (int i = 0; i < qi->width(); ++i)
-        for (int j = 0; j < qi->height(); ++j) {
-            QColor qc = qi->pixelColor(i, j);
+    for (int j = 0; j < qi->height(); ++j) {
+        QRgb *line = reinterpret_cast<QRgb *>(qi->scanLine(j));
+        for (int i = 0; i < qi->width(); ++i) {
+            QColor qc = line[i];
             int r = (qc.red() >> bitShift) << bitShift;
             int g = (qc.green() >> bitShift) << bitShift;
             int b = (qc.blue() >> bitShift) << bitShift;
-            qi->setPixelColor(i, j, QColor(r, g, b, qc.alpha()));
+            line[i] = QColor(r, g, b, qc.alpha()).rgba();
+            //qi->setPixelColor(i, j, QColor(r, g, b, qc.alpha()));
         }
+    }
+    cout << "processing took " << stdFuncs::getTime(time) << endl;
 }
 
 void graphics::Color::ditherFloydSteinberg(QImage *qi, int bpp) {
@@ -741,7 +746,9 @@ void graphics::Color::colorTransfer(QImage *to, QImage from, tType type) {
         for (int j = 0; j < ht; ++j) {
             QColor qc = to->pixelColor(i, j);
             vec4 color = vec4(qc.redF(), qc.greenF(), qc.blueF());
-            if (type == LAB) {
+            if (type == CIELAB)
+                color = rgb2lab(qc);
+            else if (type == HunterLAB) {
                 color = rgb2lms * color;
                 if (color._L == 0.0)
                     color._L = 1.0 / 10000000.0;
@@ -783,7 +790,9 @@ void graphics::Color::colorTransfer(QImage *to, QImage from, tType type) {
         for (int j = 0; j < hs; ++j) {
             QColor qc = from.pixelColor(i, j);
             vec4 color = vec4(qc.redF(), qc.greenF(), qc.blueF());
-            if (type == LAB) {
+            if (type == CIELAB)
+                color = rgb2lab(qc);
+            else if (type == HunterLAB) {
                 color = rgb2lms * color;
                 if (color._L == 0.0)
                     color._L = 1.0 / 10000000.0;
@@ -822,7 +831,9 @@ void graphics::Color::colorTransfer(QImage *to, QImage from, tType type) {
             labImg[i][j]._A = (labImg[i][j]._A - amt) * ar + ams;
             labImg[i][j]._B = (labImg[i][j]._B - bmt) * br + bms;
             vec4 color = labImg[i][j];
-            if (type == LAB) {
+            if (type == CIELAB)
+                color = lab2rgb(color);
+            else if (type == HunterLAB) {
                 color = lab2lms * color;
                 color._L = pow(10.0, color._L);
                 color._A = pow(10.0, color._A);
@@ -835,6 +846,83 @@ void graphics::Color::colorTransfer(QImage *to, QImage from, tType type) {
             qc.setBlueF(stdFuncs::clamp(color._B, 0.0, 1.0));
             to->setPixelColor(i, j, qc);
         }
+}
+
+vec4 graphics::Color::rgb2lab(QColor qc) {
+    // D65/2°
+    float xyzRef[3] = {95.047f, 100.0f, 108.883f};
+    // rgb to xyz
+    float rgb[3] = {tof(qc.redF()), tof(qc.greenF()), tof(qc.blueF())};
+    for (unsigned char i = 0; i < 3; ++i) {
+        if (rgb[i] > 0.04045f)
+            rgb[i] = pow((rgb[i] + 0.055f) / 1.055f, 2.4f);
+        else
+            rgb[i] /= 12.92f;
+        rgb[i] *= 100.0f;
+    }
+    float xyz[3] = {0.0f};
+    xyz[0] = 0.4124f * rgb[0] + 0.3576f * rgb[1] + 0.1805f * rgb[2];
+    xyz[1] = 0.2126f * rgb[0] + 0.7152f * rgb[1] + 0.0722f * rgb[2];
+    xyz[2] = 0.0193f * rgb[0] + 0.1192f * rgb[1] + 0.9505f * rgb[2];
+    // xyz to lab
+    for (unsigned char i = 0; i < 3; ++i) {
+        xyz[i] /= xyzRef[i];
+        if (xyz[i] > 0.008856f)
+            xyz[i] = pow(xyz[i], 1.0f / 3.0f);
+        else
+            xyz[i] = (7.787f * xyz[i]) + 16.0f / 116.0f;
+    }
+    return vec4({116.0f * xyz[1] - 16.0f, 500.0f * (xyz[0] - xyz[1]), 200.0f * (xyz[1] - xyz[2])});
+}
+
+vec4 graphics::Color::getLabScaled(vec4 lab) {
+    vec4 ret = lab;
+    for (unsigned char i = 0; i < 3; ++i)
+        ret.xyzw[i] = scalesLAB[i] * (ret[i] - minsLAB[i]);
+    return ret;
+}
+
+vec4 graphics::Color::getLabDescaled(vec4 lab) {
+    vec4 ret = lab;
+    for (unsigned char i = 0; i < 3; ++i)
+        ret.xyzw[i] = ret[i] / scalesLAB[i] + minsLAB[i];
+    return ret;
+}
+
+vec4 graphics::Color::lab2rgb(vec4 lab) {
+    // D65/2°
+    float xyzRef[3] = {95.047f, 100.0f, 108.883f};
+    // lab to xyz
+    float xyz[3] = {0.0f};
+    xyz[1] = (lab[0] + 16.0f) / 116.0f;
+    xyz[0] = lab[1] / 500.0f + xyz[1];
+    xyz[2] = xyz[1] - lab[2] / 200.0f;
+    for (unsigned char i = 0; i < 3; ++i) {
+        if (pow(xyz[i], 3.0f) > 0.008856f)
+            xyz[i] = pow(xyz[i], 3.0f);
+        else
+            xyz[i] = (xyz[i] - 16.0f / 116.0f) / 7.787f;
+        xyz[i] *= xyzRef[i];
+    }
+    // xyz to rgb
+    float rgb[3] = {0.0f};
+    rgb[0] = xyz[0] *  3.2406f + xyz[1] * -1.5372f + xyz[2] * -0.4986f;
+    rgb[1] = xyz[0] * -0.9689f + xyz[1] *  1.8758f + xyz[2] *  0.0415f;
+    rgb[2] = xyz[0] *  0.0557f + xyz[1] * -0.2040f + xyz[2] *  1.0570f;
+    for (unsigned char i = 0; i < 3; ++i) {
+        rgb[i] /= 100.0f;
+        if (rgb[i] > 0.0031308f)
+            rgb[i] = 1.055f * pow(rgb[i], 1.0f / 2.4f) - 0.055f;
+        else
+            rgb[i] *= 12.92f;
+    }
+    return rgb;
+}
+
+QColor graphics::Color::toQColor(vec4 rgb) {
+    QColor qc;
+    qc.setRgbF(stdFuncs::clamp(rgb[0], 0.0, 1.0), stdFuncs::clamp(rgb[1], 0.0, 1.0), stdFuncs::clamp(rgb[2], 0.0, 1.0));
+    return qc;
 }
 
 graphics::ImgSupport::ImgSupport() {
@@ -961,14 +1049,13 @@ KernelData graphics::ImgSupport::loadKernel(string fileName) {
     return ret;
 }
 
-void graphics::ImgSupport::applyAlpha(QImage *qi, int *yStart, int *yEnd, unsigned int *alpha) {
-    int ys = *yStart, ye = *yEnd;
-    unsigned int a = *alpha;
-    while (ys < ye) {
+void graphics::ImgSupport::applyAlpha(QImage *qi, int yStart, int yEnd, unsigned int alpha) {
+    int ys = yStart;
+    while (ys < yEnd) {
         QRgb *line = reinterpret_cast<QRgb *>(qi->scanLine(ys));
         for (int x = 0; x < qi->width(); ++x)
             if (line[x] & 0xFF000000)
-                line[x] = a | (line[x] & 0x00FFFFFF);
+                line[x] = alpha | (line[x] & 0x00FFFFFF);
         ++ys;
         //--*yStart&=++*yStart+++!ys;     // gross
     }
@@ -999,10 +1086,15 @@ QImage graphics::Color::Histogram(QImage *in, eType type) {
                     ++histo[1][static_cast<int>(255.0 * qc.hsvSaturationF())];
                     ++histo[2][static_cast<int>(255.0 * qc.valueF())];
                 }
-                else {
+                else if (type == HSL) {
                     ++histo[0][static_cast<int>(255.0 * static_cast<float>(qc.hslHue() + 1.0) / 360.0)];
                     ++histo[1][static_cast<int>(255.0 * qc.hslSaturationF())];
                     ++histo[2][static_cast<int>(255.0 * qc.lightnessF())];
+                }
+                else if (type == LAB) {
+                    vec4 color = getLabScaled(rgb2lab(qc));
+                    for (int i = 0; i < 3; ++i)
+                        ++histo[i][static_cast<int>(color[i])];
                 }
                 ++total;
             }
@@ -1042,7 +1134,13 @@ QImage graphics::Color::Histogram(QImage *in, eType type) {
                 qc.setHslF(0.3, static_cast<float>(x) / fbins, 0.5);
                 color = qc.rgba();
             }
-            else if ((type == RGB && j == 0) || (type != RGB && j == 2))
+            else if (type == LAB && j != 0) {
+                if (j == 1)
+                    color = QColor(x, 255 - x, 0).rgba();
+                else if (j == 2)
+                    color = QColor (255 - x, 255 - x, x).rgba();
+            }
+            else if (((type == RGB || type == LAB) && j == 0) || (type != RGB && j == 2))
                 for (unsigned char i= 0; i < 3; ++i)
                     color += value << (8 * i);
             int rowOffset = (h / 2) * (j / 2);
@@ -1070,8 +1168,13 @@ void graphics::Color::equalizeHistogramTo(QImage *qi, eType type) {
                 img[i][j] = vec4(qc.hsvHueF(), qc.hsvSaturationF(), qc.valueF());
             else if (type == HSL)
                 img[i][j] = vec4(qc.hslHueF(), qc.hslSaturationF(), qc.lightnessF());
-            else
+            else if (type == RGB)
                 img[i][j] = vec4(qc.redF(), qc.greenF(), qc.blueF());
+            else {
+                img[i][j] = getLabScaled(rgb2lab(qc));
+                img[i][j] /= 255.0;
+            }
+
         }
     //normalize into 0-255 range
     int histo[bins];
@@ -1086,8 +1189,10 @@ void graphics::Color::equalizeHistogramTo(QImage *qi, eType type) {
                 float vf;
                 if (type == RGB)
                     vf = (img[x][y][0] + img[x][y][1] + img[x][y][2]) / 3.0;
-                else
+                else if (type == HSV || type == HSL)
                     vf = img[x][y][2];
+                else
+                    vf = img[x][y][0];
                 value = static_cast<int>(vf * static_cast<float>(bins - 1) + 0.4);
                 value = stdFuncs::clamp(value, 0, bins - 1);
                 ++total;
@@ -1126,14 +1231,24 @@ void graphics::Color::equalizeHistogramTo(QImage *qi, eType type) {
                     img[x][y].set(1, static_cast<float>(lut[c2]) / 255.0);
                     img[x][y].set(2, static_cast<float>(lut[c3]) / 255.0);
                 }
+                if (type == LAB) {
+                    float vf = img[x][y][0];
+                    value = static_cast<int>(vf * static_cast<float>(bins - 1) + 0.4);
+                    stdFuncs::clamp(value, 0, bins - 1);
+                    vf = static_cast<float>(lut[value]) / 255.0;
+                    img[x][y].xyzw[0] = vf;
+                    img[x][y] *= 255.0;
+                }
                 QColor qc = qi->pixelColor(x, y);
                 float a = qc.alphaF();
                 if (type == HSV)
                     qc.setHsvF(img[x][y][0], img[x][y][1], img[x][y][2], a);
                 else if (type == HSL)
                     qc.setHslF(img[x][y][0], img[x][y][1], img[x][y][2], a);
-                else
+                else if (type == RGB)
                     qc.setRgbF(img[x][y][0], img[x][y][1], img[x][y][2], a);
+                else if (type == LAB)
+                    qc = toQColor(lab2rgb(getLabDescaled(img[x][y])));
                 qi->setPixelColor(x, y, qc);
             }
         }
@@ -1297,6 +1412,11 @@ void graphics::Color::brightnessAdjust(QImage *qi, double val, eType type) {
                     qc.setHsvF(qc.hsvHueF(), qc.hsvSaturationF(), stdFuncs::clamp(qc.valueF() + val, 0.0, 1.0), qc.alphaF());
                 else if (type == HSL)
                     qc.setHslF(qc.hslHueF(), qc.hslSaturationF(), stdFuncs::clamp(qc.lightnessF() + val, 0.0, 1.0), qc.alphaF());
+                else if (type == LAB) {
+                    vec4 color = rgb2lab(qc);
+                    color.xyzw[0] += 100.0 * val;
+                    qc = toQColor(lab2rgb(color));
+                }
                 processed.setPixelColor(i, j, qc);
             }
         *qi = processed.copy();

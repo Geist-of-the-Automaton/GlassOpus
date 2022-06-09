@@ -121,6 +121,29 @@ MainWindow::MainWindow(string startPath, string projectFile, QWidget *parent)
         ioh->setDims(QSize(static_cast<int>((16.0 / 9.0) * static_cast<float>(sizeY)), sizeY));
     }
     sr->updateHoverMap(bh.getSize(), bh.getBrushMap());
+    brushDetails = new QDockWidget(this);
+    brushScroller = new viewScroller(brushDetails);
+    brushPanel = new BrushPanel(brushScroller);
+    setupDock(brushDetails, brushScroller, brushPanel);
+    vectDetails = new QDockWidget(this);
+    vectScroller = new viewScroller(vectDetails);
+    vectPanel = new VectPanel(vectScroller);
+    setupDock(vectDetails, vectScroller, vectPanel);
+    polyDetails = new QDockWidget(this);
+    polyScroller = new viewScroller(polyDetails);
+    polyPanel = new PolyPanel(polyScroller);
+    setupDock(polyDetails, polyScroller, polyPanel);
+    rasterDetails = new QDockWidget(this);
+    rasterScroller = new viewScroller(polyDetails);
+    rasterPanel = new RasterPanel(rasterScroller);
+    setupDock(rasterDetails, rasterScroller, rasterPanel);
+    textDetails = new QDockWidget(this);
+    textScroller = new viewScroller(polyDetails);
+    textPanel = new TextPanel(textScroller);
+    setupDock(textDetails, textScroller, textPanel);
+    objDetails = vectDetails;
+    objScroller = vectScroller;
+    addDockWidget(Qt::LeftDockWidgetArea, objDetails);
     setMode(Brush_Mode);
     sr->setCursor(Qt::ArrowCursor);
     sr->setHoverActive(true);
@@ -150,13 +173,10 @@ MainWindow::MainWindow(string startPath, string projectFile, QWidget *parent)
     connect(toolbar, &QToolBar::topLevelChanged, this, [this] {
         changeOffsets();
     });
-    objDetails = new QDockWidget(this);
-    objDetails->setAllowedAreas(Qt::LeftDockWidgetArea);
-    objDetails->setCursor(Qt::ArrowCursor);
-    addDockWidget(Qt::LeftDockWidgetArea, objDetails);
-    objDetails->setFeatures(objDetails->features() & ~QDockWidget::DockWidgetClosable);
-    objDetails->setContextMenuPolicy (Qt::PreventContextMenu);
     toolbar->setContextMenuPolicy (Qt::PreventContextMenu);
+//    statBarTest = new QDockWidget(this);
+//    statBarTest->setTitleBarWidget(new QWidget(statBarTest));
+//    addDockWidget(Qt::BottomDockWidgetArea, statBarTest);
     connect(LayerMenu, &SidePanel::layerSet, this, [this] {
         ioh->getWorkingLayer()->deselect();
         ioh->setActiveLayer(LayerMenu->getActive(), mode);
@@ -173,6 +193,14 @@ MainWindow::MainWindow(string startPath, string projectFile, QWidget *parent)
         ioh->getWorkingLayer();
     });
     QTimer::singleShot(100, [this] {
+        if (objScroller->verticalScrollBar()->isVisible()) {
+            objScroller->setMinimumWidth(300);
+            objScroller->setMaximumWidth(300);
+        }
+        else {
+            objScroller->setMinimumWidth(280);
+            objScroller->setMaximumWidth(280);
+        }
         changeOffsets();
         ioh->addLayer();
         changeOffsets();
@@ -185,7 +213,7 @@ MainWindow::MainWindow(string startPath, string projectFile, QWidget *parent)
 void MainWindow::mouseMoveEvent(QMouseEvent *event) {
     if (layerMenuInteract || ioh->getWorkingLayer() == nullptr || takeFlag || magicFlag)
         return;
-    QPoint qp = sr->getZoomCorrected(vs->getScrollCorrected(event->pos() - QPoint(objDetails->width() + 5,toolbar->height())));
+    QPoint qp = sr->getZoomCorrected(vs->getScrollCorrected(event->pos() - QPoint(brushDetails->width() + 5,toolbar->height())));
     statusBar()->showMessage(("(" + to_string(qp.x()) + " , " + to_string(qp.y()) + ")").c_str(), 1000);
     if (altFlag) {
         sr->setSamplePt(qp);
@@ -236,7 +264,7 @@ void MainWindow::mousePressEvent(QMouseEvent *event) {
         return;
     }
     lastButton = event->button();
-    QPoint qp = lastPos = sr->getZoomCorrected(vs->getScrollCorrected(event->pos() - QPoint(objDetails->width() + 5,toolbar->height())));
+    QPoint qp = lastPos = sr->getZoomCorrected(vs->getScrollCorrected(event->pos() - QPoint(brushDetails->width() + 5,toolbar->height())));
     if (altFlag) {
         onePress = false;
         sr->setSamplePt(qp);
@@ -278,7 +306,7 @@ void MainWindow::mouseReleaseEvent(QMouseEvent *event) {
     }
     if (ioh->getWorkingLayer() == nullptr)
         return;
-    QPoint qp = sr->getZoomCorrected(vs->getScrollCorrected(event->pos() - QPoint(objDetails->width() + 5,toolbar->height())));
+    QPoint qp = sr->getZoomCorrected(vs->getScrollCorrected(event->pos() - QPoint(brushDetails->width() + 5,toolbar->height())));
     if (altFlag) {
         if (bh.getMethodIndex() == appMethod::sample) {
             sr->setSamplePt(qp);
@@ -336,7 +364,7 @@ void MainWindow::mouseReleaseEvent(QMouseEvent *event) {
 void MainWindow::mouseDoubleClickEvent(QMouseEvent *event) {
     if (layerMenuInteract || ioh->getWorkingLayer() == nullptr)
         return;
-    QPoint qp = sr->getZoomCorrected(vs->getScrollCorrected(event->pos() - QPoint(objDetails->width() + 5,toolbar->height())));
+    QPoint qp = sr->getZoomCorrected(vs->getScrollCorrected(event->pos() - QPoint(brushDetails->width() + 5,toolbar->height())));
     MouseButton button = event->button();
     if (mode == Spline_Mode || mode == Polygon_Mode || mode == Text_Mode) {
         if (shiftFlag)
@@ -366,8 +394,6 @@ void MainWindow::wheelEvent(QWheelEvent *event) {
         if ((zoom + c > graphics::minZoom && dx > 0 ) || (zoom + c < graphics::maxZoom && dx < 0))
             sr->setZoom(zoom + c);
         changeOffsets();
-        cout << vs->verticalScrollBar()->isVisible() << " " << vs->horizontalScrollBar()->isVisible() << endl;
-        cout << vs->verticalScrollBar()->minimum() << " " << vs->verticalScrollBar()->maximum() << endl;
     }
     else if (mode == Brush_Mode) {
         if (shiftFlag) {
@@ -426,7 +452,7 @@ void MainWindow::setShiftFlag(bool b) {
 void MainWindow::changeOffsets() {
     bool maxFlag = isMaximized();
     QRect reset = geometry();
-    int left = 0, top = menubar->height(), bottom = ui->statusbar->height();
+    int left = 0, top = menubar->height(), bottom = ui->statusbar->height();//statBarTest->height() - 5;
     if (vs->verticalScrollBar()->isVisible())
         left += vs->horizontalScrollBar()->height();
     if (vs->horizontalScrollBar()->isVisible())
@@ -744,13 +770,6 @@ void MainWindow::doSomething(string btnPress) {
         bh.setPatternInUse(true);
     else if (btnPress == "Pattern Off")
         bh.setPatternInUse(false);
-    else if (btnPress == "Brush Filter Strength") {
-        int val = bh.getFilterStrength();
-        bool ok = false;
-        int ret = QInputDialog::getInt(this, "Glass Opus", "Please enter a brush filter strength", val, graphics::minColor, graphics::maxColor, 1, &ok );
-        if (ok)
-            bh.setFilterStrength(ret);
-    }
     else if (btnPress == "Vector Width") {
         vector <unsigned char> activeVects = ioh->getWorkingLayer()->getActiveVectors();
         if (activeVects.size() != 1 && !ioh->getWorkingLayer()->symActive())
@@ -1578,6 +1597,19 @@ void MainWindow::resizeEvent(QResizeEvent *event) {
         QMenuBar *menu = dynamic_cast<QMenuBar *>(objFetch.at(UI_FileName.toStdString()));
         menu->resize(width(), menu->height());
     }
+    if (isVisible()) {
+        QTimer::singleShot(100, [this] {
+            if (objScroller->verticalScrollBar()->isVisible()) {
+                objScroller->setMinimumWidth(300);
+                objScroller->setMaximumWidth(300);
+            }
+            else {
+                objScroller->setMinimumWidth(280);
+                objScroller->setMaximumWidth(280);
+            }
+            changeOffsets();
+        });
+    }
 }
 
 void MainWindow::dragEnterEvent(QDragEnterEvent *event) {
@@ -1644,10 +1676,63 @@ void MainWindow::setMode(EditMode emode) {
     if (ioh->getWorkingLayer() != nullptr)
         ioh->getWorkingLayer()->setMode(emode);
     sr->setMode(emode);
+    if (isVisible()) {
+        removeDockWidget(objDetails);
+        switch (mode) {
+        case Brush_Mode:
+            objDetails = brushDetails;
+            objScroller = brushScroller;
+            break;
+        case Spline_Mode:
+            objDetails = vectDetails;
+            objScroller = vectScroller;
+            break;
+        case Polygon_Mode:
+            objDetails = polyDetails;
+            objScroller = polyScroller;
+            break;
+        case Raster_Mode:
+            objDetails = rasterDetails;
+            objScroller = rasterScroller;
+            break;
+        case Text_Mode:
+            objDetails = textDetails;
+            objScroller = textScroller;
+            break;
+        }
+        addDockWidget(Qt::LeftDockWidgetArea, objDetails);
+        objDetails->setVisible(true);
+        QTimer::singleShot(100, [this] {
+            if (objScroller->verticalScrollBar()->isVisible()) {
+                objScroller->setMinimumWidth(300);
+                objScroller->setMaximumWidth(300);
+            }
+            else {
+                objScroller->setMinimumWidth(280);
+                objScroller->setMaximumWidth(280);
+            }
+        });
+    }
 }
 
 void MainWindow::refresh() {
     sr->repaint();
+}
+
+void MainWindow::setupDock(QDockWidget *qdw, viewScroller *vsw, QWidget *qw) {
+    qdw->setAllowedAreas(Qt::LeftDockWidgetArea);
+    qdw->setCursor(Qt::ArrowCursor);
+    qdw->setFeatures(qdw->features() & ~QDockWidget::DockWidgetClosable);
+    qdw->setContextMenuPolicy (Qt::PreventContextMenu);
+
+    vsw->setLayoutDirection(Qt::RightToLeft);
+    vsw->setMaximumWidth(280);
+    vsw->setMinimumWidth(280);
+
+    qw->setLayoutDirection(Qt::LeftToRight);
+
+    qdw->setWidget(vsw);
+    vsw->setWidget(qw);
 }
 
 MainWindow::~MainWindow() {

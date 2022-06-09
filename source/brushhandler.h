@@ -34,7 +34,6 @@ public:
     void setAppMethod(string type);
     void setPoint(QPoint qp);
     void setDensity(int density);
-    void setFilterStrength(int val);
     void setStrength(int str);
     void setShape(string shape, vector <vector <unsigned char> > custom = vector <vector <unsigned char> > ());
     void setBrushColor(QColor qc);
@@ -52,7 +51,6 @@ public:
     int getFilterIndex();
     QColor getBrushColor();
     QColor getFillColor();
-    int getFilterStrength();
     int getDensity();
     int getStength();
     int getSize();

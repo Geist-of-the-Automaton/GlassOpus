@@ -44,14 +44,16 @@ const int minColor = 0;
 const int maxColor = 255;
 const int bins = 256;
 const double pi = 3.14159265359;
+const float minsLAB[3] {0.0f, -86.1847f, -107.864f};
+const float scalesLAB[3] {2.55f, 1.3825f, 1.2602f};
 
-const QStringList eTypes {"RGB", "HSV / HSB", "HSL / HSI"};
-enum eType {RGB, HSV, HSL};
+const QStringList eTypes {"RGB", "HSV / HSB", "HSL / HSI", "CIELAB"};
+enum eType {RGB, HSV, HSL, LAB};
 const QStringList mTypes {"RGB", "Hue", "Saturation", "Value", "Lightness"};
 enum mType {RGB_I, HUE, SAT, HSV_V, HSL_L};
 enum bType {NOT, AND, NAND, OR, NOR, XOR, XNOR};
 
-enum tType {sRGB, LAB};
+enum tType {sRGB, HunterLAB, CIELAB};
 
 class Filter {
 
@@ -157,6 +159,11 @@ public:
     static void equalizeHistogramTo(QImage *qi, eType type);
     static void claheTo(QImage *qi, eType type, float clipLimit = 0.5, int divisonX = 0, int divisionY = 0);
     static void matchHistogram(QImage *qi, QImage toMatch, mType type);
+    static vec4 rgb2lab(QColor qc);
+    static vec4 getLabScaled(vec4 lab);
+    static vec4 getLabDescaled(vec4 lab);
+    static vec4 lab2rgb(vec4 lab);
+    static QColor toQColor(vec4 rgb);
 };
 
 class ImgSupport {
@@ -175,7 +182,7 @@ public:
     static void flipHorizontal(QImage *qi);
     static list <QImage *> resize(QSize reqSize);
     static KernelData loadKernel(string fileName);
-    static void applyAlpha(QImage *qi, int *yStart, int *yEnd, unsigned int *alpha);
+    static void applyAlpha(QImage *qi, int yStart, int yEnd, unsigned int alpha);
     static QImage addLayers(QImage a, QImage b, eType type);
     static QImage subLayers(QImage a, QImage b, eType type);
     static QImage diffLayers(QImage a, QImage b, eType type);
