@@ -157,22 +157,30 @@ void screenRender::updateViews() {
 }
 
 void screenRender::paintEvent(QPaintEvent *event) {
-    long long time = stdFuncs::getTime();
+    long long time0, time = stdFuncs::getTime();
     isDrawing = true;
     if (ioh->wasUpdated())
         updateViews();
     if (workLayer == nullptr)
         return;
     qi = QImage(workLayer->getRenderCanvas().size(), QImage::Format_ARGB32);
+    QImage qi2;
     QPainter qp;
     qp.begin(&qi);
+    time0 = stdFuncs::getTime();
     if (!bgLayers.isNull())
         qp.drawPixmap(0, 0, bgLayers);
+    cout << "bg draw " << stdFuncs::getTime(time0) << endl;
+    qi2 = qi.copy();
     if (workLayer->isVisible()) {
-        qp.drawImage(0, 0, workLayer->getRenderCanvas());
+        time0 = stdFuncs::getTime();
+        //qp.drawImage(0, 0, workLayer->getRenderCanvas());
+        qp.drawPixmap(0, 0, QPixmap::fromImage(workLayer->getRenderCanvas()));
         alphaVal = static_cast<unsigned int>(workLayer->getAlpha()) << 24;
         setFixedSize(screenZoom.getZoomCorrected(qi.size()));
         int w = qi.width(), h = qi.height();
+        cout << "init " << stdFuncs::getTime(time0) << endl;
+        time0 = stdFuncs::getTime();
         vector <list <Triangle> > tris = workLayer->getTriangles();
         vector <SplineVector> vects = workLayer->getVectors();
         vector <unsigned char> activeVects = workLayer->getActiveVectors();
@@ -226,6 +234,8 @@ void screenRender::paintEvent(QPaintEvent *event) {
                 }
             }
         }
+        cout << "vects " << stdFuncs::getTime(time0) << endl;
+        time0 = stdFuncs::getTime();
         int symCreate = workLayer->symActive();
         vector <Polygon> gons = workLayer->getPolgons();
         vector <unsigned char> activeGons = workLayer->getActiveGons();
@@ -265,6 +275,8 @@ void screenRender::paintEvent(QPaintEvent *event) {
             }
             ++index;
         }
+        cout << "poly " << stdFuncs::getTime(time0) << endl;
+        time0 = stdFuncs::getTime();
         vector <DrawText> texts = workLayer->getTexts();
         vector <unsigned char> activeTexts = workLayer->getActiveTexts();
         for (DrawText &dt : texts) {
@@ -277,6 +289,8 @@ void screenRender::paintEvent(QPaintEvent *event) {
             qp.setPen(QPen(QColor(128, 128, 128), 5));
             qp.drawEllipse(samplePoint, samplePoint.x() - 2, samplePoint.y() - 2);
         }
+        cout << "text " << stdFuncs::getTime(time0) << endl;
+        time0 = stdFuncs::getTime();
         list <vector<QPoint>> ptsToDraw;
         if (mode == Polygon_Mode)
             for (unsigned char i : activeGons)
@@ -311,6 +325,8 @@ void screenRender::paintEvent(QPaintEvent *event) {
                 }
             }
         }
+        cout << "pts " << stdFuncs::getTime(time0) << endl;
+        time0 = stdFuncs::getTime();
         if (underMouse() && hoverActive && mode == Brush_Mode && hoverLock.try_lock()) {
             QPoint qp = brushLoc;
             brushLoc = QPoint(brushLoc.x() + 1, brushLoc.y() + 7);
@@ -333,15 +349,29 @@ void screenRender::paintEvent(QPaintEvent *event) {
             hoverLock.unlock();
             brushLoc = qp;
         }
-        graphics::ImgSupport::applyAlpha(&qi, &yStart, &yEnd, &alphaVal);
+        cout << "brush " << stdFuncs::getTime(time0) << endl;
+        time0 = stdFuncs::getTime();
+        graphics::ImgSupport::applyAlpha(&qi, yStart, yEnd, alphaVal);
+        cout << "alpha " << stdFuncs::getTime(time0) << endl;
     }
     qp.end();
+    time0 = stdFuncs::getTime();
+    if (workLayer->isVisible()) {
+        if (workLayer->getAlpha() == 255)
+            qi2 = qi;
+        else {
+            qp.begin(&qi2);
+            qp.drawPixmap(0, 0, QPixmap::fromImage(qi));
+            qp.end();
+        }
+    }
+    cout << "reflex " << stdFuncs::getTime(time0) << endl;
     qp.begin(this);
-    qp.drawImage(0, 0, screenZoom.zoomImg(qi));
+    qp.drawPixmap(0, 0, QPixmap::fromImage(screenZoom.zoomImg(qi2)));
     if (fgVisible && !fgLayers.isNull())
         qp.drawPixmap(0, 0, fgLayers);
     isDrawing = false;
-    //cout << stdFuncs::getTime(time) << endl;
+    cout << stdFuncs::getTime(time) << endl;
 }
 
 void screenRender::setSamplePt(QPoint qp) {

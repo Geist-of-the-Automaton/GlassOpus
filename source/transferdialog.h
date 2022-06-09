@@ -31,7 +31,7 @@ private slots:
 private:
 
     Ui::TransferDialog *ui;
-    QImage *qi, rgb, lab, proDisp;
+    QImage *qi, rgb, clab, hlab, proDisp;
 
 };
 

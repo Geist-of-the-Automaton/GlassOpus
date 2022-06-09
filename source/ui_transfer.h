@@ -63,7 +63,8 @@ public:
 
         qcb = new QComboBox(transferDialog);
         qcb->addItem("RGB");
-        qcb->addItem("LAB");
+        qcb->addItem("Hunter LAB");
+        qcb->addItem("CIELAB");
 
         verticalLayout_5->addWidget(qcb);
 

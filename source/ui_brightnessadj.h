@@ -69,7 +69,7 @@ public:
 
         qcb = new QComboBox(brightnessAdj);
         qcb->setObjectName(QString::fromUtf8("combo"));
-        qcb->addItems(QStringList({"RGB", "HSV", "HSL"}));
+        qcb->addItems(QStringList({"RGB", "HSV", "HSL", "LAB"}));
         qcb->setCurrentIndex(1);
 
         verticalLayout_1->addWidget(qcb);

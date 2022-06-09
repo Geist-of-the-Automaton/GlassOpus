@@ -371,7 +371,6 @@ void SidePanel::mousePressEvent(QMouseEvent *event) {
 
 void SidePanel::mouseMoveEvent(QMouseEvent *event) {
     int layer = (event->pos() - QPoint(0, 82 - this->verticalScrollBar()->value())).y() / 120;
-    cout << (event->button() == Qt::LeftButton) << endl;
     if (tabs.size() == 0 || layer < 0 || layer >= tabs.size() || event->pos().y() < 82 || lastBtn != Qt::RightButton)
         return;
     for (int i = 0; i < tabs.size(); ++i)
@@ -395,7 +394,6 @@ void SidePanel::mouseReleaseEvent(QMouseEvent *event) {
     int layer = (event->pos() - QPoint(0, 82 - this->verticalScrollBar()->value())).y() / 120;
     if (tabs.size() == 0 || layer < 0 || layer >= tabs.size() || event->pos().y() < 82 || event->button() != Qt::RightButton)
         return;
-    cout << "here" << endl;
     toSwap = layer;
     for (int i = 0; i < tabs.size(); ++i)
         mainVert->removeItem(tabs[i]);

@@ -12,6 +12,7 @@ SymDialog::SymDialog(QWidget *parent) :
     div = 1;
     skip = 0;
     ofEvery = 1;
+    divChange();
 }
 
 SymDialog::~SymDialog() {

@@ -16,22 +16,46 @@ TransferDialog::~TransferDialog() {
 
 void TransferDialog::setWork(QImage *toProcess, QImage from) {
     qi = toProcess;
-    lab = toProcess->copy();
+    clab = toProcess->copy();
+    hlab = toProcess->copy();
     rgb = toProcess->copy();
-    Color::colorTransfer(&lab, from, tType::LAB);
+    Color::colorTransfer(&clab, from, tType::CIELAB);
+    Color::colorTransfer(&hlab, from, tType::HunterLAB);
     Color::colorTransfer(&rgb, from, tType::sRGB);
-    proDisp = lab.scaled(lab.width() / 3, lab.height() / 3, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+    proDisp = clab.scaled(clab.width() / 3, clab.height() / 3, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
     ui->label->setPixmap(QPixmap::fromImage(proDisp));
     ui->qcb->setCurrentIndex(1);
 }
 
 void TransferDialog::process() {
-    proDisp = (ui->qcb->currentIndex() == 0 ? rgb : lab).scaled(lab.width() / 3, lab.height() / 3, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+    switch (ui->qcb->currentIndex()) {
+    case 0:
+        proDisp = rgb;
+        break;
+    case 1:
+        proDisp = hlab;
+        break;
+    case 2:
+        proDisp = clab;
+        break;
+    }
+    proDisp = proDisp.scaled(clab.width() / 3, clab.height() / 3, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
     ui->label->setPixmap(QPixmap::fromImage(proDisp));
 }
 
 void TransferDialog::on_buttonBox_accepted() {
-    *qi = (ui->qcb->currentIndex() == 0 ? rgb : lab);
+    switch (ui->qcb->currentIndex()) {
+    case 0:
+        proDisp = rgb;
+        break;
+    case 1:
+        proDisp = hlab;
+        break;
+    case 2:
+        proDisp = clab;
+        break;
+    }
+    *qi = proDisp;
     done(1);
 }
 
