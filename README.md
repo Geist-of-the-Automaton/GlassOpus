@@ -40,10 +40,13 @@ The Microsoft coding guidelines are used. Found [here](https://www.cise.ufl.edu/
 
 ![Spline_Example_1](https://user-images.githubusercontent.com/44931507/109450396-cb16b980-7a18-11eb-8ec9-137f5bc2f685.png)
 
-![Spline_Brush_Example_1](https://user-images.githubusercontent.com/44931507/109450419-d669e500-7a18-11eb-9f5e-c339581bfaa5.png)
+<!--![Spline_Brush_Example_1](https://user-images.githubusercontent.com/44931507/109450419-d669e500-7a18-11eb-9f5e-c339581bfaa5.png)-->
 
-![Spline_Brush_Example_2](https://user-images.githubusercontent.com/44931507/109450432-dbc72f80-7a18-11eb-84c6-f2a0b3ed0945.png)
+<!--![Spline_Brush_Example_2](https://user-images.githubusercontent.com/44931507/109450432-dbc72f80-7a18-11eb-84c6-f2a0b3ed0945.png)-->
 
 ![Spline_Brush_Example_3](https://user-images.githubusercontent.com/44931507/109450440-dec22000-7a18-11eb-9de4-7f6569bb464c.png)
+
+![UiView2](https://user-images.githubusercontent.com/44931507/175762495-ded825d4-ef83-48d3-b896-7427ca21b58a.PNG)
+
 
 
