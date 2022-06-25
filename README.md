@@ -1,27 +1,18 @@
 # Glass Opus
 
-Glass Opus is an open source raster and vector image processing software for students and artists. The software provides a variety of features to allow the users to see their work from start to finish. Drawing with a variety brushes and vectors, image manipulation, and filtering are among the many features than one can employ to create their vision.
+Glass Opus is an open source raster and vector image processing and manipulation software. The software provides a variety of features to allow the users to see their work from start to finish. Drawing with a variety brushes and vectors, image manipulation, and filtering are among the many features than one can employ to create their vision.
 
-The focus of Glass Opus is to provide a free software that students and artists can use to further their work and portfolio. This is often a difficult endeavor for artists due to the restrictive cost of major softwares. Since Glass Opus is open source, users can tweak features or add their own to suit specific needs. It will also serve as a foundation for those who seek to improve their knowledge in image processing and manipulation, as well as basic graphics programming.
-
-The Microsoft coding guidelines are used. Found [here](https://www.cise.ufl.edu/~mschneid/Research/C++%20Programming%20Style%20Guidelines.htm).
+The focus of Glass Opus is to provide a free software that students and artists can use to further their work and portfolio. Since Glass Opus is open source, users can tweak features or add their own to suit specific needs. It will also serve as a foundation for those who seek to improve their knowledge in image processing and manipulation, as well as basic graphics programming.
 
 The app be run via the installer found in the releases. The most current release can be found [here](https://github.com/Geist-of-the-Automaton/GlassOpus/releases/tag/1.0).
 
 ## Dev Setup
 
-1. Install C++ libraries, specifically <!--either -->[MSVC](https://visualstudio.microsoft.com/vs/features/cplusplus/)
-2. Install [Qt and Qt Creator](https://www.qt.io/download-open-source?hsCtaTracking=9f6a2170-a938-42df-a8e2-a9f0b1d6cdce%7C6cb0de4f-9bb5-4778-ab02-bfb62735f3e5)
-<!--3. Install [OpenCV](https://opencv.org/) libraries. [Tutorial](https://wiki.qt.io/How_to_setup_Qt_and_openCV_on_Windows_with_MSVC2017)(https://wiki.qt.io/How_to_setup_Qt_and_openCV_on_Windows) if needed.-->
-3. Make sure system path aligns with current installation of <!--OpenCV and--> MSVC. <!--Verify that the includes and libs within the project file are correct.-->
-<!--5. Copy the .libs from the OpenCV build folder to the highest/top directory of the build folder.-->
-4. Copy the mainMenubar.txt into the Menu folder. If the menu folder is absent, redownload it from the repo. The icons can be accessed the same way.
+1. Install C++ (17 was used) and Qt (5.12 and 5.14 were used). Make sure system paths align with the current version of MSVC.
+2. Copy the menu contents (specifically mainMenubar.txt) to the build/Menus folder, which can be obtained from the repo, otherwise the program will fail at launch.
+3. The program can either be opened after opening QCreator, or by executing the project file from the downloaded repo.
 
-## Running
-
-There are two options to running the software:  
-1. Once Qt <!--and the OpenCV libs have-->has been correctly installed, one must open the project in Qt and press the run button in the bottom left of the Qt gui. (This option requires the Qt libraries to be on your path.)
-2. Launch Glass Opus via the Windows start menu, desktop shortcut, or by opening the executable in the installation (or zip folder if used).  
+The Microsoft coding guidelines are used. Found [here](https://www.cise.ufl.edu/~mschneid/Research/C++%20Programming%20Style%20Guidelines.htm).
 
 ## Videos of program running
 
