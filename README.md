@@ -15,6 +15,7 @@ The app be run via the installer found in the releases. The most current release
 The Microsoft coding guidelines are used. Found [here](https://www.cise.ufl.edu/~mschneid/Research/C++%20Programming%20Style%20Guidelines.htm).
 
 ## Videos of program running
+(Some of the videos show the old, not updated UI)
 
 [Creation of second image below](https://youtu.be/XCe56i6esuc)
 
@@ -25,6 +26,7 @@ The Microsoft coding guidelines are used. Found [here](https://www.cise.ufl.edu/
 [Vectoring 2](https://youtu.be/p1WU3VXfM3Y)
 
 ## Images of program running
+(Some of the images show the old, not updated UI)
 
 ![glassOpusGirl](https://user-images.githubusercontent.com/44931507/116170700-4f15b680-a6d5-11eb-851d-850b10630e07.png)
 
@@ -41,7 +43,5 @@ The Microsoft coding guidelines are used. Found [here](https://www.cise.ufl.edu/
 ![Spline_Brush_Example_2](https://user-images.githubusercontent.com/44931507/109450432-dbc72f80-7a18-11eb-84c6-f2a0b3ed0945.png)
 
 ![Spline_Brush_Example_3](https://user-images.githubusercontent.com/44931507/109450440-dec22000-7a18-11eb-9de4-7f6569bb464c.png)
-
-![Spline_Example_2](https://user-images.githubusercontent.com/44931507/109450447-e5509780-7a18-11eb-8910-055c4971a558.png)
 
 
