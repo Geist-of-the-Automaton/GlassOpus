@@ -28,6 +28,8 @@ The Microsoft coding guidelines are used. Found [here](https://www.cise.ufl.edu/
 ## Images of program running
 (Some of the images show the old, not updated UI)
 
+![UiView1](https://user-images.githubusercontent.com/44931507/175762431-2e0c5d52-c30c-4882-8871-96f23aa68ad1.png)
+
 ![glassOpusGirl](https://user-images.githubusercontent.com/44931507/116170700-4f15b680-a6d5-11eb-851d-850b10630e07.png)
 
 ![demo](https://user-images.githubusercontent.com/44931507/116170714-54730100-a6d5-11eb-87f5-9ba522397bc3.png)
