@@ -23,6 +23,8 @@ The Microsoft coding guidelines are used. Found [here](https://www.cise.ufl.edu/
 
 [Brushes and filters](https://youtu.be/wA5ZYv1swbU)
 
+[Brush Symmetry](https://www.youtube.com/watch?v=dAo17hEiGo0)
+
 <!--[Vectoring 2](https://youtu.be/p1WU3VXfM3Y)-->
 
 ## Images of program running
