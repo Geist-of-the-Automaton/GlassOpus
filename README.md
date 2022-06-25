@@ -23,7 +23,7 @@ The Microsoft coding guidelines are used. Found [here](https://www.cise.ufl.edu/
 
 [Brushes and filters](https://youtu.be/wA5ZYv1swbU)
 
-[Vectoring 2](https://youtu.be/p1WU3VXfM3Y)
+<!--[Vectoring 2](https://youtu.be/p1WU3VXfM3Y)-->
 
 ## Images of program running
 (Some of the images show the old, not updated UI)
