@@ -17,9 +17,11 @@ The Microsoft coding guidelines are used. Found [here](https://www.cise.ufl.edu/
 ## Videos of program running
 (Some of the videos show the old, not updated UI)
 
+[Demo showing most features]
+
 [Creation of second image below](https://youtu.be/XCe56i6esuc)
 
-[Vectoring 3](https://youtu.be/YO4rZiHFvdQ)
+[Vectoring](https://youtu.be/YO4rZiHFvdQ)
 
 [Brushes and filters](https://youtu.be/wA5ZYv1swbU)
 
