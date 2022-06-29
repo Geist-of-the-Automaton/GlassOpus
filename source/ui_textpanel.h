@@ -60,7 +60,8 @@ public:
     QSpinBox *letterSB;
     QSlider *letterS;
 
-    QHBoxLayout *style1, *style2, *style3, *styleLB1, *styleLB2, *styleLB3;
+    QHBoxLayout *mainStyle;
+    QVBoxLayout *style1v, *style2v, *style3v;
     QLabel *boldLb, *italLb, *undrLb, *overLb, *strkLb;
     QRadioButton *bold, *ital, *undr, *over, *strk;
 
@@ -131,20 +132,20 @@ public:
         colorDesc1->setObjectName("colorDesc");
         colorLb1 = new QLabel(vectPanel);
         colorLb1->setObjectName("colorLb");
-        colorLb1->setText("Vector Colors");
+        colorLb1->setText("Text Color");
         colorDesc1->addWidget(colorLb1);
         colorDesc1->addSpacerItem(new QSpacerItem(0, 0, QSizePolicy::MinimumExpanding, QSizePolicy::Minimum));
         colorBox1 = new QHBoxLayout();
         mainVert->addLayout(colorDesc1);
         colorSB1 = new QSpinBox(vectPanel);
         colorSB1->setRange(0, 360);
-        colorSB1->setObjectName("colorSB");
-        colorSB1->setValue(120);
+        colorSB1->setObjectName("colorSB1");
+        colorSB1->setValue(0);
         colorBox1->addWidget(colorSB1);
         colorS1 = new QSlider(vectPanel);
         colorS1->setRange(0, 360);
-        colorS1->setObjectName("colorS");
-        colorS1->setValue(120);
+        colorS1->setObjectName("colorS1");
+        colorS1->setValue(0);
         colorS1->setOrientation(Qt::Horizontal);
         colorS1->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Minimum);
         colorBox1->addWidget(colorS1);
@@ -155,15 +156,14 @@ public:
         mainVert->addLayout(colorBox1);
         QImage img1(256, 128, QImage::Format_ARGB32_Premultiplied);
         QColor qc1;
-        unsigned long time1 = stdFuncs::getTime();
         for (short y = 0; y <= 127; ++y) {
             QRgb *line = reinterpret_cast<QRgb *>(img1.scanLine(y));
             for (short x = 0; x <= 255; ++x) {
-                qc1.setHsl(45, 255 - 2 * y, x);
+                qc1.setHsl(-1, 255 - 2 * y, x);
                 line[x] = qc1.rgba();
             }
         }
-        qc1.setHsl(45, 0, 0);
+        qc1.setHsl(-1, 0, 0);
         int hue1 = (qc1.hslHue() + 1) + 180;
         if (hue1 > 360)
             hue1 -= 360;
@@ -184,7 +184,6 @@ public:
         }
         color1 = new QLabel(vectPanel);
         color1->setPixmap(QPixmap::fromImage(img1));
-        cout << stdFuncs::getTime(time1) << endl;
         color1->setCursor(Qt::CrossCursor);
         color1->setMouseTracking(true);
         mainVert->addWidget(color1);
@@ -261,72 +260,68 @@ public:
         letterBox->addWidget(letterS);
         mainVert->addLayout(letterBox);
 
-        mainVert->addSpacerItem(new QSpacerItem(275, 10, QSizePolicy::Minimum, QSizePolicy::Fixed));
+        //mainVert->addSpacerItem(new QSpacerItem(275, 5, QSizePolicy::Minimum, QSizePolicy::Fixed));
 
-        styleLB1 = new QHBoxLayout();
-        styleLB1->setObjectName("styleLB1");
+        mainStyle = new QHBoxLayout();
+        mainStyle->setObjectName("mainStyle");
+        style1v = new QVBoxLayout();
+        style1v->setObjectName("style1v");
         boldLb = new QLabel(vectPanel);
         boldLb->setObjectName("boldLb");
         boldLb->setText("Bold");
-        styleLB1->addWidget(boldLb);
-        styleLB1->addSpacerItem(new QSpacerItem(0, 0, QSizePolicy::MinimumExpanding, QSizePolicy::Minimum));
-        italLb = new QLabel(vectPanel);
-        italLb->setObjectName("italLb");
-        italLb->setText("Italic");
-        styleLB1->addWidget(italLb);
-        styleLB1->addSpacerItem(new QSpacerItem(0, 0, QSizePolicy::MinimumExpanding, QSizePolicy::Minimum));
-        mainVert->addLayout(styleLB1);
-        style1 = new QHBoxLayout();
-        style1->setObjectName("style1");
+        style1v->addWidget(boldLb);
         bold = new QRadioButton(vectPanel);
+        bold->setChecked(false);
         bold->setObjectName("bold");
-        style1->addWidget(bold);
-        ital = new QRadioButton(vectPanel);
-        ital->setObjectName("ital");
-        style1->addWidget(ital);
-        mainVert->addLayout(style1);
-
+        bold->setAutoExclusive(false);
+        style1v->addWidget(bold);
         mainVert->addSpacerItem(new QSpacerItem(275, 10, QSizePolicy::Minimum, QSizePolicy::Fixed));
-
-        styleLB2 = new QHBoxLayout();
-        styleLB2->setObjectName("styleLB2");
-        undrLb = new QLabel(vectPanel);
-        undrLb->setObjectName("undrLb");
-        undrLb->setText("Underline");
-        styleLB2->addWidget(undrLb);
-        styleLB2->addSpacerItem(new QSpacerItem(0, 0, QSizePolicy::MinimumExpanding, QSizePolicy::Minimum));
         overLb = new QLabel(vectPanel);
         overLb->setObjectName("overLb");
         overLb->setText("Overline");
-        styleLB2->addWidget(overLb);
-        styleLB2->addSpacerItem(new QSpacerItem(0, 0, QSizePolicy::MinimumExpanding, QSizePolicy::Minimum));
-        mainVert->addLayout(styleLB2);
-        style2 = new QHBoxLayout();
-        style2->setObjectName("style2");
-        undr = new QRadioButton(vectPanel);
-        undr->setObjectName("undr");
-        style2->addWidget(undr);
+        style1v->addWidget(overLb);
         over = new QRadioButton(vectPanel);
         over->setObjectName("over");
-        style2->addWidget(over);
-        mainVert->addLayout(style2);
+        over->setAutoExclusive(false);
+        style1v->addWidget(over);
+        mainStyle->addLayout(style1v);
+        mainStyle->addSpacerItem(new QSpacerItem(0, 0, QSizePolicy::MinimumExpanding, QSizePolicy::Minimum));
 
+        style2v = new QVBoxLayout();
+        style2v->setObjectName("style2v");
+        italLb = new QLabel(vectPanel);
+        italLb->setObjectName("italLb");
+        italLb->setText("Italic");
+        style2v->addWidget(italLb);
+        ital = new QRadioButton(vectPanel);
+        ital->setObjectName("ital");
+        ital->setAutoExclusive(false);
+        style2v->addWidget(ital);
         mainVert->addSpacerItem(new QSpacerItem(275, 10, QSizePolicy::Minimum, QSizePolicy::Fixed));
-
-        styleLB3 = new QHBoxLayout();
-        styleLB3->setObjectName("styleLB3");
         strkLb = new QLabel(vectPanel);
         strkLb->setObjectName("strkLb");
         strkLb->setText("Strikeout");
-        styleLB3->addWidget(strkLb);
-        styleLB3->addSpacerItem(new QSpacerItem(0, 0, QSizePolicy::MinimumExpanding, QSizePolicy::Minimum));
-        mainVert->addLayout(styleLB3);
-        style3 = new QHBoxLayout();
-        style3->setObjectName("style3");
+        style2v->addWidget(strkLb);
         strk = new QRadioButton(vectPanel);
         strk->setObjectName("strk");
-        style3->addWidget(strk);
-        mainVert->addLayout(style3);
+        strk->setAutoExclusive(false);
+        style2v->addWidget(strk);
+        mainStyle->addLayout(style2v);
+        mainStyle->addSpacerItem(new QSpacerItem(0, 0, QSizePolicy::MinimumExpanding, QSizePolicy::Minimum));
+
+        style3v = new QVBoxLayout();
+        style3v->setObjectName("style3v");
+        undrLb = new QLabel(vectPanel);
+        undrLb->setObjectName("undrLb");
+        undrLb->setText("Underline");
+        style3v->addWidget(undrLb);
+        undr = new QRadioButton(vectPanel);
+        undr->setObjectName("undr");
+        undr->setAutoExclusive(false);
+        style3v->addWidget(undr);
+        style3v->addSpacerItem(new QSpacerItem(0, 0, QSizePolicy::Minimum, QSizePolicy::Expanding));
+        mainStyle->addLayout(style3v);
+        mainVert->addLayout(mainStyle);
 
 
         mainVert->addSpacerItem(new QSpacerItem(275, 0, QSizePolicy::Minimum, QSizePolicy::MinimumExpanding));

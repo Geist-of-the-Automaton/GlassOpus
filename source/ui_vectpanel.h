@@ -21,6 +21,8 @@
 #include <graphics.h>
 #include <splinevector.h>
 
+#include <graphics.h>
+
 QT_BEGIN_NAMESPACE
 
 class Ui_VectPanel
@@ -49,10 +51,17 @@ public:
     QSpinBox *colorSB2;
     QSlider *colorS2;
 
-    QHBoxLayout *taperDesc, *taperBox1, *taperBox2;
+    QHBoxLayout *widthDesc, *widthBox;
+    QLabel *widthLb;
+    QSpinBox *widthSB;
+    QSlider *widthS;
+
+    QHBoxLayout *taperDesc, *taperBox1, *taperBox2, *taperBox3;
     QLabel *taperLb1, *taperLb2;
-    QSpinBox *taperSB, *taperSb2;
+    QSpinBox *taperSB1, *taperSB2;
     QSlider *taperS1, *taperS2;
+    QComboBox *typeCB;
+    QPushButton *tSwapPB;
 
     QHBoxLayout *gapDesc, *gapBox;
     QLabel *gapLb;
@@ -64,13 +73,9 @@ public:
     QSpinBox *bandSB;
     QSlider *bandS;
 
-    QHBoxLayout *symDesc, *symBox;
-    QLabel *symLb;
-    QComboBox *sym1, *sym2, *sym3;
-
     QHBoxLayout *otherDesc, *otherBox;
     QLabel *otherLb;
-    QPushButton *cSwapPB, *tSwapPB;
+    QPushButton *cSwapPB, *symPB;
 
     void setupUi(QWidget *vectPanel)
     {
@@ -98,12 +103,12 @@ public:
         modeFilterBox->setObjectName("modeFilterBox");
         modeCB = new QComboBox(vectPanel);
         modeCB->addItems({"Color Vector", "Filter Vector"});
-        modeCB->setObjectName("mode");
+        modeCB->setObjectName("modeCB");
         modeFilterBox->addWidget(modeCB);
         filterCB = new QComboBox(vectPanel);
         for (string s : graphics::vectorFilters)
             filterCB->addItem(s.c_str());
-        filterCB->setObjectName("filter");
+        filterCB->setObjectName("filterCB");
         modeFilterBox->addWidget(filterCB);
         mainVert->addLayout(modeFilterBox);
 
@@ -119,19 +124,21 @@ public:
         strengthBox = new QHBoxLayout();
         mainVert->addLayout(strengthDesc);
         strengthSB = new QSpinBox(vectPanel);
-        strengthSB->setRange(0, 1);
+        strengthSB->setRange(0, graphics::maxColor);
         strengthSB->setObjectName("strengthSB");
         strengthSB->setValue(255);
+        strengthSB->setSingleStep(1);
         strengthBox->addWidget(strengthSB);
         strengthS = new QSlider(vectPanel);
-        strengthS->setRange(0, 1);
+        strengthS->setRange(0, graphics::maxColor);
         strengthS->setObjectName("strengthS");
         strengthS->setValue(255);
         strengthS->setOrientation(Qt::Horizontal);
+        strengthS->setTickInterval(1);
         strengthBox->addWidget(strengthS);
         mainVert->addLayout(strengthBox);
 
-        mainVert->addSpacerItem(new QSpacerItem(275, 10, QSizePolicy::Minimum, QSizePolicy::Fixed));
+        //mainVert->addSpacerItem(new QSpacerItem(275, 10, QSizePolicy::Minimum, QSizePolicy::Fixed));
 
         colorDesc1 = new QHBoxLayout();
         colorDesc1->setObjectName("colorDesc");
@@ -144,15 +151,17 @@ public:
         mainVert->addLayout(colorDesc1);
         colorSB1 = new QSpinBox(vectPanel);
         colorSB1->setRange(0, 360);
-        colorSB1->setObjectName("colorSB");
-        colorSB1->setValue(120);
+        colorSB1->setObjectName("colorSB1");
+        colorSB1->setValue(0);
+        colorSB1->setSingleStep(1);
         colorBox1->addWidget(colorSB1);
         colorS1 = new QSlider(vectPanel);
         colorS1->setRange(0, 360);
-        colorS1->setObjectName("colorS");
-        colorS1->setValue(120);
+        colorS1->setObjectName("colorS1");
+        colorS1->setValue(0);
         colorS1->setOrientation(Qt::Horizontal);
         colorS1->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Minimum);
+        colorS1->setSingleStep(1);
         colorBox1->addWidget(colorS1);
         colorAdv1 = new QPushButton(vectPanel);
         colorAdv1->setText("Advanced");
@@ -165,11 +174,11 @@ public:
         for (short y = 0; y <= 127; ++y) {
             QRgb *line = reinterpret_cast<QRgb *>(img1.scanLine(y));
             for (short x = 0; x <= 255; ++x) {
-                qc1.setHsl(45, 255 - 2 * y, x);
+                qc1.setHsl(-1, 255 - 2 * y, x);
                 line[x] = qc1.rgba();
             }
         }
-        qc1.setHsl(45, 0, 0);
+        qc1.setHsl(-1, 0, 0);
         int hue1 = (qc1.hslHue() + 1) + 180;
         if (hue1 > 360)
             hue1 -= 360;
@@ -197,15 +206,17 @@ public:
         colorBox2 = new QHBoxLayout();
         colorSB2 = new QSpinBox(vectPanel);
         colorSB2->setRange(0, 360);
-        colorSB2->setObjectName("colorSB");
-        colorSB2->setValue(120);
+        colorSB2->setObjectName("colorSB2");
+        colorSB2->setValue(0);
+        colorSB2->setSingleStep(1);
         colorBox2->addWidget(colorSB2);
         colorS2 = new QSlider(vectPanel);
         colorS2->setRange(0, 360);
-        colorS2->setObjectName("colorS");
-        colorS2->setValue(120);
+        colorS2->setObjectName("colorS2");
+        colorS2->setValue(0);
         colorS2->setOrientation(Qt::Horizontal);
         colorS2->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Minimum);
+        colorS2->setSingleStep(1);
         colorBox2->addWidget(colorS2);
         colorAdv2 = new QPushButton(vectPanel);
         colorAdv2->setText("Advanced");
@@ -218,11 +229,11 @@ public:
         for (short y = 0; y <= 127; ++y) {
             QRgb *line = reinterpret_cast<QRgb *>(img.scanLine(y));
             for (short x = 0; x <= 255; ++x) {
-                qc.setHsl(120, 255 - 2 * y, x);
+                qc.setHsl(-1, 255 - 2 * y, x);
                 line[x] = qc.rgba();
             }
         }
-        qc.setHsl(120, 0, 0);
+        qc.setHsl(-1, 0, 0);
         int hue = (qc.hslHue() + 1) + 180;
         if (hue > 360)
             hue -= 360;
@@ -250,6 +261,32 @@ public:
 
         mainVert->addSpacerItem(new QSpacerItem(275, 10, QSizePolicy::Minimum, QSizePolicy::Fixed));
 
+        widthDesc = new QHBoxLayout();
+        widthDesc->setObjectName("widthDesc");
+        widthLb = new QLabel(vectPanel);
+        widthLb->setObjectName("widthLb");
+        widthLb->setText("Vector Width");
+        widthDesc->addWidget(widthLb);
+        mainVert->addLayout(widthDesc);
+        widthBox = new QHBoxLayout();
+        widthBox->setObjectName("widthBox");
+        widthSB = new QSpinBox(vectPanel);
+        widthSB->setObjectName("widthSB");
+        widthSB->setRange(minWidth, maxWidth);
+        widthSB->setValue(minWidth);
+        widthSB->setSingleStep(1);
+        widthBox->addWidget(widthSB);
+        widthS = new QSlider(vectPanel);
+        widthS->setObjectName("widthS");
+        widthS->setRange(minWidth, maxWidth);
+        widthS->setOrientation(Qt::Horizontal);
+        widthS->setValue(minWidth);
+        widthS->setTickInterval(1);
+        widthBox->addWidget(widthS);
+        mainVert->addLayout(widthBox);
+
+        mainVert->addSpacerItem(new QSpacerItem(275, 10, QSizePolicy::Minimum, QSizePolicy::Fixed));
+
         taperDesc = new QHBoxLayout();
         taperDesc->setObjectName("taperDesc");
         taperLb1 = new QLabel(vectPanel);
@@ -258,33 +295,51 @@ public:
         taperDesc->addWidget(taperLb1);
         taperDesc->addSpacerItem(new QSpacerItem(0, 0, QSizePolicy::MinimumExpanding, QSizePolicy::Minimum));
         taperBox1 = new QHBoxLayout();
+        taperBox1->setObjectName(QString::fromUtf8("taperBox1"));
         mainVert->addLayout(taperDesc);
-        taperSB = new QSpinBox(vectPanel);
-        taperSB->setRange(minTaper, maxTaper);
-        taperSB->setObjectName("taperSB1");
-        taperSB->setValue(0);
-        taperBox1->addWidget(taperSB);
+        taperSB1 = new QSpinBox(vectPanel);
+        taperSB1->setRange(minTaper, maxTaper);
+        taperSB1->setObjectName("taperSB1");
+        taperSB1->setValue(0);
+        taperSB1->setSingleStep(1);
+        taperBox1->addWidget(taperSB1);
         taperS1 = new QSlider(vectPanel);
         taperS1->setRange(minTaper, maxTaper);
         taperS1->setObjectName("taperS1");
         taperS1->setValue(0);
         taperS1->setOrientation(Qt::Horizontal);
+        taperS1->setSingleStep(1);
         taperBox1->addWidget(taperS1);
         mainVert->addLayout(taperBox1);
 
         taperBox2 = new QHBoxLayout();
-        taperSB = new QSpinBox(vectPanel);
-        taperSB->setRange(minTaper, maxTaper);
-        taperSB->setObjectName("taperSB2");
-        taperSB->setValue(0);
-        taperBox2->addWidget(taperSB);
+        taperBox2->setObjectName(QString::fromUtf8("taperBox2"));
+        taperSB2 = new QSpinBox(vectPanel);
+        taperSB2->setRange(minTaper, maxTaper);
+        taperSB2->setObjectName("taperSB2");
+        taperSB2->setValue(0);
+        taperSB2->setSingleStep(1);
+        taperBox2->addWidget(taperSB2);
         taperS2 = new QSlider(vectPanel);
         taperS2->setRange(minTaper, maxTaper);
         taperS2->setObjectName("taperS2");
         taperS2->setValue(0);
         taperS2->setOrientation(Qt::Horizontal);
+        taperS2->setSingleStep(1);
         taperBox2->addWidget(taperS2);
         mainVert->addLayout(taperBox2);
+
+        taperBox3 = new QHBoxLayout();
+        taperBox3->setObjectName(QString::fromUtf8("taperBox3"));
+        typeCB = new QComboBox(vectPanel);
+        typeCB->setObjectName("typeCB");
+        typeCB->addItems({"Single Taper", "Double Taper"});
+        taperBox3->addWidget(typeCB);
+        tSwapPB = new QPushButton(vectPanel);
+        tSwapPB->setObjectName("tSwapPB");
+        tSwapPB->setText("Swap Tapers");
+        taperBox3->addWidget(tSwapPB);
+        mainVert->addLayout(taperBox3);
 
         mainVert->addSpacerItem(new QSpacerItem(275, 10, QSizePolicy::Minimum, QSizePolicy::Fixed));
 
@@ -301,16 +356,18 @@ public:
         gapSB->setRange(0, maxStyle);
         gapSB->setObjectName("gapSB");
         gapSB->setValue(0);
+        gapSB->setSingleStep(1);
         gapBox->addWidget(gapSB);
         gapS = new QSlider(vectPanel);
         gapS->setRange(0, maxStyle);
         gapS->setObjectName("gapS");
         gapS->setValue(0);
         gapS->setOrientation(Qt::Horizontal);
+        gapS->setTickInterval(1);
         gapBox->addWidget(gapS);
         mainVert->addLayout(gapBox);
 
-        mainVert->addSpacerItem(new QSpacerItem(275, 10, QSizePolicy::Minimum, QSizePolicy::Fixed));
+        //mainVert->addSpacerItem(new QSpacerItem(275, 10, QSizePolicy::Minimum, QSizePolicy::Fixed));
 
         bandDesc = new QHBoxLayout();
         bandDesc->setObjectName("bandDesc");
@@ -325,40 +382,16 @@ public:
         bandSB->setRange(minStyle, maxStyle);
         bandSB->setObjectName("bandSB");
         bandSB->setValue(minStyle);
+        bandSB->setSingleStep(1);
         bandBox->addWidget(bandSB);
         bandS = new QSlider(vectPanel);
         bandS->setRange(minStyle, maxStyle);
         bandS->setObjectName("bandS");
         bandS->setValue(minStyle);
         bandS->setOrientation(Qt::Horizontal);
+        bandS->setTickInterval(1);
         bandBox->addWidget(bandS);
         mainVert->addLayout(bandBox);
-
-        mainVert->addSpacerItem(new QSpacerItem(275, 10, QSizePolicy::Minimum, QSizePolicy::Fixed));
-
-        symDesc = new QHBoxLayout();
-        symDesc->setObjectName("symDesc");
-        symLb = new QLabel(vectPanel);
-        symLb->setObjectName("symLb");
-        symLb->setText("Symmetry");
-        symDesc->addWidget(symLb);
-        symDesc->addSpacerItem(new QSpacerItem(0, 0, QSizePolicy::MinimumExpanding, QSizePolicy::Minimum));
-        symBox = new QHBoxLayout();
-        mainVert->addLayout(symDesc);
-        sym1 = new QComboBox(vectPanel);
-        sym1->setObjectName(QString::fromUtf8("sym1"));
-        for (int i = minSym; i <= maxSym; ++i)
-            sym1->addItem((to_string(i) + " Divisions").c_str());
-        symBox->addWidget(sym1);
-        sym2 = new QComboBox(vectPanel);
-        sym2->setObjectName(QString::fromUtf8("sym2"));
-        sym2->addItem("Of Every 1");
-        symBox->addWidget(sym2);
-        sym3 = new QComboBox(vectPanel);
-        sym3->setObjectName(QString::fromUtf8("csym3"));
-        sym3->addItem("Skip 0");
-        symBox->addWidget(sym3);
-        mainVert->addLayout(symBox);
 
         mainVert->addSpacerItem(new QSpacerItem(275, 10, QSizePolicy::Minimum, QSizePolicy::Fixed));
 
@@ -375,13 +408,11 @@ public:
         cSwapPB->setObjectName("cSwapPB");
         cSwapPB->setText("Swap Colors");
         otherBox->addWidget(cSwapPB);
-        tSwapPB = new QPushButton(vectPanel);
-        tSwapPB->setObjectName("tSwapPB");
-        tSwapPB->setText("Swap Tapers");
-        otherBox->addWidget(tSwapPB);
+        symPB = new QPushButton(vectPanel);
+        symPB->setObjectName(QString::fromUtf8("symPB"));
+        symPB->setText("Symmetry Tool");
+        otherBox->addWidget(symPB);
         mainVert->addLayout(otherBox);
-
-
 
 
 

@@ -17,6 +17,7 @@ public:
     int getDiv();
     int getOfEvery();
     int getSkip();
+    void setIndicies(int s1, int s2, int s3);
 
 private slots:
     void divChange();

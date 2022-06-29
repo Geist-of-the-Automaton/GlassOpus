@@ -73,12 +73,12 @@ public:
         colorSB1 = new QSpinBox(rasterPanel);
         colorSB1->setRange(0, 360);
         colorSB1->setObjectName("colorSB");
-        colorSB1->setValue(120);
+        colorSB1->setValue(0);
         colorBox1->addWidget(colorSB1);
         colorS1 = new QSlider(rasterPanel);
         colorS1->setRange(0, 360);
         colorS1->setObjectName("colorS");
-        colorS1->setValue(120);
+        colorS1->setValue(0);
         colorS1->setOrientation(Qt::Horizontal);
         colorS1->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Minimum);
         colorBox1->addWidget(colorS1);
@@ -93,11 +93,11 @@ public:
         for (short y = 0; y <= 255; ++y) {
             QRgb *line = reinterpret_cast<QRgb *>(img1.scanLine(y));
             for (short x = 0; x <= 255; ++x) {
-                qc1.setHsl(120, 255 - y, x);
+                qc1.setHsl(-1, 255 - y, x);
                 line[x] = qc1.rgba();
             }
         }
-        qc1.setHsl(120, 0, 0);
+        qc1.setHsl(-1, 0, 0);
         int hue1 = (qc1.hslHue() + 1) + 180;
         if (hue1 > 360)
             hue1 -= 360;
@@ -177,11 +177,11 @@ public:
         mainVert->addLayout(flipDesc);
         flipBox = new QHBoxLayout();
         hFlipPB = new QPushButton(rasterPanel);
-        hFlipPB->setObjectName("hflipPB");
+        hFlipPB->setObjectName("hFlipPB");
         hFlipPB->setText("Horizontal Flip");
         flipBox->addWidget(hFlipPB);
         vFlipPB = new QPushButton(rasterPanel);
-        vFlipPB->setObjectName("flipSetPB");
+        vFlipPB->setObjectName("vFlipPB");
         vFlipPB->setText("Vertical Flip");
         flipBox->addWidget(vFlipPB);
         mainVert->addLayout(flipBox);

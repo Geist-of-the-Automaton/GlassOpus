@@ -49,24 +49,10 @@ public:
     QSpinBox *colorSB2;
     QSlider *colorS2;
 
-    QHBoxLayout *taperDesc, *taperBox1, *taperBox2;
-    QLabel *taperLb1, *taperLb2;
-    QSpinBox *taperSB, *taperSb2;
-    QSlider *taperS1, *taperS2;
-
-    QHBoxLayout *gapDesc, *gapBox;
-    QLabel *gapLb;
-    QSpinBox *gapSB;
-    QSlider *gapS;
-
     QHBoxLayout *bandDesc, *bandBox;
     QLabel *bandLb;
     QSpinBox *bandSB;
     QSlider *bandS;
-
-    QHBoxLayout *symDesc, *symBox;
-    QLabel *symLb;
-    QComboBox *sym1, *sym2, *sym3;
 
     QHBoxLayout *tViewDesc, *tViewBox;
     QLabel *tViewLb;
@@ -102,12 +88,12 @@ public:
         modeFilterBox->setObjectName("modeFilterBox");
         modeCB = new QComboBox(polyPanel);
         modeCB->addItems({"Color Polygon", "Filter Polygon"});
-        modeCB->setObjectName("mode");
+        modeCB->setObjectName("modeCB");
         modeFilterBox->addWidget(modeCB);
         filterCB = new QComboBox(polyPanel);
         for (string s : graphics::vectorFilters)
             filterCB->addItem(s.c_str());
-        filterCB->setObjectName("filter");
+        filterCB->setObjectName("filterCB");
         modeFilterBox->addWidget(filterCB);
         mainVert->addLayout(modeFilterBox);
 
@@ -123,15 +109,17 @@ public:
         strengthBox = new QHBoxLayout();
         mainVert->addLayout(strengthDesc);
         strengthSB = new QSpinBox(polyPanel);
-        strengthSB->setRange(0, 1);
+        strengthSB->setRange(0, 255);
         strengthSB->setObjectName("strengthSB");
         strengthSB->setValue(255);
+        strengthSB->setSingleStep(1);
         strengthBox->addWidget(strengthSB);
         strengthS = new QSlider(polyPanel);
-        strengthS->setRange(0, 1);
+        strengthS->setRange(0, 255);
         strengthS->setObjectName("strengthS");
         strengthS->setValue(255);
         strengthS->setOrientation(Qt::Horizontal);
+        strengthS->setTickInterval(1);
         strengthBox->addWidget(strengthS);
         mainVert->addLayout(strengthBox);
 
@@ -148,15 +136,17 @@ public:
         mainVert->addLayout(colorDesc1);
         colorSB1 = new QSpinBox(polyPanel);
         colorSB1->setRange(0, 360);
-        colorSB1->setObjectName("colorSB");
-        colorSB1->setValue(120);
+        colorSB1->setObjectName("colorSB1");
+        colorSB1->setValue(0);
+        colorSB1->setSingleStep(1);
         colorBox1->addWidget(colorSB1);
         colorS1 = new QSlider(polyPanel);
         colorS1->setRange(0, 360);
-        colorS1->setObjectName("colorS");
-        colorS1->setValue(120);
+        colorS1->setObjectName("colorS1");
+        colorS1->setValue(0);
         colorS1->setOrientation(Qt::Horizontal);
         colorS1->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Minimum);
+        colorS1->setSingleStep(1);
         colorBox1->addWidget(colorS1);
         colorAdv1 = new QPushButton(polyPanel);
         colorAdv1->setText("Advanced");
@@ -165,15 +155,14 @@ public:
         mainVert->addLayout(colorBox1);
         QImage img1(256, 128, QImage::Format_ARGB32_Premultiplied);
         QColor qc1;
-        unsigned long time1 = stdFuncs::getTime();
         for (short y = 0; y <= 127; ++y) {
             QRgb *line = reinterpret_cast<QRgb *>(img1.scanLine(y));
             for (short x = 0; x <= 255; ++x) {
-                qc1.setHsl(45, 255 - 2 * y, x);
+                qc1.setHsl(-1, 255 - 2 * y, x);
                 line[x] = qc1.rgba();
             }
         }
-        qc1.setHsl(45, 0, 0);
+        qc1.setHsl(-1, 0, 0);
         int hue1 = (qc1.hslHue() + 1) + 180;
         if (hue1 > 360)
             hue1 -= 360;
@@ -194,22 +183,23 @@ public:
         }
         color1 = new QLabel(polyPanel);
         color1->setPixmap(QPixmap::fromImage(img1));
-        cout << stdFuncs::getTime(time1) << endl;
         color1->setCursor(Qt::CrossCursor);
         color1->setMouseTracking(true);
         mainVert->addWidget(color1);
         colorBox2 = new QHBoxLayout();
         colorSB2 = new QSpinBox(polyPanel);
         colorSB2->setRange(0, 360);
-        colorSB2->setObjectName("colorSB");
-        colorSB2->setValue(120);
+        colorSB2->setObjectName("colorSB2");
+        colorSB2->setValue(0);
+        colorSB2->setSingleStep(1);
         colorBox2->addWidget(colorSB2);
         colorS2 = new QSlider(polyPanel);
         colorS2->setRange(0, 360);
-        colorS2->setObjectName("colorS");
-        colorS2->setValue(120);
+        colorS2->setObjectName("colorS2");
+        colorS2->setValue(0);
         colorS2->setOrientation(Qt::Horizontal);
         colorS2->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Minimum);
+        colorS2->setSingleStep(1);
         colorBox2->addWidget(colorS2);
         colorAdv2 = new QPushButton(polyPanel);
         colorAdv2->setText("Advanced");
@@ -218,15 +208,14 @@ public:
         mainVert->addLayout(colorBox2);
         QImage img(256, 128, QImage::Format_ARGB32_Premultiplied);
         QColor qc;
-        unsigned long time2 = stdFuncs::getTime();
         for (short y = 0; y <= 127; ++y) {
             QRgb *line = reinterpret_cast<QRgb *>(img.scanLine(y));
             for (short x = 0; x <= 255; ++x) {
-                qc.setHsl(120, 255 - 2 * y, x);
+                qc.setHsl(-1, 255 - 2 * y, x);
                 line[x] = qc.rgba();
             }
         }
-        qc.setHsl(120, 0, 0);
+        qc.setHsl(-1, 0, 0);
         int hue = (qc.hslHue() + 1) + 180;
         if (hue > 360)
             hue -= 360;
@@ -247,7 +236,6 @@ public:
         }
         color2 = new QLabel(polyPanel);
         color2->setPixmap(QPixmap::fromImage(img));
-        cout << stdFuncs::getTime(time2) << endl;
         color2->setCursor(Qt::CrossCursor);
         color2->setMouseTracking(true);
         mainVert->addWidget(color2);
@@ -264,15 +252,17 @@ public:
         bandBox = new QHBoxLayout();
         mainVert->addLayout(bandDesc);
         bandSB = new QSpinBox(polyPanel);
-        bandSB->setRange(minStyle, maxStyle);
+        bandSB->setRange(0, maxWidth);
         bandSB->setObjectName("bandSB");
-        bandSB->setValue(minStyle);
+        bandSB->setValue(0);
+        bandSB->setSingleStep(1);
         bandBox->addWidget(bandSB);
         bandS = new QSlider(polyPanel);
-        bandS->setRange(minStyle, maxStyle);
+        bandS->setRange(0, maxWidth);
         bandS->setObjectName("bandS");
-        bandS->setValue(minStyle);
+        bandS->setValue(0);
         bandS->setOrientation(Qt::Horizontal);
+        bandS->setTickInterval(1);
         bandBox->addWidget(bandS);
         mainVert->addLayout(bandBox);
 

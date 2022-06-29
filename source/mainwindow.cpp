@@ -87,6 +87,9 @@ MainWindow::MainWindow(string startPath, string projectFile, QWidget *parent)
     ui->menubar->setCornerWidget(dynamic_cast<QMenuBar *>(objFetch.at(UI_FileName.toStdString())), Qt::TopLeftCorner);
     resizeCheck = new resizeWindow(this, ioh);
     radialProfiler = new RadialProfiler(&bh, this);
+    brushProlfiler = new brushShape(this);
+    pp = new patternProfiler(this);
+    symDialog = new SymDialog(this);
     onePress = false;
     vs->setWidget(sr);
     file.setFileName(QDir::currentPath() + UI_Loc + Icon_Loc + WinIco_FileName);
@@ -124,22 +127,176 @@ MainWindow::MainWindow(string startPath, string projectFile, QWidget *parent)
     brushDetails = new QDockWidget(this);
     brushScroller = new viewScroller(brushDetails);
     brushPanel = new BrushPanel(brushScroller);
+    brushPanel->setWork(&bh, pp, brushProlfiler, radialProfiler);
+    connect(brushPanel, &BrushPanel::updateSizeShape, this, [this] {
+        if (bh.getBrushShape() == custom)
+            bh.setShape(brushShapes[bh.getBrushShape()], brushProlfiler->getShapeSize(bh.getSize()));
+        sr->updateHoverMap(bh.getSize(), bh.getBrushMap());
+    });
+    connect(brushPanel, &BrushPanel::symExec, this, [this] {
+       doSomething("Symmetry Tool");
+    });
     setupDock(brushDetails, brushScroller, brushPanel);
     vectDetails = new QDockWidget(this);
     vectScroller = new viewScroller(vectDetails);
     vectPanel = new VectPanel(vectScroller);
+    connect(vectPanel, &VectPanel::actionGiven, this, [this] {
+        Layer *layer = ioh->getWorkingLayer();
+        pair <vType, unsigned int> data = vectPanel->getData();
+        if (layer->getActiveVectors().size() == 1 || layer->symActive())
+            switch (data.first) {
+            case vSym:
+                doSomething("Symmetry Tool");
+                break;
+            case vMode:
+                doSomething(data.second == 0 ? "Color Vector" : "Filter Vector");
+                break;
+            case vFilter:
+                changeVectorFilter(vectorFilters[data.second]);
+                break;
+            case vStrength:
+                layer->setVectorFilterStrength(data.second);
+                break;
+            case vColor1:
+                layer->setVectorColor2(data.second);
+                break;
+            case vColor2:
+                layer->setVectorColor1(data.second);
+                break;
+            case vTaper1:
+                layer->setVectorTaper1(data.second);
+                break;
+            case vTaper2:
+                layer->setVectorTaper2(data.second);
+                break;
+            case vGap:
+                layer->setGap(data.second);
+                break;
+            case vBand:
+                layer->setBand(data.second);
+                break;
+            case vWidth:
+                layer->setWidth(data.second);
+                break;
+            case vStyle:
+                doSomething(data.second == 0 ? "Single Taper" : "Double Taper");
+                break;
+            }
+        refresh();
+    });
     setupDock(vectDetails, vectScroller, vectPanel);
     polyDetails = new QDockWidget(this);
     polyScroller = new viewScroller(polyDetails);
     polyPanel = new PolyPanel(polyScroller);
+    connect(polyPanel, &PolyPanel::actionGiven, this, [this] {
+        Layer *layer = ioh->getWorkingLayer();
+        pair <pType, unsigned int> data = polyPanel->getData();
+        if (layer->getActiveGons().size() == 1)
+            switch (data.first) {
+            case pMode:
+                doSomething(data.second == 0 ? "Color Polygon" : "Filter Polygon");
+                break;
+            case pFilter:
+                changePolygonFilter(vectorFilters[data.second]);
+                break;
+            case pStrength:
+                layer->setPolyFilterStrength(data.second);
+                break;
+            case pColor1:
+                layer->setGonColor(pair <QColor, QColor> (data.second, layer->getGonColor().second));
+                break;
+            case pColor2:
+                layer->setGonColor(pair <QColor, QColor> (layer->getGonColor().first, data.second));
+                break;
+            case pBand:
+                layer->setEdgeSize(data.second);
+                break;
+            case pReduce:
+                doSomething("Reduce Points");
+                break;
+            case pTriView:
+                layer->setShowDivs(data.second == 0 ? false : true);
+                break;
+            }
+        refresh();
+    });
     setupDock(polyDetails, polyScroller, polyPanel);
     rasterDetails = new QDockWidget(this);
     rasterScroller = new viewScroller(polyDetails);
     rasterPanel = new RasterPanel(rasterScroller);
+    connect(rasterPanel, &RasterPanel::actionGiven, this, [this] {
+        Layer *layer = ioh->getWorkingLayer();
+        pair <rType, unsigned int> data = rasterPanel->getData();
+        if (data.first == rColor)
+            bh.setFillColor(data.second);
+        else {
+            string arr[] = {"Take Color", "Transparency Fill", "Magic Wand Selection", "Magic Wand Settings", "Flip Selection Horizontal", "Flip Selection Vertical", "Brightness Adjustment", "Contrast Adjustment", "Gamma Adjustment", "Saturation Adjustment", "Hue Adjustment", "Target Tool", "Filter", "Convolve", "Dither", "Color Transfer"};
+            doSomething(arr[data.first - 1]);
+        }
+    });
     setupDock(rasterDetails, rasterScroller, rasterPanel);
     textDetails = new QDockWidget(this);
     textScroller = new viewScroller(polyDetails);
     textPanel = new TextPanel(textScroller);
+    connect(textPanel, &TextPanel::actionGiven, this, [this] {
+        Layer *layer = ioh->getWorkingLayer();
+        pair <textType, unsigned int> data = textPanel->getData();
+        if (layer->getActiveTexts().size() == 1) {
+            QFont font = layer->getFont();
+            QStaticText qst = layer->getText();
+            QFontDatabase qfd;
+            switch (data.first) {
+            case tColor:
+                layer->setTextColor(data.second);
+                break;
+            case tText:
+                qst.setText(textPanel->getText());
+                layer->setText(qst);
+                break;
+            case tFont:
+                font.setFamily(qfd.families()[data.second]);
+                layer->setFont(font);
+                break;
+            case tSize:
+                font.setPointSize(data.second);
+                layer->setFont(font);
+                break;
+            case tTaw:
+                qst.setTextWidth(data.second);
+                layer->setText(qst);
+                break;
+            case tWord:
+                font.setWordSpacing(static_cast<int>(data.second));
+                layer->setFont(font);
+                break;
+            case tLetter:
+                font.setLetterSpacing(font.letterSpacingType(), static_cast<int>(data.second));
+                layer->setFont(font);
+                break;
+            case tBold:
+                font.setBold(data.second == 0 ? false : true);
+                layer->setFont(font);
+                break;
+            case tItal:
+                font.setItalic(data.second == 0 ? false : true);
+                layer->setFont(font);
+                break;
+            case tUndr:
+                font.setUnderline(data.second == 0 ? false : true);
+                layer->setFont(font);
+                break;
+            case tOver:
+                font.setOverline(data.second == 0 ? false : true);
+                layer->setFont(font);
+                break;
+            case tStrk:
+                font.setStrikeOut(data.second == 0 ? false : true);
+                layer->setFont(font);
+                break;
+            }
+        }
+        refresh();
+    });
     setupDock(textDetails, textScroller, textPanel);
     objDetails = vectDetails;
     objScroller = vectScroller;
@@ -147,8 +304,6 @@ MainWindow::MainWindow(string startPath, string projectFile, QWidget *parent)
     setMode(Brush_Mode);
     sr->setCursor(Qt::ArrowCursor);
     sr->setHoverActive(true);
-    brushProlfiler = new brushShape(this);
-    pp = new patternProfiler(this);
     mwd = new MagicWandDialog(this);
     if (projectFile != "") {
         show();
@@ -166,7 +321,6 @@ MainWindow::MainWindow(string startPath, string projectFile, QWidget *parent)
     }
     ioh->addLayer();
     histograms = new QLabel();
-    symDialog = new SymDialog(this);
     connect(&qte, SIGNAL(textChanged()), this, SLOT(textChanged()));
     showMaximized();
     LayerMenu->setOffsets(menubar->height() + toolbar->height(), ui->statusbar->height(), 0);
@@ -324,6 +478,7 @@ void MainWindow::mouseReleaseEvent(QMouseEvent *event) {
             bh.setSym(qp, symDialog->getDiv(), symDialog->getOfEvery(), symDialog->getSkip());
             if (symDialog->getDiv() == 1)
                 sr->setSamplePt(QPoint(-1000, -1000));
+            brushPanel->updateFromBH();
             altFlag = false;
         }
         refresh();
@@ -335,10 +490,14 @@ void MainWindow::mouseReleaseEvent(QMouseEvent *event) {
         return;
     }
     if (takeFlag) {
-        if (mode == Brush_Mode)
+        if (mode == Brush_Mode) {
             bh.setBrushColor(ioh->getWorkingLayer()->getCanvas()->pixelColor(qp.x(), qp.y()));
-        else if (mode == Raster_Mode)
+            brushPanel->updateFromBH();
+        }
+        else if (mode == Raster_Mode) {
             bh.setFillColor(ioh->getWorkingLayer()->getCanvas()->pixelColor(qp.x(), qp.y()));
+            rasterPanel->updatePanel(bh.getFillColor());
+        }
         if (!shiftFlag)
             takeFlag = false;
         return;
@@ -374,6 +533,26 @@ void MainWindow::mouseDoubleClickEvent(QMouseEvent *event) {
             layer->doubleClickLeft(qp, ctrlFlag);
         else if (button == RightButton && (ctrlFlag || mode == Text_Mode))
             layer->doubleClickRight(qp);
+        if (mode == Spline_Mode) {
+            if (layer->getActiveVectors().size() == 1 || layer->symActive())
+                vectPanel->updatePanel(layer->getVectors()[layer->getActiveVectors()[0]]);
+            else
+                vectPanel->resetPanel();
+        }
+        else if (mode == Polygon_Mode) {
+            cout << "here" << endl;
+            if (layer->getActiveGons().size() == 1)
+                polyPanel->updatePanel(layer->getPolgons()[layer->getActiveGons()[0]]);
+            else
+                polyPanel->resetPanel();
+            cout << "there" << endl;
+        }
+        else if (mode == Text_Mode) {
+            if (layer->getActiveTexts().size() == 1)
+                textPanel->updatePanel(layer->getTexts()[layer->getActiveTexts()[0]]);
+            else
+                textPanel->resetPanel();
+        }
         sr->showPts();
         refresh();
     }
@@ -399,10 +578,12 @@ void MainWindow::wheelEvent(QWheelEvent *event) {
         if (shiftFlag) {
             bh.setStrength(bh.getStength() + dy);
             statusBar()->showMessage(("Brush Strength: " + to_string(bh.getStength())).c_str(), 1000);
+            brushPanel->updateFromBH();
         }
         else if (ctrlFlag) {
             bh.setDensity(bh.getDensity() + dy);
             statusBar()->showMessage(("Brush Density: " + to_string(bh.getDensity())).c_str(), 1000);
+            brushPanel->updateFromBH();
         }
         else {
             radialProfiler->updateSize(bh.getSize() + dy);
@@ -410,6 +591,7 @@ void MainWindow::wheelEvent(QWheelEvent *event) {
                 bh.setShape(brushShapes[bh.getBrushShape()], brushProlfiler->getShapeSize(bh.getSize()));
             sr->updateHoverMap(bh.getSize(), bh.getBrushMap());
             statusBar()->showMessage(("Brush Radius: " + to_string(bh.getSize())).c_str(), 1000);
+            brushPanel->updateFromBH();
         }
     }
     else if (mode == Spline_Mode) {
@@ -419,6 +601,7 @@ void MainWindow::wheelEvent(QWheelEvent *event) {
                 return;
             ioh->getWorkingLayer()->setVectorTaper1(ioh->getWorkingLayer()->getVectorTapers().first + dy);
             statusBar()->showMessage(("Vector Taper 1: " + to_string(ioh->getWorkingLayer()->getVectorTapers().first)).c_str(), 1000);
+            vectPanel->updatePanel(pair <vType, unsigned int> (vTaper1, ioh->getWorkingLayer()->getVectorTapers().first));
         }
         else if (ctrlFlag) {
             vector <unsigned char> activeVects = ioh->getWorkingLayer()->getActiveVectors();
@@ -426,14 +609,22 @@ void MainWindow::wheelEvent(QWheelEvent *event) {
                 return;
             ioh->getWorkingLayer()->setVectorTaper2(ioh->getWorkingLayer()->getVectorTapers().second + dy);
             statusBar()->showMessage(("Vector Taper 2: " + to_string(ioh->getWorkingLayer()->getVectorTapers().second)).c_str(), 1000);
+            vectPanel->updatePanel(pair <vType, unsigned int> (vTaper2, ioh->getWorkingLayer()->getVectorTapers().second));
         }
         else {
             ioh->getWorkingLayer()->spinWheel(dy);
             if (ioh->getWorkingLayer()->getActiveVectors().size() == 1)
                 statusBar()->showMessage(("Vector Width: " + to_string(ioh->getWorkingLayer()->getWidth())).c_str(), 1000);
+            vectPanel->updatePanel(pair <vType, unsigned int> (vWidth, ioh->getWorkingLayer()->getWidth()));
         }
     }
-    else if (mode == Raster_Mode || mode == Polygon_Mode || mode == Text_Mode)
+    else if (mode == Polygon_Mode) {
+        ioh->getWorkingLayer()->spinWheel(dy);
+        Layer *layer = ioh->getWorkingLayer();
+        if (layer->getActiveGons().size() == 1)
+            polyPanel->updatePanel(pair <pType, unsigned int> (pBand, (layer->getPolgons()[layer->getActiveGons()[0]]).getEdgeSize()));
+    }
+    else if (mode == Raster_Mode || mode == Text_Mode)
         ioh->getWorkingLayer()->spinWheel(dy);
     scrollLock.unlock();
     refresh();
@@ -723,10 +914,10 @@ void MainWindow::doSomething(string btnPress) {
     else if (btnPress == "Brush Color") {
         QColor color = QColorDialog::getColor(bh.getBrushColor(), this);
         bh.setBrushColor(color);
+        brushPanel->updateFromBH();
     }
-    else if (btnPress == "Radial Profiler") {
+    else if (btnPress == "Radial Profiler")
         radialProfiler->showRelative();
-    }
     else if (btnPress == "Brush Radius") {
         bool ok = false;
         int ret = QInputDialog::getInt(this, "Glass Opus", "Please enter a brush radius", bh.getSize(), minRadius, maxRadius, 1, &ok);
@@ -735,13 +926,16 @@ void MainWindow::doSomething(string btnPress) {
             if (bh.getBrushShape() == custom)
                 bh.setShape(brushShapes[bh.getBrushShape()], brushProlfiler->getShapeSize(bh.getSize()));
             sr->updateHoverMap(bh.getSize(), bh.getBrushMap());
+            brushPanel->updateFromBH();
         }
     }
     else if (btnPress == "Brush Strength") {
         bool ok = false;
         int ret = QInputDialog::getInt(this, "Glass Opus", "Please enter a brush strength", bh.getStength(), minStrength, maxStrength, 1, &ok );
-        if (ok)
+        if (ok) {
             bh.setStrength(ret);
+            brushPanel->updateFromBH();
+        }
     }
     else if (btnPress == "Brush Filter") {
         QInputDialog resPrompt;
@@ -753,31 +947,41 @@ void MainWindow::doSomething(string btnPress) {
         resPrompt.setTextValue(items.first());
         resPrompt.setWindowTitle("Filters");
         int res = resPrompt.exec();
-        if (res)
+        if (res) {
             bh.setFilter(resPrompt.textValue().toStdString());
+            brushPanel->updateFromBH();
+        }
     }
     else if (btnPress == "Spray Density") {
         bool ok = false;
         int ret = QInputDialog::getInt(this, "Glass Opus", "Please enter a spray density", bh.getDensity(), minDensity, maxDensity, 1, &ok );
-        if (ok)
+        if (ok) {
             bh.setDensity(ret);
+            brushPanel->updateFromBH();
+        }
     }
     else if (btnPress == "Flip Selection Vertical")
         ioh->getWorkingLayer()->flipVert();
     else if (btnPress == "Flip Selection Horizontal")
         ioh->getWorkingLayer()->flipHori();
-    else if (btnPress == "Pattern On")
+    else if (btnPress == "Pattern On") {
         bh.setPatternInUse(true);
-    else if (btnPress == "Pattern Off")
+        brushPanel->updateFromBH();
+    }
+    else if (btnPress == "Pattern Off") {
         bh.setPatternInUse(false);
+        brushPanel->updateFromBH();
+    }
     else if (btnPress == "Vector Width") {
         vector <unsigned char> activeVects = ioh->getWorkingLayer()->getActiveVectors();
         if (activeVects.size() != 1 && !ioh->getWorkingLayer()->symActive())
             return;
         bool ok = false;
         int ret = QInputDialog::getInt(this, "Glass Opus", "Please enter a vector width", ioh->getWorkingLayer()->getWidth(), minWidth, maxWidth, 1, &ok );
-        if (ok)
+        if (ok) {
             ioh->getWorkingLayer()->setWidth(ret);
+            vectPanel->updatePanel(pair <vType, unsigned int> (vWidth, ret));
+        }
     }
     else if (btnPress == "Vector Filter Strength") {
         int val = ioh->getWorkingLayer()->getVectorFilterStrength();
@@ -785,8 +989,10 @@ void MainWindow::doSomething(string btnPress) {
             return;
         bool ok = false;
         int ret = QInputDialog::getInt(this, "Glass Opus", "Please enter a vector filter strength", val, graphics::minColor, graphics::maxColor, 1, &ok );
-        if (ok)
+        if (ok) {
             ioh->getWorkingLayer()->setVectorFilterStrength(ret);
+            vectPanel->updatePanel(pair <vType, unsigned int> (vStrength, ret));
+        }
     }
     else if (btnPress == "Taper 1") {
         vector <unsigned char> activeVects = ioh->getWorkingLayer()->getActiveVectors();
@@ -794,8 +1000,10 @@ void MainWindow::doSomething(string btnPress) {
             return;
         bool ok = false;
         int ret = QInputDialog::getInt(this, "Glass Opus", "Please enter a first taper degree", ioh->getWorkingLayer()->getVectorTapers().first, minTaper, maxTaper, 1, &ok);
-        if (ok)
+        if (ok) {
             ioh->getWorkingLayer()->setVectorTaper1(ret);
+            vectPanel->updatePanel(pair <vType, unsigned int> (vTaper1, ret));
+        }
     }
     else if (btnPress == "Taper 2") {
         vector <unsigned char> activeVects = ioh->getWorkingLayer()->getActiveVectors();
@@ -803,8 +1011,10 @@ void MainWindow::doSomething(string btnPress) {
             return;
         bool ok = false;
         int ret = QInputDialog::getInt(this, "Glass Opus", "Please enter a second taper degree", ioh->getWorkingLayer()->getVectorTapers().second, minTaper, maxTaper, 1, &ok);
-        if (ok)
+        if (ok) {
             ioh->getWorkingLayer()->setVectorTaper2(ret);
+            vectPanel->updatePanel(pair <vType, unsigned int> (vTaper2, ret));
+        }
     }
     else if (btnPress == "Vector Color 1") {
         vector <unsigned char> activeVects = ioh->getWorkingLayer()->getActiveVectors();
@@ -812,6 +1022,7 @@ void MainWindow::doSomething(string btnPress) {
             return;
         QColor color = QColorDialog::getColor(ioh->getWorkingLayer()->getVectorColors().second, this);
         ioh->getWorkingLayer()->setVectorColor2(color.rgba());
+        vectPanel->updatePanel(pair <vType, unsigned int> (vColor1, color.rgba()));
     }
     else if (btnPress == "Vector Color 2") {
         vector <unsigned char> activeVects = ioh->getWorkingLayer()->getActiveVectors();
@@ -819,12 +1030,15 @@ void MainWindow::doSomething(string btnPress) {
             return;
         QColor color = QColorDialog::getColor(ioh->getWorkingLayer()->getVectorColors().first, this);
         ioh->getWorkingLayer()->setVectorColor1(color.rgba());
+        vectPanel->updatePanel(pair <vType, unsigned int> (vColor2, color.rgba()));
     }
     else if (btnPress == "Single Taper") {
         ioh->getWorkingLayer()->setVectorTaperType(Single);
+        vectPanel->updatePanel(pair <vType, unsigned int> (vStyle, 1));
     }
     else if (btnPress == "Double Taper") {
         ioh->getWorkingLayer()->setVectorTaperType(Double);
+        vectPanel->updatePanel(pair <vType, unsigned int> (vStyle, 0));
     }
     else if (btnPress == "Band Size") {
         vector <unsigned char> activeVects = ioh->getWorkingLayer()->getActiveVectors();
@@ -832,8 +1046,10 @@ void MainWindow::doSomething(string btnPress) {
             return;
         bool ok = false;
         int ret = QInputDialog::getInt(this, "Glass Opus", "Please enter a banding width", ioh->getWorkingLayer()->getBand(), minStyle, maxStyle, 1, &ok);
-        if (ok)
+        if (ok) {
             ioh->getWorkingLayer()->setBand(ret);
+            vectPanel->updatePanel(pair <vType, unsigned int> (vBand, ret));
+        }
     }
     else if (btnPress == "Gap Size") {
         vector <unsigned char> activeVects = ioh->getWorkingLayer()->getActiveVectors();
@@ -841,20 +1057,27 @@ void MainWindow::doSomething(string btnPress) {
             return;
         bool ok = false;
         int ret = QInputDialog::getInt(this, "Glass Opus", "Please enter a gap width", ioh->getWorkingLayer()->getGap(), 0, maxStyle, 1, &ok);
-        if (ok)
+        if (ok) {
             ioh->getWorkingLayer()->setGap(ret);
+            vectPanel->updatePanel(pair <vType, unsigned int> (vGap, ret));
+        }
     }
     else if (btnPress == "Swap Colors") {
         ioh->getWorkingLayer()->swapColors();
     }
     else if (btnPress == "Swap Tapers") {
         ioh->getWorkingLayer()->swapTapers();
+        pair <char, char> tapers = ioh->getWorkingLayer()->getVectorTapers();
+        vectPanel->updatePanel(pair <vType, unsigned int> (vTaper1, tapers.first));
+        vectPanel->updatePanel(pair <vType, unsigned int> (vTaper2, tapers.second));
     }
     else if (btnPress == "Color Vector") {
         ioh->getWorkingLayer()->setVectorMode(ColorFill);
+        vectPanel->updatePanel(pair <vType, unsigned int> (vMode, 0));
     }
     else if (btnPress == "Filter Vector") {
         ioh->getWorkingLayer()->setVectorMode(Filtered);
+        vectPanel->updatePanel(pair <vType, unsigned int> (vMode, 1));
     }
     else if (btnPress == "Symmetry Tool") {
         symDialog->exec();
@@ -863,16 +1086,21 @@ void MainWindow::doSomething(string btnPress) {
         if (symDialog->getDiv() != 1)
             sr->setSamplePt(bh.getSymPt());
     }
-    else if (btnPress == "Color Polygon")
+    else if (btnPress == "Color Polygon") {
         ioh->getWorkingLayer()->setPolyMode(ColorGon);
-    else if (btnPress == "Filter Polygon")
+        polyPanel->updatePanel(pair <pType, unsigned int> (pMode, 0));
+    }
+    else if (btnPress == "Filter Polygon") {
         ioh->getWorkingLayer()->setPolyMode(FilterGon);
+        polyPanel->updatePanel(pair <pType, unsigned int> (pMode, 1));
+    }
     else if (btnPress == "Interior Color") {
         Layer *layer = ioh->getWorkingLayer();
         if (layer->getActiveGons().size() == 1) {
             pair<QColor, QColor> colors = layer->getGonColor();
             colors.first = QColorDialog::getColor(colors.first, this);
             layer->setGonColor(colors);
+            polyPanel->updatePanel(pair <pType, unsigned int> (pColor1, ioh->getWorkingLayer()->getGonColor().first.rgba()));
         }
     }
     else if (btnPress == "Edge Color") {
@@ -881,6 +1109,7 @@ void MainWindow::doSomething(string btnPress) {
             pair<QColor, QColor> colors = layer->getGonColor();
             colors.second = QColorDialog::getColor(colors.second, this);
             layer->setGonColor(colors);
+            polyPanel->updatePanel(pair <pType, unsigned int> (pColor2, ioh->getWorkingLayer()->getGonColor().second.rgba()));
         }
     }
     else if (btnPress == "Transparent Interior") {
@@ -889,6 +1118,7 @@ void MainWindow::doSomething(string btnPress) {
             pair<QColor, QColor> colors = layer->getGonColor();
             colors.first.setAlpha(0);
             layer->setGonColor(colors);
+            polyPanel->updatePanel(pair <pType, unsigned int> (pColor1, ioh->getWorkingLayer()->getGonColor().first.rgba()));
         }
     }
     else if (btnPress == "Polygon Filter Strength") {
@@ -896,8 +1126,10 @@ void MainWindow::doSomething(string btnPress) {
         if (layer->getActiveGons().size() == 1) {
             bool ok = false;
             int ret = QInputDialog::getInt(this, "Glass Opus", "Please enter a filter strength", layer->getPolyFilterStrength(), 0, 255, 1, &ok);
-            if (ok)
+            if (ok) {
                 layer->setPolyFilterStrength(ret);
+                polyPanel->updatePanel(pair <pType, unsigned int> (pStrength, ret));
+            }
         }
     }
     else if (btnPress == "Edge Size") {
@@ -905,8 +1137,10 @@ void MainWindow::doSomething(string btnPress) {
         if (layer->getActiveGons().size() == 1) {
             bool ok = false;
             int ret = QInputDialog::getInt(this, "Glass Opus", "Please enter a edge size", layer->getEdgeSize(), 0, maxEdgeSize, 1, &ok);
-            if (ok)
+            if (ok) {
+                polyPanel->updatePanel(pair <pType, unsigned int> (pStrength, ret));
                 layer->setEdgeSize(ret);
+            }
         }
     }
     else if (btnPress == "Drag Draw On")
@@ -915,13 +1149,18 @@ void MainWindow::doSomething(string btnPress) {
         ioh->getWorkingLayer()->setDragDraw(false);
     else if (btnPress == "Reduce Points")
         ioh->getWorkingLayer()->reduceGonPts();
-    else if (btnPress == "View Divisions")
+    else if (btnPress == "View Divisions") {
         ioh->getWorkingLayer()->setShowDivs(true);
-    else if (btnPress == "Hide Divisions")
+        polyPanel->updatePanel(pair <pType, unsigned int> (pTriView, 1));
+    }
+    else if (btnPress == "Hide Divisions") {
         ioh->getWorkingLayer()->setShowDivs(false);
+        polyPanel->updatePanel(pair <pType, unsigned int> (pTriView, 0));
+    }
     else if (btnPress == "Polygons to Raster Selection") {
         ioh->getWorkingLayer()->polyToSelect();
         setMode(Raster_Mode);
+        polyPanel->resetPanel();
     }
     else if (btnPress == "Edit Text") {
         if (ioh->getWorkingLayer()->getActiveTexts().size() == 1) {
@@ -930,6 +1169,7 @@ void MainWindow::doSomething(string btnPress) {
             qte.setText(text);
             qte.setWindowModality(Qt::ApplicationModal);
             qte.show();
+            textPanel->updatePanel(text);
         }
     }
     else if (btnPress == "Font") {
@@ -948,6 +1188,7 @@ void MainWindow::doSomething(string btnPress) {
             fontPrompt.exec();
             font.setFamily(fontPrompt.textValue());
             l->setFont(font);
+            textPanel->updatePanel(pair <textType, unsigned int> (tFont, items.indexOf(fontPrompt.textValue())));
         }
     }
     else if (btnPress == "Text Size") {
@@ -957,8 +1198,9 @@ void MainWindow::doSomething(string btnPress) {
             bool ok = false;
             int ret = QInputDialog::getInt(this, "Glass Opus", "Please enter a text size", font.pointSize(), 0, 1000, 1, &ok);
             if (ok)
-                font.setPixelSize(ret);
+                font.setPointSize(ret);
             l->setFont(font);
+            textPanel->updatePanel(pair <textType, unsigned int> (tSize, ret));
         }
     }
     else if (btnPress == "Text Color") {
@@ -966,6 +1208,7 @@ void MainWindow::doSomething(string btnPress) {
             Layer *l = ioh->getWorkingLayer();
             QColor qc = QColorDialog::getColor(l->getTextColor(), this);
             l->setTextColor(qc);
+            textPanel->updatePanel(pair <textType, unsigned int> (tColor, qc.rgba()));
         }
     }
     else if (btnPress == "Bold") {
@@ -974,6 +1217,7 @@ void MainWindow::doSomething(string btnPress) {
             QFont font = l->getFont();
             font.setBold(!font.bold());
             l->setFont(font);
+            textPanel->updatePanel(pair <textType, unsigned int> (tBold, font.bold()));
         }
     }
     else if (btnPress == "Italic") {
@@ -982,6 +1226,7 @@ void MainWindow::doSomething(string btnPress) {
             QFont font = l->getFont();
             font.setItalic(!font.italic());
             l->setFont(font);
+            textPanel->updatePanel(pair <textType, unsigned int> (tItal, font.italic()));
         }
     }
     else if (btnPress == "Underline") {
@@ -990,6 +1235,7 @@ void MainWindow::doSomething(string btnPress) {
             QFont font = l->getFont();
             font.setUnderline(!font.underline());
             l->setFont(font);
+            textPanel->updatePanel(pair <textType, unsigned int> (tUndr, font.underline()));
         }
     }
     else if (btnPress == "Overline") {
@@ -998,6 +1244,7 @@ void MainWindow::doSomething(string btnPress) {
             QFont font = l->getFont();
             font.setOverline(!font.overline());
             l->setFont(font);
+            textPanel->updatePanel(pair <textType, unsigned int> (tOver, font.overline()));
         }
     }
     else if (btnPress == "Strikeout") {
@@ -1006,6 +1253,7 @@ void MainWindow::doSomething(string btnPress) {
             QFont font = l->getFont();
             font.setStrikeOut(!font.strikeOut());
             l->setFont(font);
+            textPanel->updatePanel(pair <textType, unsigned int> (tStrk, font.strikeOut()));
         }
     }
     else if (btnPress == "Text Area Size") {
@@ -1016,6 +1264,7 @@ void MainWindow::doSomething(string btnPress) {
             int ret = QInputDialog::getInt(this, "Glass Opus", "Please enter text area width", qst.textWidth(), -1, 10000, 1, &ok);
             if (ok)
                 qst.setTextWidth(ret);
+            textPanel->updatePanel(pair <textType, unsigned int> (tTaw, ret));
             l->setText(qst);
         }
     }
@@ -1027,6 +1276,7 @@ void MainWindow::doSomething(string btnPress) {
             double ret = QInputDialog::getDouble(this, "Glass Opus", "Please enter word spacing", font.wordSpacing(), -100, 100.0, 1.0, &ok);
             if (ok)
                 font.setWordSpacing(ret);
+            textPanel->updatePanel(pair <textType, unsigned int> (tWord, ret));
             l->setFont(font);
         }
     }
@@ -1038,6 +1288,7 @@ void MainWindow::doSomething(string btnPress) {
             double ret = QInputDialog::getDouble(this, "Glass Opus", "Please enter letter spacing", font.letterSpacing(), -100, 100.0, 1.0, &ok);
             if (ok)
                 font.setLetterSpacing(QFont::AbsoluteSpacing, ret);
+            textPanel->updatePanel(pair <textType, unsigned int> (tLetter, ret));
             l->setFont(font);
         }
     }
@@ -1107,6 +1358,7 @@ void MainWindow::doSomething(string btnPress) {
     else if (btnPress == "Fill Color") {
         QColor color = QColorDialog::getColor(bh.getFillColor(), this);
         bh.setFillColor(color);
+        rasterPanel->updatePanel(color);
     }
     else if (btnPress == "Take Color" && (mode == Brush_Mode || mode == Raster_Mode))
         takeFlag = true;
@@ -1195,29 +1447,67 @@ void MainWindow::doSomething(string btnPress) {
             ioh->copyText();
     }
     else if (btnPress == "Cut") {
-        if (mode == Spline_Mode)
+        if (mode == Spline_Mode) {
             ioh->cutVectors();
+            vectPanel->resetPanel();
+        }
         else if (mode == Raster_Mode)
             ioh->cutRaster();
-        else if (mode == Polygon_Mode)
+        else if (mode == Polygon_Mode) {
             ioh->cutPolygons();
-        else if (mode == Text_Mode)
+            polyPanel->resetPanel();
+        }
+        else if (mode == Text_Mode) {
             ioh->cutText();
+            textPanel->resetPanel();
+        }
     }
-    else if (btnPress == "Delete")
+    else if (btnPress == "Delete") {
         ioh->getWorkingLayer()->deleteSelected();
+        if (mode == Polygon_Mode)
+            polyPanel->resetPanel();
+        else if (mode == Spline_Mode)
+            vectPanel->resetPanel();
+        else if (mode == Text_Mode)
+            textPanel->resetPanel();
+    }
+    else if (btnPress == "Deselect") {
+        ioh->getWorkingLayer()->deselect();
+        if (mode == Polygon_Mode)
+            polyPanel->resetPanel();
+        else if (mode == Spline_Mode)
+            vectPanel->resetPanel();
+        else if (mode == Text_Mode)
+            textPanel->resetPanel();
+    }
     else if (btnPress == "Paste") {
-        if (mode == Spline_Mode)
+        if (mode == Spline_Mode) {
             ioh->pasteVectors();
+            if (ioh->getWorkingLayer()->getActiveVectors().size() == 1 || ioh->getWorkingLayer()->symActive())
+                vectPanel->updatePanel(ioh->getWorkingLayer()->getVectors()[ioh->getWorkingLayer()->getActiveVectors()[0]]);
+        }
         else if (mode == Raster_Mode)
             ioh->pasteRaster();
-        else if (mode == Polygon_Mode)
+        else if (mode == Polygon_Mode) {
             ioh->pastePolygons();
-        else if (mode == Text_Mode)
+            if (ioh->getWorkingLayer()->getActiveGons().size() == 1)
+                polyPanel->updatePanel(ioh->getWorkingLayer()->getPolgons()[ioh->getWorkingLayer()->getActiveGons()[0]]);
+        }
+        else if (mode == Text_Mode) {
             ioh->pasteText();
+            if (ioh->getWorkingLayer()->getActiveTexts().size() == 1)
+                textPanel->updatePanel(ioh->getWorkingLayer()->getTexts()[ioh->getWorkingLayer()->getActiveTexts()[0]]);
+        }
     }
-    else if (btnPress == "Select All")
+    else if (btnPress == "Select All") {
         ioh->getWorkingLayer()->selectAll();
+        if (mode == Spline_Mode && (ioh->getWorkingLayer()->getActiveVectors().size() == 1 || ioh->getWorkingLayer()->symActive()))
+            vectPanel->updatePanel(ioh->getWorkingLayer()->getVectors()[ioh->getWorkingLayer()->getActiveVectors()[0]]);
+        else if (mode == Polygon_Mode && ioh->getWorkingLayer()->getActiveGons().size() == 1)
+            polyPanel->updatePanel(ioh->getWorkingLayer()->getPolgons()[ioh->getWorkingLayer()->getActiveGons()[0]]);
+        else if (mode == Text_Mode && ioh->getWorkingLayer()->getActiveTexts().size() == 1)
+            textPanel->updatePanel(ioh->getWorkingLayer()->getTexts()[ioh->getWorkingLayer()->getActiveTexts()[0]]);
+    }
     else if (btnPress == "Set Active Layer") {
         bool ok = false;
         int ret = QInputDialog::getInt(this, "Glass Opus", "Select a layer to edit", ioh->getActiveLayer() + 1, 1, ioh->getNumLayers(), 1, &ok) - 1;
@@ -1383,9 +1673,10 @@ void MainWindow::downloadTimeout() {
 }
 
 void MainWindow::changeVectorFilter(string s) {
-    if (ioh->getWorkingLayer() == nullptr || ioh->getWorkingLayer()->getActiveVectors().size() == 0)
+    if (ioh->getWorkingLayer() == nullptr || !(ioh->getWorkingLayer()->getActiveVectors().size() == 1 || ioh->getWorkingLayer()->symActive()))
         return;
     ioh->getWorkingLayer()->setVectorFilter(s);
+    vectPanel->updatePanel(pair <vType, unsigned int> (vFilter, (ioh->getWorkingLayer()->getVectors()[ioh->getWorkingLayer()->getActiveVectors()[0]]).getFilter().getFilterIndex()));
     refresh();
 }
 
@@ -1393,6 +1684,7 @@ void MainWindow::changePolygonFilter(string s) {
     if (ioh->getWorkingLayer() == nullptr || ioh->getWorkingLayer()->getActiveGons().size() == 0)
         return;
     ioh->getWorkingLayer()->setPolygonFilter(s);
+    polyPanel->updatePanel(pair <pType, unsigned int> (pFilter, (ioh->getWorkingLayer()->getPolgons()[ioh->getWorkingLayer()->getActiveGons()[0]]).getFilter().getFilterIndex()));
     refresh();
 }
 
@@ -1405,6 +1697,7 @@ void MainWindow::changeScreenFilter(string filterName) {
 
 void MainWindow::changeBrushFilter(string filterName) {
     bh.setFilter(filterName);
+    brushPanel->updateFromBH();
 }
 
 void MainWindow::changeBrushShape(string shape) {
@@ -1414,6 +1707,7 @@ void MainWindow::changeBrushShape(string shape) {
     }
     else
         bh.setShape(shape);
+    brushPanel->updateFromBH();
     sr->updateHoverMap(bh.getSize(), bh.getBrushMap());
 }
 
@@ -1423,6 +1717,7 @@ void MainWindow::changeBrushMethod(string method) {
         bh.setSym(bh.getSymPt(), 1, 1, 0);
     }
     bh.setAppMethod(method);
+    brushPanel->updateFromBH();
 }
 
 void MainWindow::textChanged() {
@@ -1451,8 +1746,10 @@ void MainWindow::keyPressEvent(QKeyEvent *event) {
         Layer *layer = ioh->getWorkingLayer();
         bool ret = layer->updateText(key, shiftFlag);
         refresh();
-        if (ret)
+        if (ret) {
+            textPanel->updatePanel(layer->getText().text());
             return;
+        }
     }
     switch (key) {
     case Key_Up:
@@ -1466,22 +1763,28 @@ void MainWindow::keyPressEvent(QKeyEvent *event) {
             if (shiftFlag) {
                 bh.strengthDown();
                 statusBar()->showMessage(("Brush Strength: " + to_string(bh.getStength())).c_str(), 1000);
+                brushPanel->updateFromBH();
             }
             else if (ctrlFlag) {
                 bh.densityDown();
                 statusBar()->showMessage(("Brush Density: " + to_string(bh.getDensity())).c_str(), 1000);
+                brushPanel->updateFromBH();
             }
             else {
                 radialProfiler->updateSize(bh.getSize() - 1);
                 statusBar()->showMessage(("Brush Radius: " + to_string(bh.getSize())).c_str(), 1000);
+                brushPanel->updateFromBH();
             }
         }
-        else if (mode == Spline_Mode)
+        else if (mode == Spline_Mode) {
             layer->widthDown();
+            vectPanel->updatePanel(pair <vType, unsigned int> (vWidth, layer->getWidth()));
+        }
         else if (mode == Polygon_Mode) {
             if (layer->getActiveGons().size() == 1) {
                 layer->setEdgeSize(layer->getEdgeSize() - 1);
                 statusBar()->showMessage(("Edge Size: " + to_string(layer->getEdgeSize())).c_str(), 1000);
+                polyPanel->updatePanel(pair <pType, unsigned int> (pBand, layer->getEdgeSize()));
             }
         }
         break;
@@ -1490,22 +1793,28 @@ void MainWindow::keyPressEvent(QKeyEvent *event) {
             if (shiftFlag) {
                 bh.strengthUp();
                 statusBar()->showMessage(("Brush Strength: " + to_string(bh.getStength())).c_str(), 1000);
+                brushPanel->updateFromBH();
             }
             else if (ctrlFlag) {
                 bh.densityUp();
                 statusBar()->showMessage(("Brush Density: " + to_string(bh.getDensity())).c_str(), 1000);
+                brushPanel->updateFromBH();
             }
             else {
                 radialProfiler->updateSize(bh.getSize() + 1);
                 statusBar()->showMessage(("Brush Radius: " + to_string(bh.getSize())).c_str(), 1000);
+                brushPanel->updateFromBH();
             }
         }
-        else if (mode == Spline_Mode)
+        else if (mode == Spline_Mode) {
             layer->widthUp();
+            vectPanel->updatePanel(pair <vType, unsigned int> (vWidth, layer->getWidth()));
+        }
         else if (mode == Polygon_Mode) {
             if (layer->getActiveGons().size() == 1) {
                 layer->setEdgeSize(layer->getEdgeSize() + 1);
                 statusBar()->showMessage(("Edge Size: " + to_string(layer->getEdgeSize())).c_str(), 1000);
+                polyPanel->updatePanel(pair <pType, unsigned int> (pBand, layer->getEdgeSize()));
             }
         }
         break;
@@ -1525,22 +1834,43 @@ void MainWindow::keyPressEvent(QKeyEvent *event) {
             altFlag = true;
         break;
     case Key_Escape:
+        doSomething("Deselect");
+        /*
         layer->deselect();
+        if (mode == Spline_Mode)
+            vectPanel->resetPanel();
+        else if (mode == Polygon_Mode)
+            polyPanel->resetPanel();
+            */
         break;
     case Key_Backspace:
     case Key_Delete:
+        doSomething("Delete");
+        /*
         layer->deleteSelected();
+        if (mode == Spline_Mode)
+            vectPanel->resetPanel();
+        if (mode == Polygon_Mode)
+            polyPanel->resetPanel();
+            */
         break;
     case Key_X:
         if (ctrlFlag) {
-            if (mode == Spline_Mode)
+            doSomething("Cut");
+            /*
+            if (mode == Spline_Mode) {
                 ioh->cutVectors();
+                vectPanel->resetPanel();
+            }
             else if (mode == Raster_Mode)
                 ioh->cutRaster();
-            else if (mode == Polygon_Mode)
+            else if (mode == Polygon_Mode) {
                 ioh->cutPolygons();
+                polyPanel->resetPanel();
+            }
             else if (mode == Text_Mode)
                 ioh->cutText();
+                */
         }
         break;
     case Key_C:
@@ -1557,14 +1887,27 @@ void MainWindow::keyPressEvent(QKeyEvent *event) {
         break;
     case Key_V:
         if (ctrlFlag) {
-            if (mode == Spline_Mode)
+            doSomething("Paste");
+            /*
+            if (mode == Spline_Mode) {
                 ioh->pasteVectors();
+                if (ioh->getWorkingLayer()->getActiveVectors().size() == 1 || ioh->getWorkingLayer()->symActive())
+                    vectPanel->updatePanel(ioh->getWorkingLayer()->getVectors()[ioh->getWorkingLayer()->getActiveVectors()[0]]);
+                else
+                    vectPanel->resetPanel();
+            }
             else if (mode == Raster_Mode)
                 ioh->pasteRaster();
-            else if (mode == Polygon_Mode)
+            else if (mode == Polygon_Mode) {
                 ioh->pastePolygons();
+                if (ioh->getWorkingLayer()->getActiveGons().size() == 1)
+                    polyPanel->updatePanel(ioh->getWorkingLayer()->getPolgons()[ioh->getWorkingLayer()->getActiveGons()[0]]);
+                else
+                    polyPanel->resetPanel();
+            }
             else if (mode == Text_Mode)
                 ioh->pasteText();
+                */
         }
         break;
     case Key_A:
@@ -1675,6 +2018,10 @@ void MainWindow::setMode(EditMode emode) {
     mode = emode;
     if (ioh->getWorkingLayer() != nullptr)
         ioh->getWorkingLayer()->setMode(emode);
+    if (mode == Spline_Mode)
+        vectPanel->resetPanel();
+//    else if (mode == Polygon_Mode)
+//        polyPanel->resetPanel();
     sr->setMode(emode);
     if (isVisible()) {
         removeDockWidget(objDetails);

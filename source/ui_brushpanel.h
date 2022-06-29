@@ -61,9 +61,8 @@ public:
     QRadioButton *patternRB;
     QPushButton *patternPB;
 
-    QHBoxLayout *symDesc, *symBox;
-    QLabel *symLb;
-    QComboBox *sym1, *sym2, *sym3;
+    QHBoxLayout *symBox;
+    QPushButton *symPB;
 
     QHBoxLayout *otherDesc, *otherBox;
     QLabel *otherLb;
@@ -77,6 +76,7 @@ public:
         mainVert->setObjectName("mainVert");
         brushPanel->setLayout(mainVert);
         brushPanel->setMaximumWidth(275);
+        brushPanel->setMouseTracking(false);
         methodShapeDesc = new QHBoxLayout();
         methodShapeDesc->setObjectName("methodShapeDesc");
         //methodShapeDesc->addSpacerItem(new QSpacerItem(0, 0, QSizePolicy::MinimumExpanding, QSizePolicy::Minimum));
@@ -97,12 +97,12 @@ public:
         methodCB = new QComboBox(brushPanel);
         for (string s : appMethods)
             methodCB->addItem(s.c_str());
-        methodCB->setObjectName("method");
+        methodCB->setObjectName("methodCB");
         methodShapeBox->addWidget(methodCB);
         shapeCB = new QComboBox(brushPanel);
         for (string s : brushShapes)
             shapeCB->addItem(s.c_str());
-        shapeCB->setObjectName("shape");
+        shapeCB->setObjectName("shapeCB");
         methodShapeBox->addWidget(shapeCB);
         mainVert->addLayout(methodShapeBox);
 
@@ -160,12 +160,12 @@ public:
         colorSB = new QSpinBox(brushPanel);
         colorSB->setRange(0, 360);
         colorSB->setObjectName("colorSB");
-        colorSB->setValue(120);
+        colorSB->setValue(0);
         colorBox->addWidget(colorSB);
         colorS = new QSlider(brushPanel);
         colorS->setRange(0, 360);
         colorS->setObjectName("colorS");
-        colorS->setValue(120);
+        colorS->setValue(0);
         colorS->setOrientation(Qt::Horizontal);
         colorS->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Minimum);
         colorBox->addWidget(colorS);
@@ -180,11 +180,11 @@ public:
         for (short y = 0; y <= 255; ++y) {
             QRgb *line = reinterpret_cast<QRgb *>(img.scanLine(y));
             for (short x = 0; x <= 255; ++x) {
-                qc.setHsl(120, 255 - y, x);
+                qc.setHsl(-1, 255 - y, x);
                 line[x] = qc.rgba();
             }
         }
-        qc.setHsl(120, 0, 0);
+        qc.setHsl(-1, 0, 0);
         int hue = (qc.hslHue() + 1) + 180;
         if (hue > 360)
             hue -= 360;
@@ -278,33 +278,6 @@ public:
         patternPB->setObjectName("patternPB");
         patternBox->addWidget(patternPB);
         mainVert->addLayout(patternBox);
-
-        mainVert->addSpacerItem(new QSpacerItem(275, 10, QSizePolicy::Minimum, QSizePolicy::Fixed));
-
-        symDesc = new QHBoxLayout();
-        symDesc->setObjectName("symDesc");
-        symLb = new QLabel(brushPanel);
-        symLb->setObjectName("symLb");
-        symLb->setText("Symmetry");
-        symDesc->addWidget(symLb);
-        symDesc->addSpacerItem(new QSpacerItem(0, 0, QSizePolicy::MinimumExpanding, QSizePolicy::Minimum));
-        symBox = new QHBoxLayout();
-        mainVert->addLayout(symDesc);
-        sym1 = new QComboBox(brushPanel);
-        sym1->setObjectName(QString::fromUtf8("sym1"));
-        for (int i = minSym; i <= maxSym; ++i)
-            sym1->addItem((to_string(i) + " Divisions").c_str());
-        symBox->addWidget(sym1);
-        sym2 = new QComboBox(brushPanel);
-        sym2->setObjectName(QString::fromUtf8("sym2"));
-        sym2->addItem("Of Every 1");
-        symBox->addWidget(sym2);
-        sym3 = new QComboBox(brushPanel);
-        sym3->setObjectName(QString::fromUtf8("csym3"));
-        sym3->addItem("Skip 0");
-        symBox->addWidget(sym3);
-        mainVert->addLayout(symBox);
-
         mainVert->addSpacerItem(new QSpacerItem(275, 10, QSizePolicy::Minimum, QSizePolicy::Fixed));
 
         otherDesc = new QHBoxLayout();
@@ -325,6 +298,16 @@ public:
         radialPB->setText("Radial Profiler");
         otherBox->addWidget(radialPB);
         mainVert->addLayout(otherBox);
+
+        symBox = new QHBoxLayout();
+        symPB = new QPushButton(brushPanel);
+        symPB->setObjectName(QString::fromUtf8("symPB"));
+        symPB->setMinimumWidth(123);
+        symPB->setText("Symmetry Tool");
+        symBox->addWidget(symPB);
+        symBox->addSpacerItem(new QSpacerItem(0, 0, QSizePolicy::MinimumExpanding, QSizePolicy::Minimum));
+        mainVert->addLayout(symBox);
+
 
 
 

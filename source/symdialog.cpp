@@ -19,6 +19,17 @@ SymDialog::~SymDialog() {
     delete ui;
 }
 
+void SymDialog::setIndicies(int s1, int s2, int s3) {
+    ui->qcb1->setCurrentIndex(s1);
+    div = s1;
+    divChange();
+    ui->qcb2->setCurrentIndex(s2);
+    ofEvery = s2;
+    ofEveryChange();
+    ui->qcb3->setCurrentIndex(s3);
+    skip = s3;
+}
+
 void SymDialog::divChange() {
     int qcb1_index = ui->qcb1->currentIndex();
     QComboBox *qcb2 = ui->qcb2;
