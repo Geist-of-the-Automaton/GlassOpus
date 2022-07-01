@@ -17,7 +17,7 @@ The Microsoft coding guidelines are used. Found [here](https://www.cise.ufl.edu/
 ## Videos of program running
 (Some of the videos show the old, not updated UI)
 
-[Demo showing most features]
+[Demo showing most features](https://www.youtube.com/watch?v=sTZM2OrUnVs)
 
 [Creation of second image below](https://youtu.be/XCe56i6esuc)
 
