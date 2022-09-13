@@ -9,7 +9,7 @@ The app be run via the installer found in the releases. The most current release
 ## Dev Setup
 
 1. Install C++ (17 was used) and Qt (5.12 and 5.14 were used). Make sure system paths align with the current version of MSVC.
-2. Copy the menu contents (specifically mainMenubar.txt) to the build/Menus folder, which can be obtained from the repo, otherwise the program will fail at launch.
+2. Copy the menu contents (specifically mainMenubar.txt) to the build/Menus folder, which can be obtained from the repo, otherwise the program will produce a notice and not launch.
 3. The program can either be opened after opening QCreator, or by executing the project file from the downloaded repo.
 
 The Microsoft coding guidelines are used. Found [here](https://www.cise.ufl.edu/~mschneid/Research/C++%20Programming%20Style%20Guidelines.htm).
