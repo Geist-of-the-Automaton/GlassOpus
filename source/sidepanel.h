@@ -38,6 +38,11 @@ public:
     void setOffsets(int topOff, int botOff, int leftOff);
     void stopMoving();
     void remove(int delLayer);
+    void moveBack(int layer);
+    void moveToBack(int layer);
+    void moveFront(int layer);
+    void moveToFront(int layer);
+    void compileFrame();
     void add(Layer *layer);
     void setActive(int layer);
     int getActive();

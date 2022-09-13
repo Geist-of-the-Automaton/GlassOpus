@@ -12,6 +12,7 @@
 #include <QtWidgets/QWidget>
 #include <QtWidgets/QDoubleSpinBox>
 #include <QtWidgets/QComboBox>
+#include <QtWidgets/QSpacerItem>
 #include <string>
 using std::to_string;
 
@@ -32,9 +33,16 @@ public:
     QVBoxLayout *verticalLayout_5;
     QVBoxLayout *verticalLayout_4;
     QVBoxLayout *verticalLayout_1;
+    QHBoxLayout *horiLayout1, *horiLayout2, *horiLayout3;
     QVBoxLayout *verticalLayout;
     QDialogButtonBox *buttonBox;
     QComboBox *qcb1, *qcb2, *qcb3;
+    QSpinBox *xdivSB, *ydivSB;
+    QDoubleSpinBox *clipSB;
+    QSlider *clipS, *xdivS, *ydivS;
+    QLabel *matchLB, *clipLB, *xdivLB, *ydivLB, *note;
+    QSpacerItem *spacer;
+
 
     void setupUi(QWidget *histoDialog)
     {
@@ -104,17 +112,87 @@ public:
 
         verticalLayout_2->addLayout(horizontalLayout_3);
 
+        horiLayout1 = new QHBoxLayout();
+        horiLayout1->setObjectName("horiLayout1");
+        clipLB = new QLabel(histoDialog);
+        clipLB->setText("Clipping Limit");
+        clipLB->setObjectName("clipLB");
+        horiLayout1->addWidget(clipLB);
+        clipSB = new QDoubleSpinBox(histoDialog);
+        clipSB->setRange(0.0, 10.0);
+        clipSB->setValue(1.5);
+        clipSB->setSingleStep(0.1);
+        clipSB->setObjectName("clipSB");
+        clipS = new QSlider(histoDialog);
+        clipS->setRange(0, 100);
+        clipS->setValue(15);
+        clipS->setSingleStep(1);
+        clipS->setObjectName("clipS");
+        clipS->setOrientation(Qt::Horizontal);
+        horiLayout1->addWidget(clipSB);
+        horiLayout1->addWidget(clipS);
+        verticalLayout_2->addLayout(horiLayout1);
+
+        horiLayout2 = new QHBoxLayout();
+        horiLayout2->setObjectName("horiLayout2");
+        xdivLB = new QLabel(histoDialog);
+        xdivLB->setText("X Divisions");
+        xdivLB->setObjectName("xdivLB");
+        horiLayout2->addWidget(xdivLB);
+        xdivSB = new QSpinBox(histoDialog);
+        xdivSB->setRange(1, 64);
+        xdivSB->setValue(2);
+        xdivSB->setSingleStep(1);
+        xdivSB->setObjectName("xdivSB");
+        xdivS = new QSlider(histoDialog);
+        xdivS->setRange(1, 64);
+        xdivS->setValue(2);
+        xdivS->setSingleStep(1);
+        xdivS->setObjectName("xdivS");
+        xdivS->setOrientation(Qt::Horizontal);
+        horiLayout2->addWidget(xdivSB);
+        horiLayout2->addWidget(xdivS);
+        verticalLayout_2->addLayout(horiLayout2);
+
+        horiLayout3 = new QHBoxLayout();
+        horiLayout3->setObjectName("horiLayout3");
+        ydivLB = new QLabel(histoDialog);
+        ydivLB->setText("Y Divisions");
+        ydivLB->setObjectName("ydivLB");
+        horiLayout3->addWidget(ydivLB);
+        ydivSB = new QSpinBox(histoDialog);
+        ydivSB->setRange(1, 64);
+        ydivSB->setValue(2);
+        ydivSB->setSingleStep(1);
+        ydivSB->setObjectName("ydivSB");
+        ydivS = new QSlider(histoDialog);
+        ydivS->setRange(1, 64);
+        ydivS->setValue(2);
+        ydivS->setSingleStep(1);
+        ydivS->setObjectName("ydivS");
+        ydivS->setOrientation(Qt::Horizontal);
+        horiLayout3->addWidget(ydivSB);
+        horiLayout3->addWidget(ydivS);
+        verticalLayout_2->addLayout(horiLayout3);
+
         horizontalLayout->addLayout(verticalLayout_2);
 
+        note = new QLabel(histoDialog);
+        note->setText("X or Y CLAHE divisions of 1 will use auto-divisions in that axis.");
+        note->setObjectName("note");
+        verticalLayout_2->addWidget(note);
+
+        spacer = new QSpacerItem(40, 20, QSizePolicy::Expanding, QSizePolicy::Expanding);
+        verticalLayout_2->addSpacerItem(spacer);
         verticalLayout = new QVBoxLayout();
         verticalLayout->setObjectName(QString::fromUtf8("verticalLayout"));
         buttonBox = new QDialogButtonBox(histoDialog);
         buttonBox->setObjectName(QString::fromUtf8("buttonBox"));
-        buttonBox->setStandardButtons(QDialogButtonBox::Cancel|QDialogButtonBox::Ok);
+        buttonBox->setStandardButtons(QDialogButtonBox::Cancel | QDialogButtonBox::Ok);
 
-        verticalLayout->addWidget(buttonBox);
+        verticalLayout_2->addWidget(buttonBox);
 
-        horizontalLayout->addLayout(verticalLayout);
+        //horizontalLayout->addLayout(verticalLayout);
 
         verticalLayout_3->addLayout(horizontalLayout);
 

@@ -60,7 +60,7 @@ SidePanel::SidePanel(QWidget *parent) : QScrollArea(parent) {
     });
 
     handler = new QPushButton(parent);
-    handler->setObjectName("SidePanelhandler");
+    handler->setObjectName("SidePanelHandler");
     handler->resize(QSize(24, 60));//handler->size();
     handler->setFont(QFont(nullptr, 20));
     mainVert = new QVBoxLayout;
@@ -355,10 +355,94 @@ void SidePanel::remove(int delLayer) {
     tabs.erase(tabs.begin() + delLayer);
     for (int i = 0; i < tabs.size(); ++i)
         tabs[i]->updateNum(i);
-    if (delLayer == activeLayer)
-        setActive(activeLayer);
-    else if (delLayer == tabs.size() && tabs.size() > 0)
-        setActive(--activeLayer);
+    if (tabs.size() != 0) {
+        if (delLayer == tabs.size())
+            setActive(--activeLayer);
+        else if (delLayer == activeLayer)
+            setActive(activeLayer);
+    }
+}
+
+void SidePanel::moveBack(int layer) {
+    if (layer == 0)
+        return;
+    mainVert->removeItem(spacer);
+    activeLayer = layer - 1;
+    for (int i = tabs.size() - 1; i >= activeLayer; --i)
+        mainVert->removeItem(tabs[i]);
+    std::swap(tabs[activeLayer], tabs[layer]);
+    for (int i = activeLayer; i < tabs.size(); ++i) {
+        mainVert->addLayout(tabs[i]);
+        tabs[i]->updateNum(i);
+    }
+    mainVert->addItem(spacer);
+    setActive(activeLayer);
+    QApplication::processEvents();
+}
+
+void SidePanel::moveToBack(int layer) {
+    if (layer == 0)
+        return;
+    mainVert->removeItem(spacer);
+    for (int i = tabs.size() - 1; i > layer; --i)
+        mainVert->removeItem(tabs[i]);
+    for (int i = layer; i > 0; --i) {
+        std::swap(tabs[i], tabs[i - 1]);
+        mainVert->removeItem(tabs[i]);
+    }
+    tabs[0]->updateNum(0);
+    for (int i = 1; i < tabs.size(); ++i) {
+        mainVert->addLayout(tabs[i]);
+        tabs[i]->updateNum(i);
+    }
+    mainVert->addItem(spacer);
+    setActive(0);
+    QApplication::processEvents();
+}
+
+void SidePanel::moveFront(int layer) {
+    if (layer == tabs.size() - 1)
+        return;
+    mainVert->removeItem(spacer);
+    activeLayer = layer + 1;
+    std::swap(tabs[activeLayer], tabs[layer]);
+    tabs[layer]->updateNum(layer);
+    for (int i = tabs.size() - 1; i >= activeLayer; --i)
+        mainVert->removeItem(tabs[i]);
+    for (int i = layer; i < tabs.size(); ++i) {
+        mainVert->addLayout(tabs[i]);
+        tabs[i]->updateNum(i);
+    }
+    mainVert->addItem(spacer);
+    setActive(activeLayer);
+    QApplication::processEvents();
+}
+
+void SidePanel::moveToFront(int layer) {
+    if (layer == tabs.size() - 1)
+        return;
+    mainVert->removeItem(spacer);
+    mainVert->removeItem(tabs[layer]);
+    for (int i = layer; i < tabs.size() - 1; ++i) {
+        std::swap(tabs[i], tabs[i + 1]);
+        tabs[i]->updateNum(i);
+    }
+    activeLayer = tabs.size() - 1;
+    mainVert->addLayout(tabs[activeLayer]);
+    tabs[activeLayer]->updateNum(activeLayer);
+    mainVert->addItem(spacer);
+    setActive(activeLayer);
+    QApplication::processEvents();
+}
+
+void SidePanel::compileFrame() {
+    setActive(0);
+    while (tabs.size() > 1) {
+        int delLayer = tabs.size() - 1;
+        mainVert->removeItem(tabs[delLayer]);
+        delete tabs[delLayer];
+        tabs.erase(tabs.begin() + delLayer);
+    }
 }
 
 void SidePanel::mousePressEvent(QMouseEvent *event) {
