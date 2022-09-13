@@ -1370,6 +1370,8 @@ void MainWindow::doSomething(string btnPress) {
         if (!ok)
             mwd->setVals(settings);
     }
+    else if (btnPress == "Invert Selection")
+        ioh->getWorkingLayer()->invertSelection();
     else if (btnPress == "Transparency Fill")
         bh.setFillColor(QColor(255, 255, 255, 0));
     else if (btnPress == "Filter") {
@@ -1518,14 +1520,22 @@ void MainWindow::doSomething(string btnPress) {
             LayerMenu->setActive(ioh->getActiveLayer());
         }
     }
-    else if (btnPress == "Move Backward")
+    else if (btnPress == "Move Backward") {
+        LayerMenu->moveBack(ioh->getActiveLayer());
         ioh->moveBackward();
-    else if (btnPress == "Move Forward")
+    }
+    else if (btnPress == "Move Forward") {
+        LayerMenu->moveFront(ioh->getActiveLayer());
         ioh->moveForward();
-    else if (btnPress == "Move To Back")
+    }
+    else if (btnPress == "Move To Back") {
+        LayerMenu->moveToBack(ioh->getActiveLayer());
         ioh->moveToBack();
-    else if (btnPress == "Move To Front")
+    }
+    else if (btnPress == "Move To Front") {
+        LayerMenu->moveToFront(ioh->getActiveLayer());
         ioh->moveToFront();
+    }
     else if (btnPress == "Copy Layer")
         ioh->copyLayer();
     else if (btnPress == "Cut Layer") {
@@ -1553,9 +1563,11 @@ void MainWindow::doSomething(string btnPress) {
     }
     else if (btnPress == "Compile Layer")
         ioh->compileLayer();
-    else if (btnPress == "Compile Frame") {
+    else if (btnPress == "Compile Layers") {
+        LayerMenu->compileFrame();
         ioh->compileFrame();
         setMode(mode);
+        LayerMenu->setActive(0);
     }
     else if (btnPress == "Clear Vectors")
         ioh->getWorkingLayer()->clearVectors();

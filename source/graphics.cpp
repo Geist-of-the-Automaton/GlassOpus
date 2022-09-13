@@ -1257,8 +1257,6 @@ void graphics::Color::equalizeHistogramTo(QImage *qi, eType type) {
 //clipLimit 0.0 to 1.0, 0.0 ahe, 1.0 og, inbetween clahe
 
 void graphics::Color::claheTo(QImage *qi, eType type, float clipLimit, int divisionX, int divisionY) {
-    if (clipLimit == 1.0)
-        return;
     QImage safe = qi->copy();
     int w = qi->width(), h = qi->height();
     int mi = 256, ma = -1;
@@ -1267,17 +1265,19 @@ void graphics::Color::claheTo(QImage *qi, eType type, float clipLimit, int divis
     for (int i = 0; i < w; ++i)
         for (int j = 0; j < h; ++j) {
             QColor qc = qi->pixelColor(i, j);
-            if (type == RGB)
-                edL[i][j] = (qc.red() + qc.green() + qc.blue()) / 3;
-            else if (type == HSL)
+            if (type == HSL || type == RGB)
                 edL[i][j] = static_cast<int>(255.0 * qc.lightnessF());
             else if (type == HSV)
                 edL[i][j] = static_cast<int>(255.0 * qc.valueF());
+            else if (type == HSV)
+                edL[i][j] = static_cast<int>(255.0 * qc.valueF());
+            else if (type == LAB)
+                edL[i][j] = static_cast<int>(getLabScaled(rgb2lab(qc)).xyzw[0]);
             ma = max(ma, edL[i][j]);
             mi = min(mi, edL[i][j]);
         }
     // for automatic mode
-    if (divisionX == 0) {
+    if (divisionX < 2 || divisionY < 2) {
         float sum = 0.0;
         vector< vector<int> > sobel;
         sobel.push_back({-1, -2, -1});
@@ -1300,98 +1300,289 @@ void graphics::Color::claheTo(QImage *qi, eType type, float clipLimit, int divis
                     }
                 sum += sqrt(static_cast<double>(totalL_1 * totalL_1 + totalL_2 * totalL_2)) * scale;
             }
-        sum = sqrt(stdFuncs::clamp(1.0 - sum / (255.0 * static_cast<float>(w * h)), 0.0, 1.0));
-        if (clipLimit > 0.0)
-            divisionX = divisionY = 2 + static_cast<int>(30.0 * sum);
-        else
-            divisionX = divisionY = 16 + static_cast<int>(112.0 * sum);
+        sum = pow(stdFuncs::clamp(sum / (32.0 * static_cast<float>(w * h)), 0.0, 1.0), 2);
+        int divs = clipLimit > 0.0 ? 2 + static_cast<int>(64.0 * sum / clipLimit) : 2;
+        if (divisionX < 2)
+            divisionX = divs;
+        if (divisionY < 2)
+            divisionY = divs;
     }
-    /*   pImage - Pointer to the input/output image
-     *   uiNrX - Number of contextial regions in the X direction (min 2, max uiMAX_REG_X)
-     *   uiNrY - Number of contextial regions in the Y direction (min 2, max uiMAX_REG_Y)
-     *   float fCliplimit - Normalized cliplimit (higher values give more contrast)
-     * The number of "effective" greylevels in the output image is set by uiNrBins; selecting
-     * a small value (eg. 128) speeds up processing and still produce an output image of
-     * good quality. The output image will have the same minimum and maximum value as the input
-     * image. A clip limit smaller than 1 results in standard (non-contrast limited) AHE.
-     */
+    cout << "divisions " << divisionX << " " << divisionY << endl;
+    int offX = 0, offY = 0;
+    if (safe.width() % divisionX != 0 || safe.height() % divisionY != 0) {
+        int divX = (static_cast<int>(safe.width() / divisionX) + 1) * divisionX;
+        int divY = (static_cast<int>(safe.height() / divisionY) + 1) * divisionY;
+        safe = safe.scaled(divX, divY, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+        offX = (divX - qi->width()) / 2;
+        offY = (divY - qi->height()) / 2;
+        for (int j = 0; j < qi->height(); ++j) {
+            QRgb *line = reinterpret_cast<QRgb *>(qi->scanLine(j));
+            QRgb *line2 = reinterpret_cast<QRgb *>(safe.scanLine(j + offY));
+            for (int i = 0; i < qi->width(); ++i)
+                line2[i + offX] = line[i];
+        }
+    }
     unsigned int uiX, uiY;		  /* counters */
     unsigned int uiXSize, uiYSize, uiSubX, uiSubY; /* size of context. reg. and subimages */
     unsigned int uiXL, uiXR, uiYU, uiYB;  /* auxiliary variables interpolation routine */
     unsigned long ulClipLimit, ulNrPixels;/* clip limit and region pixel count */
-    unsigned int aLUT[bins];	    /* lookup table used for scaling of input image */
+    unsigned char *pImPointer, *pImage;		   /* pointer to image */
+    unsigned char aLUT[bins];	    /* lookup table used for scaling of input image */
     unsigned long *pulHist, *pulMapArray; /* pointer to histogram and mappings*/
-    unsigned long *pulLU, *pulLB, *pulRU, *pulRB; /* auxiliary pointers interpolation */
-
-    pulMapArray = (unsigned long *)malloc(sizeof(unsigned long) * divisionX * divisionY * bins);
-    if (pulMapArray == 0)
-        return;	  /* Not enough memory! (try reducing uiNrBins) */
-
-    uiXSize = w / divisionX;
-    uiYSize = h / divisionY;  /* Actual size of contextual regions */
-    ulNrPixels = (unsigned long)uiXSize * (unsigned long)uiYSize;
-
-    if(clipLimit > 0.0) {		  /* Calculate actual cliplimit	 */
-       ulClipLimit = (unsigned long) (clipLimit * (uiXSize * uiYSize) / bins);
-       ulClipLimit = (ulClipLimit < 1UL) ? 1UL : ulClipLimit;
+    unsigned long* pulLU, *pulLB, *pulRU, *pulRB; /* auxiliary pointers interpolation */
+    uiXSize = safe.width() / divisionX;
+    uiYSize = safe.height() / divisionY;  /* Actual size of contextual regions */
+    ulNrPixels = static_cast<unsigned long>(uiXSize) * static_cast<unsigned long>(uiYSize);
+    pulMapArray = (unsigned long *) malloc(sizeof(unsigned long) * divisionX * divisionY * bins);
+    pImage = (unsigned char *) malloc(sizeof(unsigned char) * safe.width() * safe.height());
+    long cntr = 0;
+    for (int j = 0; j < safe.height(); ++j) {
+        QRgb *line2 = reinterpret_cast<QRgb *>(safe.scanLine(j));
+        for (int i = 0; i < safe.width(); ++i) {
+            QColor qc = line2[i];
+            if (type == HSL || type == RGB)
+                pImage[cntr] = static_cast<unsigned char>(255.0 * qc.lightnessF());
+            else if (type == HSV)
+                pImage[cntr] = static_cast<unsigned char>(255.0 * qc.valueF());
+            else if (type == LAB)
+                pImage[cntr] = static_cast<unsigned char>(getLabScaled(rgb2lab(qc)).xyzw[0]);
+            ++cntr;
+        }
+    }
+    --cntr;
+    if (clipLimit > 0.0) {		  /* Calculate actual cliplimit	 */
+       ulClipLimit = static_cast<unsigned long>(clipLimit * static_cast<float>(uiXSize * uiYSize) / static_cast<float>(bins));
+       if (ulClipLimit < 1UL)
+           ulClipLimit = 1UL;
     }
     else
-        ulClipLimit = 1UL<<14;		  /* Large value, do not clip (AHE) */
-
-
-    /*
-
-    // Calculate greylevel mappings for each contextual region
+        ulClipLimit = 1UL << 14;		  /* Large value, do not clip (AHE) */
+    for (int i = 0; i < bins; ++i)
+        aLUT[i] = i - mi;
+    /* Calculate greylevel mappings for each contextual region */
     for (uiY = 0, pImPointer = pImage; uiY < divisionY; uiY++) {
         for (uiX = 0; uiX < divisionX; uiX++, pImPointer += uiXSize) {
             pulHist = &pulMapArray[bins * (uiY * divisionX + uiX)];
-            MakeHistogram(pImPointer, w, uiXSize, uiYSize, pulHist, bins);
-            ClipHistogram(pulHist, bins, ulClipLimit);
-            MapHistogram(pulHist, Min, Max, bins, ulNrPixels);
+            MakeHistogram(pImPointer, safe.width(), uiXSize, uiYSize, pulHist, aLUT);
+            ClipHistogram(pulHist, ulClipLimit);
+            MapHistogram(pulHist, mi, ma, ulNrPixels);
         }
-        pImPointer += (uiYSize - 1) * w;		  // skip lines, set pointer
+        pImPointer += (uiYSize - 1) * safe.width();		  /* skip lines, set pointer */
     }
-
-    // Interpolate greylevel mappings to get CLAHE image
-    for (pImPointer = pImage, uiY = 0; uiY <= uiNrY; uiY++) {
-        if (uiY == 0) {					 // special case: top row
-            uiSubY = uiYSize >> 1;  uiYU = 0; uiYB = 0;
+    /* Interpolate greylevel mappings to get CLAHE image */
+    for (pImPointer = pImage, uiY = 0; uiY <= divisionY; uiY++) {
+        if (uiY == 0) {					  /* special case: top row */
+            uiSubY = uiYSize >> 1;
+            uiYU = 0;
+            uiYB = 0;
         }
         else {
-            if (uiY == uiNrY) {				  // special case: bottom row
-                uiSubY = (uiYSize+1) >> 1;	uiYU = uiNrY-1;	 uiYB = uiYU;
+            if (uiY == divisionY) {				  /* special case: bottom row */
+                uiSubY = (uiYSize+1) >> 1;
+                uiYU = divisionY - 1;
+                uiYB = uiYU;
             }
-            else {					  // default values
-                uiSubY = uiYSize; uiYU = uiY - 1; uiYB = uiYU + 1;
+            else {					  /* default values */
+                uiSubY = uiYSize;
+                uiYU = uiY - 1;
+                uiYB = uiYU + 1;
             }
         }
-        for (uiX = 0; uiX <= uiNrX; uiX++) {
-            if (uiX == 0) {				   //special case: left column
-                uiSubX = uiXSize >> 1; uiXL = 0; uiXR = 0;
+        for (uiX = 0; uiX <= divisionX; uiX++) {
+            if (uiX == 0) {				  /* special case: left column */
+                uiSubX = uiXSize >> 1;
+                uiXL = 0;
+                uiXR = 0;
             }
             else {
-                if (uiX == uiNrX) {			  // special case: right column
-                    uiSubX = (uiXSize+1) >> 1;  uiXL = uiNrX - 1; uiXR = uiXL;
+                if (uiX == divisionX) {			  /* special case: right column */
+                    uiSubX = (uiXSize+1) >> 1;
+                    uiXL = divisionX - 1;
+                    uiXR = uiXL;
                 }
-                else {					  // default values
-                    uiSubX = uiXSize; uiXL = uiX - 1; uiXR = uiXL + 1;
+                else {					  /* default values */
+                    uiSubX = uiXSize;
+                    uiXL = uiX - 1;
+                    uiXR = uiXL + 1;
                 }
             }
-
-            pulLU = &pulMapArray[bins * (uiYU * uiNrX + uiXL)];
-            pulRU = &pulMapArray[bins * (uiYU * uiNrX + uiXR)];
-            pulLB = &pulMapArray[bins * (uiYB * uiNrX + uiXL)];
-            pulRB = &pulMapArray[bins * (uiYB * uiNrX + uiXR)];
-            Interpolate(pImPointer,w,pulLU,pulRU,pulLB,pulRB,uiSubX,uiSubY);
-            pImPointer += uiSubX;			  // set pointer on next matrix
+            pulLU = &pulMapArray[bins * (uiYU * divisionX + uiXL)];
+            pulRU = &pulMapArray[bins * (uiYU * divisionX + uiXR)];
+            pulLB = &pulMapArray[bins * (uiYB * divisionX + uiXL)];
+            pulRB = &pulMapArray[bins * (uiYB * divisionX + uiXR)];
+            Interpolate(pImPointer, safe.width(), pulLU, pulRU, pulLB, pulRB, uiSubX, uiSubY, aLUT);
+            pImPointer += uiSubX;			  /* set pointer on next matrix */
         }
-        pImPointer += (uiSubY - 1) * w;
+        pImPointer += (uiSubY - 1) * safe.width();
+    }
+    while(cntr >= 0) {
+        QRgb *line2 = reinterpret_cast<QRgb *>(safe.scanLine(cntr / safe.width()));
+        for (int i = safe.width() - 1; i >= 0; --i) {
+            QColor qc(line2[i]);
+            if (type == RGB || type == HSL)
+                qc.setHslF(qc.hslHueF(), qc.hslSaturationF(), static_cast<float>(pImage[cntr]) / 255.0);
+            else if (type == HSV)
+                qc.setHsvF(qc.hsvHueF(), qc.hsvSaturationF(), static_cast<float>(pImage[cntr]) / 255.0);
+            else if (type == LAB) {
+                vec4 color = getLabScaled(rgb2lab(qc));
+                color.xyzw[0] = pImage[cntr];
+                qc = toQColor(lab2rgb(getLabDescaled(color)));
+            }
+            line2[i] = qc.rgba();
+            --cntr;
+        }
+    }
+    for (int j = 0; j < qi->height(); ++j) {
+        QRgb *line = reinterpret_cast<QRgb *>(qi->scanLine(j));
+        QRgb *line2 = reinterpret_cast<QRgb *>(safe.scanLine(j + offY));
+        for (int i = 0; i < qi->width(); ++i)
+            line[i] = line2[i + offX];
+    }
+    free(pulMapArray);					  /* free space for histograms */
+    free(pImage);					  /* free space for histograms */
+}
+
+void graphics::Color::ClipHistogram (unsigned long* pulHistogram, unsigned long ulClipLimit)
+/* This function performs clipping of the histogram and redistribution of bins.
+ * The histogram is clipped and the number of excess pixels is counted. Afterwards
+ * the excess pixels are equally redistributed across the whole histogram (providing
+ * the bin count is smaller than the cliplimit).
+ */
+{
+    unsigned long* pulBinPointer, *pulEndPointer, *pulHisto;
+    unsigned long ulNrExcess, ulUpper, ulBinIncr, ulStepSize, i;
+    long lBinExcess;
+
+    ulNrExcess = 0;
+    pulBinPointer = pulHistogram;
+    for (i = 0; i < bins; i++) { /* calculate total number of excess pixels */
+        lBinExcess = (long) pulBinPointer[i] - (long) ulClipLimit;
+        if (lBinExcess > 0)
+            ulNrExcess += lBinExcess;	  /* excess in current bin */
     }
 
+    /* Second part: clip histogram and redistribute excess pixels in each bin */
+    ulBinIncr = ulNrExcess / bins;		  /* average binincrement */
+    ulUpper =  ulClipLimit - ulBinIncr;	 /* Bins larger than ulUpper set to cliplimit */
 
+    for (i = 0; i < bins; i++) {
+      if (pulHistogram[i] > ulClipLimit)
+          pulHistogram[i] = ulClipLimit; /* clip bin */
+      else {
+          unsigned long temp = ulNrExcess;
+          if (pulHistogram[i] > ulUpper) {		/* high bin count */
+              ulNrExcess -= pulHistogram[i] - ulUpper;
+              pulHistogram[i] = ulClipLimit;
+          }
+          else {					/* low bin count */
+              ulNrExcess -= ulBinIncr;
+              pulHistogram[i] += ulBinIncr;
+          }
+          if (temp < ulNrExcess)
+              ulNrExcess = 0;
+       }
+    }
+    while (ulNrExcess) {   /* Redistribute remaining excess  */
+        pulEndPointer = &pulHistogram[bins];
+        pulHisto = pulHistogram;
+        unsigned long loopFault = ulNrExcess;
+        while (ulNrExcess && pulHisto < pulEndPointer) {
+            ulStepSize = bins / ulNrExcess;
+            if (ulStepSize < 1)
+                ulStepSize = 1;		  /* stepsize at least 1 */
+            for (pulBinPointer = pulHisto; pulBinPointer < pulEndPointer && ulNrExcess; pulBinPointer += ulStepSize) {
+                if (*pulBinPointer < ulClipLimit) {
+                    (*pulBinPointer)++;
+                    ulNrExcess--;	  /* reduce excess */
+                }
+            }
+            pulHisto++;		  /* restart redistributing on other bin location */
+        }
+        if (loopFault == ulNrExcess)
+            break;
+    }
+}
 
-    */
+void graphics::Color::MakeHistogram (unsigned char * pImage, unsigned int uiXRes, unsigned int uiSizeX, unsigned int uiSizeY, unsigned long* pulHistogram, unsigned char* pLookupTable)
+/* This function classifies the greylevels present in the array image into
+ * a greylevel histogram. The pLookupTable specifies the relationship
+ * between the greyvalue of the pixel (typically between 0 and 4095) and
+ * the corresponding bin in the histogram (usually containing only 128 bins).
+ */
+{
+    unsigned char* pImagePointer;
+    unsigned int i;
 
+    for (i = 0; i < bins; i++) pulHistogram[i] = 0L; /* clear histogram */
+
+    for (i = 0; i < uiSizeY; i++) {
+        pImagePointer = &pImage[uiSizeX];
+        while (pImage < pImagePointer) pulHistogram[pLookupTable[*pImage++]]++;
+        pImagePointer += uiXRes;
+        pImage = &pImagePointer[-(int)uiSizeX];	/* go to bdeginning of next row */
+    }
+}
+
+void graphics::Color::MapHistogram (unsigned long* pulHistogram, unsigned char Min, unsigned char Max, unsigned long ulNrOfPixels)
+/* This function calculates the equalized lookup table (mapping) by
+ * cumulating the input histogram. Note: lookup table is rescaled in range [Min..Max].
+ */
+{
+    unsigned int i;  unsigned long ulSum = 0;
+    const float fScale = ((float)(Max - Min)) / ulNrOfPixels;
+    const unsigned long ulMin = (unsigned long) Min;
+
+    for (i = 0; i < bins; i++) {
+        ulSum += pulHistogram[i]; pulHistogram[i]=(unsigned long)(ulMin+ulSum*fScale);
+        if (pulHistogram[i] > Max) pulHistogram[i] = Max;
+    }
+}
+
+void graphics::Color::Interpolate (unsigned char * pImage, int uiXRes, unsigned long * pulMapLU, unsigned long * pulMapRU, unsigned long * pulMapLB,  unsigned long * pulMapRB, unsigned int uiXSize, unsigned int uiYSize, unsigned char * pLUT)
+/* pImage      - pointer to input/output image
+ * uiXRes      - resolution of image in x-direction
+ * pulMap*     - mappings of greylevels from histograms
+ * uiXSize     - uiXSize of image submatrix
+ * uiYSize     - uiYSize of image submatrix
+ * pLUT	       - lookup table containing mapping greyvalues to bins
+ * This function calculates the new greylevel assignments of pixels within a submatrix
+ * of the image with size uiXSize and uiYSize. This is done by a bilinear interpolation
+ * between four different mappings in order to eliminate boundary artifacts.
+ * It uses a division; since division is often an expensive operation, I added code to
+ * perform a logical shift instead when feasible.
+ */
+{
+    const unsigned int uiIncr = uiXRes-uiXSize; /* Pointer increment after processing row */
+    unsigned char GreyValue; unsigned int uiNum = uiXSize*uiYSize; /* Normalization factor */
+
+    unsigned int uiXCoef, uiYCoef, uiXInvCoef, uiYInvCoef, uiShift = 0;
+
+    if (uiNum & (uiNum - 1))   /* If uiNum is not a power of two, use division */
+        for (uiYCoef = 0, uiYInvCoef = uiYSize; uiYCoef < uiYSize;
+         uiYCoef++, uiYInvCoef--,pImage+=uiIncr) {
+        for (uiXCoef = 0, uiXInvCoef = uiXSize; uiXCoef < uiXSize;
+             uiXCoef++, uiXInvCoef--) {
+            GreyValue = pLUT[*pImage];		   /* get histogram bin value */
+            *pImage++ = (unsigned char) ((uiYInvCoef * (uiXInvCoef*pulMapLU[GreyValue]
+                          + uiXCoef * pulMapRU[GreyValue])
+                    + uiYCoef * (uiXInvCoef * pulMapLB[GreyValue]
+                          + uiXCoef * pulMapRB[GreyValue])) / uiNum);
+        }
+    }
+    else {			   /* avoid the division and use a right shift instead */
+        while (uiNum >>= 1) uiShift++;		   /* Calculate 2log of uiNum */
+        for (uiYCoef = 0, uiYInvCoef = uiYSize; uiYCoef < uiYSize;
+             uiYCoef++, uiYInvCoef--,pImage+=uiIncr) {
+             for (uiXCoef = 0, uiXInvCoef = uiXSize; uiXCoef < uiXSize;
+               uiXCoef++, uiXInvCoef--) {
+               GreyValue = pLUT[*pImage];	  /* get histogram bin value */
+               *pImage++ = (unsigned char)((uiYInvCoef* (uiXInvCoef * pulMapLU[GreyValue]
+                          + uiXCoef * pulMapRU[GreyValue])
+                    + uiYCoef * (uiXInvCoef * pulMapLB[GreyValue]
+                          + uiXCoef * pulMapRB[GreyValue])) >> uiShift);
+            }
+        }
+    }
 }
 
 void graphics::Color::brightnessAdjust(QImage *qi, double val, eType type) {

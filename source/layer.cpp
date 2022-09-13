@@ -123,6 +123,7 @@ void Layer::pasteRaster(QImage rasterIn, double angleIn, pair<QPoint, QPoint> bo
     rasterselectOg = rasterIn;
     postAngle = angleIn;
     selectOgActive = true;
+    ogLocation = boundPt1;
     deltaMove = rotateAnchor = boundPt1;
 }
 
@@ -436,6 +437,7 @@ void Layer::release(QPoint qp, MouseButton button) {
                         qi->setPixel(i, j, 0x00000000);
                     }
                 selectOgActive = true;
+                ogLocation = boundPt1;
             }
             else
                 deselect();
@@ -1246,6 +1248,7 @@ void Layer::selectAll() {
         qi->fill(0x00000000);
         deltaMove = rotateAnchor = boundPt1;
         selectOgActive = true;
+        ogLocation = boundPt1;
     }
     else if (mode == Polygon_Mode) {
         for (int i = 0; i < gons.size(); ++i)
@@ -1268,7 +1271,6 @@ void Layer::deselect() {
         drawRasterSelection(qi, SmoothTransformation);
         rasterselectOg = QImage();
         selection = NoSelect;
-        selectOgActive = false;
         postAngle = 0.0;
         selecting = selectOgActive = false;
     }
@@ -1472,6 +1474,7 @@ void Layer::polyToSelect() {
     deltaMove = rotateAnchor = minPt;
     postAngle = 0.0;
     selectOgActive = true;
+    ogLocation = boundPt1;
 }
 
 vector <Polygon> Layer::getPolgons() {
@@ -1611,6 +1614,61 @@ void Layer::magicSelect(QPoint qp, vec4 vals) {
     deltaMove = rotateAnchor = minPt;
     postAngle = 0.0;
     selectOgActive = true;
+    ogLocation = boundPt1;
+}
+
+void Layer::invertSelection() {
+    if (mode != Raster_Mode)
+        return;
+    else if (selectOgActive) {
+        QImage selectTemp = qi->copy();
+        QImage screenTemp = QImage(qi->size(), qi->format());
+        screenTemp.fill(0x00000000);
+        for (int j = 0; j < rasterselectOg.height(); ++j) {
+            QRgb *line = reinterpret_cast<QRgb *>(screenTemp.scanLine(j + ogLocation.y()));
+            QRgb *line2 = reinterpret_cast<QRgb *>(rasterselectOg.scanLine(j));
+            for (int i = 0; i < rasterselectOg.width(); ++i)
+                line[i + ogLocation.x()] = line2[i];
+        }
+        QPoint offset = QPoint(qi->width(), qi->height());
+        for (int j = 0; j < selectTemp.height(); ++j) {
+            QRgb *line = reinterpret_cast<QRgb *>(selectTemp.scanLine(j));
+            for (int i = 0; i < selectTemp.width(); ++i)
+                if (line[i] != 0x00000000) {
+                    offset.setX(min(offset.x(), i));
+                    offset.setY(min(offset.y(), j));
+                    break;
+                }
+        }
+        if (offset == QPoint(qi->width(), qi->height())) {
+            rasterselectOg = QImage();
+            selection = NoSelect;
+            postAngle = 0.0;
+            selecting = selectOgActive = false;
+            return;
+        }
+        QPoint end = QPoint(0, 0);
+        for (int j = selectTemp.height() - 1; j > offset.y(); --j) {
+            QRgb *line = reinterpret_cast<QRgb *>(selectTemp.scanLine(j));
+            for (int i = selectTemp.width() - 1; i > offset.y(); --i)
+                if (line[i] != 0x00000000) {
+                    end.setX(max(end.x(), i));
+                    end.setY(max(end.y(), j));
+                    break;
+                }
+        }
+        *qi = screenTemp;
+        selectTemp = selectTemp.copy(offset.x(), offset.y(), end.x() + 1 - offset.x(), end.y() + 1 - offset.y());
+        rasterselectOg = selectTemp;
+        selection = NoSelect;
+        postAngle = 0.0;
+        boundPt1 = offset;
+        boundPt2 = offset + QPoint(rasterselectOg.width(), rasterselectOg.height());
+        deltaMove = rotateAnchor = QPoint(0, 0);
+        ogLocation = boundPt1;
+    }
+    else
+        selectAll();
 }
 
 void Layer::setVisibility(bool vis) {

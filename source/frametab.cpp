@@ -44,6 +44,8 @@ FrameTab::~FrameTab() {
 }
 
 void FrameTab::refLayer(Layer *layer) {
+    setObjectName(to_string((unsigned long long) layer).c_str());
+    cout << objectName().toStdString() << endl;
     ref = layer;
     updateView();
     connect(ref, &Layer::viewUpdated, this, [this] {

@@ -144,6 +144,7 @@ public:
     void setTextColor(QColor color);
     bool updateText(Qt::Key key, bool shiftFlag);
     void magicSelect(QPoint qp, vec4 vals);
+    void invertSelection();
 
     void setVisibility(bool vis);
     bool isVisible();
@@ -178,7 +179,7 @@ private:
     float ipolPts, limiter = ipolMin, limitCnt = 2.0, postAngle;
     int alpha;
     bool shiftFlag, selectOgActive, selecting, symCreate, dragDraw, addOrSub, visible, hasFiltItems;
-    QPoint deltaMove, boundPt1, boundPt2, rotateAnchor;
+    QPoint deltaMove, boundPt1, boundPt2, rotateAnchor, ogLocation;
     QPoint symPt;
     int symDiv, symOfEvery, symSkip;
 

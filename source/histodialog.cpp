@@ -24,6 +24,8 @@ void HistoDialog::setWork(QImage *toProcess) {
     for (int i = 0; i < 4; ++i)
         histos[i] = graphics::Color::Histogram(qi, graphics::eType(i));
     ui->label->setPixmap(QPixmap::fromImage(histos[0]));
+    ui->clipS->setValue(150);
+    ui->clipSB->setValue(1.5);
 }
 
 void HistoDialog::matchChanged() {
@@ -43,6 +45,30 @@ void HistoDialog::process() {
     }
     else
         ui->qcb3->setEnabled(true);
+    if (index2 != 3) {
+        ui->clipS->setValue(15);
+        ui->clipSB->setValue(1.5);
+        ui->xdivS->setValue(1);
+        ui->xdivSB->setValue(1);
+        ui->ydivS->setValue(1);
+        ui->ydivSB->setValue(1);
+        ui->clipS->setEnabled(false);
+        ui->clipSB->setEnabled(false);
+        ui->xdivS->setEnabled(false);
+        ui->xdivSB->setEnabled(false);
+        ui->ydivS->setEnabled(false);
+        ui->ydivSB->setEnabled(false);
+        ui->note->setText("");
+    }
+    else {
+        ui->clipS->setEnabled(true);
+        ui->clipSB->setEnabled(true);
+        ui->xdivS->setEnabled(true);
+        ui->xdivSB->setEnabled(true);
+        ui->ydivS->setEnabled(true);
+        ui->ydivSB->setEnabled(true);
+        ui->note->setText("X or Y CLAHE divisions of 1 will use auto-divisions in that axis.");
+    }
     if (index2 == 0)
         ui->label->setPixmap(QPixmap::fromImage(histos[index1]));
     else {
@@ -68,10 +94,40 @@ void HistoDialog::process() {
         else if (index2 == 2)
             graphics::Color::equalizeHistogramTo(&processed, graphics::eType(index1));
         else if (index2 == 3)
-            graphics::Color::claheTo(&processed, graphics::eType(index1));
+            graphics::Color::claheTo(&processed, graphics::eType(index1), ui->clipSB->value(), ui->xdivSB->value(), ui->ydivSB->value());
         processed = processed.scaled(qi->width() / 3, qi->height() / 3, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
         ui->label->setPixmap(QPixmap::fromImage(processed));
     }
+}
+
+void HistoDialog::on_clipSB_valueChanged(double value) {
+    ui->clipS->setValue(static_cast<int>(value * 10.0));
+    process();
+}
+
+void HistoDialog::on_clipS_valueChanged(int value) {
+    ui->clipSB->setValue(static_cast<float>(value) / 10.0);
+    process();
+}
+
+void HistoDialog::on_xdivS_valueChanged(int value) {
+    ui->xdivSB->setValue(value);
+    process();
+}
+
+void HistoDialog::on_xdivSB_valueChanged(int value) {
+    ui->xdivS->setValue(value);
+    process();
+}
+
+void HistoDialog::on_ydivS_valueChanged(int value) {
+    ui->ydivSB->setValue(value);
+    process();
+}
+
+void HistoDialog::on_ydivSB_valueChanged(int value) {
+    ui->ydivS->setValue(value);
+    process();
 }
 
 void HistoDialog::on_buttonBox_accepted() {
@@ -82,7 +138,7 @@ void HistoDialog::on_buttonBox_accepted() {
     else if (index2 == 2)
         graphics::Color::equalizeHistogramTo(qi, graphics::eType(index1));
     else if (index2 == 3)
-        graphics::Color::claheTo(qi, graphics::eType(index1));
+        graphics::Color::claheTo(qi, graphics::eType(index1), ui->clipSB->value(), ui->xdivSB->value(), ui->ydivSB->value());
     done(1);
 }
 

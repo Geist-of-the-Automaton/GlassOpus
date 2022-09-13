@@ -164,6 +164,12 @@ public:
     static vec4 getLabDescaled(vec4 lab);
     static vec4 lab2rgb(vec4 lab);
     static QColor toQColor(vec4 rgb);
+
+private:
+    static void ClipHistogram (unsigned long *, unsigned long);
+    static void MakeHistogram (unsigned char *, unsigned int, unsigned int, unsigned int, unsigned long *, unsigned char *);
+    static void MapHistogram (unsigned long *, unsigned char, unsigned char, unsigned long);
+    static void Interpolate (unsigned char *, int, unsigned long *, unsigned long *, unsigned long *, unsigned long *, unsigned int, unsigned int, unsigned char *);
 };
 
 class ImgSupport {

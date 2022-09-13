@@ -24,6 +24,12 @@ public:
 private slots:
     void process();
     void matchChanged();
+    void on_clipSB_valueChanged(double value);
+    void on_clipS_valueChanged(int value);
+    void on_xdivS_valueChanged(int value);
+    void on_xdivSB_valueChanged(int value);
+    void on_ydivS_valueChanged(int value);
+    void on_ydivSB_valueChanged(int value);
     void on_buttonBox_accepted();
     void on_buttonBox_rejected();
 
