@@ -55,6 +55,7 @@ public:
     void setMode(EditMode emode);
     void updateHoverMap(int r, const unsigned char const* const* arr);
     void setHoverActive(bool active);
+    void allowRedraw(int n);
 
 private:
 
@@ -87,6 +88,7 @@ private:
     long long time;
     int yStart, yMid, yEnd;
     unsigned int alphaVal;
+    int redrawVal;
 
 
 public slots:

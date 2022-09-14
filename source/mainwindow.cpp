@@ -367,7 +367,7 @@ MainWindow::MainWindow(string startPath, string projectFile, QWidget *parent)
 void MainWindow::mouseMoveEvent(QMouseEvent *event) {
     if (layerMenuInteract || ioh->getWorkingLayer() == nullptr || takeFlag || magicFlag)
         return;
-    QPoint qp = sr->getZoomCorrected(vs->getScrollCorrected(event->pos() - QPoint(brushDetails->width() + 5,toolbar->height())));
+    QPoint qp = sr->getZoomCorrected(vs->getScrollCorrected(event->pos() - QPoint(brushDetails->width() + 5, toolbar->height())));
     statusBar()->showMessage(("(" + to_string(qp.x()) + " , " + to_string(qp.y()) + ")").c_str(), 1000);
     if (altFlag) {
         sr->setSamplePt(qp);
@@ -375,14 +375,16 @@ void MainWindow::mouseMoveEvent(QMouseEvent *event) {
         return;
     }
     if (mode == Brush_Mode) {
-        if (lastButton == LeftButton)
+        if (lastButton == LeftButton) {
             bh.applyBrush(ioh->getWorkingLayer()->getCanvas(), qp);
+        }
         else if (lastButton == RightButton) {
             if (bh.getMethodIndex() == appMethod::sample)
                 setSamplePt(qp);
             else
                 bh.erase(ioh->getWorkingLayer()->getCanvas(), qp);
         }
+        sr->allowRedraw(1);
     }
     else if (mode == Spline_Mode || mode == Raster_Mode || mode == Text_Mode) {
         if (ctrlFlag)
@@ -493,6 +495,7 @@ void MainWindow::mouseReleaseEvent(QMouseEvent *event) {
         if (mode == Brush_Mode) {
             bh.setBrushColor(ioh->getWorkingLayer()->getCanvas()->pixelColor(qp.x(), qp.y()));
             brushPanel->updateFromBH();
+            sr->allowRedraw(-1);
         }
         else if (mode == Raster_Mode) {
             bh.setFillColor(ioh->getWorkingLayer()->getCanvas()->pixelColor(qp.x(), qp.y()));
@@ -504,6 +507,7 @@ void MainWindow::mouseReleaseEvent(QMouseEvent *event) {
     }
     if (mode == Brush_Mode) {
         sr->setHoverActive(true);
+        sr->allowRedraw(-1);
         bh.setInterpolationActive(false);
         refresh();
     }

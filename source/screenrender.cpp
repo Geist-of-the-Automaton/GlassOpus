@@ -17,6 +17,7 @@ screenRender::screenRender(DataIOHandler *dioh, QWidget *parent) : QWidget(paren
     radius = -1;
     yStart = 0;
     setCursor(CrossCursor);
+    allowRedraw(-1);
 }
 
 screenRender::~screenRender() {
@@ -156,8 +157,18 @@ void screenRender::updateViews() {
         flasher->start(flashSpeed);
 }
 
+void screenRender::allowRedraw(int n) {
+    redrawVal = n;
+}
+
 void screenRender::paintEvent(QPaintEvent *event) {
-    //long long time0, time = stdFuncs::getTime();
+    if (redrawVal == 0) {
+        event->ignore();
+        return;
+    }
+    if (redrawVal == 1)
+        redrawVal = 0;
+    long long time0, time = stdFuncs::getTime();
     isDrawing = true;
     if (ioh->wasUpdated())
         updateViews();
@@ -330,21 +341,23 @@ void screenRender::paintEvent(QPaintEvent *event) {
         if (underMouse() && hoverActive && mode == Brush_Mode && hoverLock.try_lock()) {
             QPoint qp = brushLoc;
             brushLoc = QPoint(brushLoc.x() + 1, brushLoc.y() + 7);
-            int x = brushLoc.x() < radius ? radius - brushLoc.x() - 1 : 0, yStarter = brushLoc.y() < radius ? radius - brushLoc.y() : 0;
-            for (int i = max(0, brushLoc.x() - radius); i <= min(qi.width() - 1, brushLoc.x() + radius + (brushLoc.x() < radius ? 1 : 0)); ++i) {
-                int y = yStarter;
-                for (int j = max(0, brushLoc.y() - radius); j <= min(qi.height() - 1, brushLoc.y() + radius); ++j) {
+            int xStarter = brushLoc.x() < radius ? radius - brushLoc.x() - 1 : 0;
+            int y = brushLoc.y() < radius ? radius - brushLoc.y() : 0;
+            for (int j = max(0, brushLoc.y() - radius); j <= min(qi.height() - 1, brushLoc.y() + radius); ++j) {
+                int x = xStarter;
+                QRgb *line = reinterpret_cast<QRgb *>(qi.scanLine(j));
+                for (int i = max(0, brushLoc.x() - radius); i <= min(qi.width() - 1, brushLoc.x() + radius + (brushLoc.x() < radius ? 1 : 0)); ++i) {
                     if (hoverMap[x][y] == 1) {
-                        QRgb c = qi.pixel(i, j);
+                        QRgb c = line[i];
                         if (!(c & 0xFF000000))
                             c = 0xFFFFFFFF;
                         else
                             c |= 0xFF000000;
-                        qi.setPixel(i, j, graphics::Filtering::negative(graphics::Filtering::polarize(c, 128), 255));
+                        line[i] = graphics::Filtering::negative(graphics::Filtering::polarize(c, 128), 255);
                     }
-                    ++y;
+                    ++x;
                 }
-                ++x;
+                ++y;
             }
             hoverLock.unlock();
             brushLoc = qp;
@@ -371,7 +384,7 @@ void screenRender::paintEvent(QPaintEvent *event) {
     if (fgVisible && !fgLayers.isNull())
         qp.drawPixmap(0, 0, fgLayers);
     isDrawing = false;
-    //cout << stdFuncs::getTime(time) << endl;
+    cout << stdFuncs::getTime(time) << endl;
 }
 
 void screenRender::setSamplePt(QPoint qp) {

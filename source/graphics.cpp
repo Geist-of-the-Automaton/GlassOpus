@@ -484,11 +484,12 @@ void graphics::Color::ditherBayer(QImage *qi, int bpp, int matrixSize) {
             arr[i][j] *= 255.0 / BPP;
         }
     int bitShift = 8 - bpp;
-    for (int i = 0; i < qi->width(); ++i) {
-        int I = i % matrixSize;
-        for (int j = 0; j < qi->height(); ++j) {
-            int J = j % matrixSize;
-            QColor qp = qi->pixelColor(i, j);
+    for (int j = 0; j < qi->height(); ++j) {
+        int J = j % matrixSize;
+        QRgb *line = reinterpret_cast<QRgb *>(qi->scanLine(j));
+        for (int i = 0; i < qi->width(); ++i) {
+            int I = i % matrixSize;
+            QColor qp = line[i];
             int r = qp.red() + arr[I][J], g = qp.green() + arr[I][J], b = qp.blue() + arr[I][J];
             r = stdFuncs::clamp(r, 0, 255);
             g = stdFuncs::clamp(g, 0, 255);
@@ -496,27 +497,28 @@ void graphics::Color::ditherBayer(QImage *qi, int bpp, int matrixSize) {
             r = (r >> bitShift) << bitShift;
             g = (g >> bitShift) << bitShift;
             b = (b >> bitShift) << bitShift;
-            qi->setPixelColor(i, j, QColor(r, g, b, qp.alpha()));
+            line[i] = QColor(r, g, b, qp.alpha()).rgba();
         }
     }
 }
 
 void graphics::Color::ditherRandom(QImage *qi, int bpp) {
     int bitShift;
-    for (int i = 0; i < qi->width(); ++i)
-        for (int j = 0; j < qi->height(); ++j) {
+    for (int j = 0; j < qi->height(); ++j) {
+        QRgb *line = reinterpret_cast<QRgb *>(qi->scanLine(j));
+        for (int i = 0; i < qi->width(); ++i) {
+            QColor qp = line[i];
             bitShift = 8 - (bpp - rand() % bpp);
-            QColor qc = qi->pixelColor(i, j);
-            int r = (qc.red() >> bitShift) << bitShift;
-            int g = (qc.green() >> bitShift) << bitShift;
-            int b = (qc.blue() >> bitShift) << bitShift;
-            qi->setPixelColor(i, j, QColor(r, g, b, qc.alpha()));
+            int r = qp.red(), g = qp.green(), b = qp.blue();
+            r = (r >> bitShift) << bitShift;
+            g = (g >> bitShift) << bitShift;
+            b = (b >> bitShift) << bitShift;
+            line[i] = QColor(r, g, b, qp.alpha()).rgba();
         }
-
+    }
 }
 
 void graphics::Color::paletteReduction(QImage *qi, int bpp) {
-    long time = stdFuncs::getTime();
     int bitShift = 8 - bpp;
     for (int j = 0; j < qi->height(); ++j) {
         QRgb *line = reinterpret_cast<QRgb *>(qi->scanLine(j));
@@ -526,10 +528,8 @@ void graphics::Color::paletteReduction(QImage *qi, int bpp) {
             int g = (qc.green() >> bitShift) << bitShift;
             int b = (qc.blue() >> bitShift) << bitShift;
             line[i] = QColor(r, g, b, qc.alpha()).rgba();
-            //qi->setPixelColor(i, j, QColor(r, g, b, qc.alpha()));
         }
     }
-    cout << "processing took " << stdFuncs::getTime(time) << endl;
 }
 
 void graphics::Color::ditherFloydSteinberg(QImage *qi, int bpp) {
@@ -542,8 +542,9 @@ void graphics::Color::ditherFloydSteinberg(QImage *qi, int bpp) {
     vector <int> errorG(size, 0);
     vector <int> errorB(size, 0);
     for (int j = 0; j < h; ++j) {
+        QRgb *line = reinterpret_cast<QRgb *>(qi->scanLine(j));
         for (int i = 0; i < w; ++i) {
-            QColor qc = qi->pixelColor(i, j);
+            QColor qc = line[i];
             r = ((qc.red() + errorR[acc]) >> bpp) << bpp;
             g = ((qc.green() + errorG[acc]) >> bpp) << bpp;
             b = ((qc.blue() + errorB[acc]) >> bpp) << bpp;
@@ -553,7 +554,7 @@ void graphics::Color::ditherFloydSteinberg(QImage *qi, int bpp) {
             rErr = static_cast<float>(qc.red() - r);
             gErr = static_cast<float>(qc.green() - g);
             bErr = static_cast<float>(qc.blue() - b);
-            qi->setPixelColor(i, j, QColor(r, g, b, qc.alpha()));
+            line[i] = QColor(r, g, b, qc.alpha()).rgba();
             int offset = acc + 1;
             if (i + 1 < w) {
                 errorR[offset] += static_cast<int>(rErr * A);
@@ -593,8 +594,9 @@ void graphics::Color::ditherSierra(QImage *qi, int bpp) {
     vector <int> errorG(size, 0);
     vector <int> errorB(size, 0);
     for (int j = 0; j < h; ++j) {
+        QRgb *line = reinterpret_cast<QRgb *>(qi->scanLine(j));
         for (int i = 0; i < w; ++i) {
-            QColor qc = qi->pixelColor(i, j);
+            QColor qc = line[i];
             r = ((qc.red() + errorR[acc]) >> bpp) << bpp;
             g = ((qc.green() + errorG[acc]) >> bpp) << bpp;
             b = ((qc.blue() + errorB[acc]) >> bpp) << bpp;
@@ -604,7 +606,7 @@ void graphics::Color::ditherSierra(QImage *qi, int bpp) {
             rErr = static_cast<float>(qc.red() - r);
             gErr = static_cast<float>(qc.green() - g);
             bErr = static_cast<float>(qc.blue() - b);
-            qi->setPixelColor(i, j, QColor(r, g, b, qc.alpha()));
+            line[i] = QColor(r, g, b, qc.alpha()).rgba();
             int offset = acc + 1;
             if (i + 1 < w) {
                 errorR[offset] += static_cast<int>(rErr * D);
@@ -680,6 +682,7 @@ void graphics::Color::ditherSierraLite(QImage *qi, int bpp) {
     vector <int> errorG(size, 0);
     vector <int> errorB(size, 0);
     for (int j = 0; j < h; ++j) {
+        QRgb *line = reinterpret_cast<QRgb *>(qi->scanLine(j));
         for (int i = 0; i < w; ++i) {
             QColor qc = qi->pixelColor(i, j);
             r = ((qc.red() + errorR[acc]) >> bpp) << bpp;
@@ -691,7 +694,7 @@ void graphics::Color::ditherSierraLite(QImage *qi, int bpp) {
             rErr = static_cast<float>(qc.red() - r);
             gErr = static_cast<float>(qc.green() - g);
             bErr = static_cast<float>(qc.blue() - b);
-            qi->setPixelColor(i, j, QColor(r, g, b, qc.alpha()));
+            line[i] = QColor(r, g, b, qc.alpha()).rgba();
             int offset = acc + 1;
             if (i + 1 < w) {
                 errorR[offset] += static_cast<int>(rErr * A);
@@ -742,14 +745,15 @@ void graphics::Color::colorTransfer(QImage *to, QImage from, tType type) {
     for (int i = 0; i < wt; ++i)
         labImg[i].resize(ht);
     float lmt = 0.0, amt = 0.0, bmt = 0.0;
-    for (int i = 0; i < wt; ++i)
-        for (int j = 0; j < ht; ++j) {
-            QColor qc = to->pixelColor(i, j);
-            vec4 color = vec4(qc.redF(), qc.greenF(), qc.blueF());
+    for (int j = 0; j < ht; ++j) {
+        QRgb *line = reinterpret_cast<QRgb *>(to->scanLine(j));
+        for (int i = 0; i < wt; ++i) {
+            QColor qc = line[i];
+            vec4 color;
             if (type == CIELAB)
                 color = rgb2lab(qc);
             else if (type == HunterLAB) {
-                color = rgb2lms * color;
+                color = rgb2lms * vec4(qc.redF(), qc.greenF(), qc.blueF());
                 if (color._L == 0.0)
                     color._L = 1.0 / 10000000.0;
                 if (color._A == 0.0)
@@ -761,11 +765,14 @@ void graphics::Color::colorTransfer(QImage *to, QImage from, tType type) {
                 color._B = log10(color._B);
                 color = lms2lab * color;
             }
+            else
+                color = vec4(qc.redF(), qc.greenF(), qc.blueF());
             lmt += color._L;
             amt += color._A;
             bmt += color._B;
             labImg[i][j] = color;
         }
+    }
     float sizet = static_cast<float>(wt * ht);
     lmt /= sizet;
     amt /= sizet;
@@ -786,14 +793,15 @@ void graphics::Color::colorTransfer(QImage *to, QImage from, tType type) {
     for (int i = 0; i < ws; ++i)
         labImg2[i].resize(hs);
     float lms = 0.0, ams = 0.0, bms = 0.0;
-    for (int i = 0; i < ws; ++i)
-        for (int j = 0; j < hs; ++j) {
-            QColor qc = from.pixelColor(i, j);
-            vec4 color = vec4(qc.redF(), qc.greenF(), qc.blueF());
+    for (int j = 0; j < hs; ++j) {
+        QRgb *line = reinterpret_cast<QRgb *>(from.scanLine(j));
+        for (int i = 0; i < ws; ++i) {
+            QColor qc = line[i];
+            vec4 color;
             if (type == CIELAB)
                 color = rgb2lab(qc);
             else if (type == HunterLAB) {
-                color = rgb2lms * color;
+                color = rgb2lms * vec4(qc.redF(), qc.greenF(), qc.blueF());
                 if (color._L == 0.0)
                     color._L = 1.0 / 10000000.0;
                 if (color._A == 0.0)
@@ -805,11 +813,14 @@ void graphics::Color::colorTransfer(QImage *to, QImage from, tType type) {
                 color._B = log10(color._B);
                 color = lms2lab * color;
             }
+            else
+                color = vec4(qc.redF(), qc.greenF(), qc.blueF());
             lms += color._L;
             ams += color._A;
             bms += color._B;
             labImg2[i][j] = color;
         }
+    }
     float sizes = static_cast<float>(ws * hs);
     lms /= sizes;
     ams /= sizes;
@@ -825,8 +836,9 @@ void graphics::Color::colorTransfer(QImage *to, QImage from, tType type) {
     asds = sqrt(asds / sizes);
     bsds = sqrt(bsds / sizes);
     double lr = lsds / lsdt, ar = asds / asdt, br = bsds / bsdt;
-    for (int i = 0; i < wt; ++i)
-        for (int j = 0; j < ht; ++j) {
+    for (int j = 0; j < ht; ++j) {
+        QRgb *line = reinterpret_cast<QRgb *>(to->scanLine(j));
+        for (int i = 0; i < wt; ++i) {
             labImg[i][j]._L = (labImg[i][j]._L - lmt) * lr + lms;
             labImg[i][j]._A = (labImg[i][j]._A - amt) * ar + ams;
             labImg[i][j]._B = (labImg[i][j]._B - bmt) * br + bms;
@@ -840,12 +852,13 @@ void graphics::Color::colorTransfer(QImage *to, QImage from, tType type) {
                 color._B = pow(10.0, color._B);
                 color = lms2rgb * color;
             }
-            QColor qc = to->pixelColor(i, j);
+            QColor qc = line[i];
             qc.setRedF(stdFuncs::clamp(color._R, 0.0, 1.0));
             qc.setGreenF(stdFuncs::clamp(color._G, 0.0, 1.0));
             qc.setBlueF(stdFuncs::clamp(color._B, 0.0, 1.0));
-            to->setPixelColor(i, j, qc);
+            line[i] = qc.rgba();
         }
+    }
 }
 
 vec4 graphics::Color::rgb2lab(QColor qc) {
@@ -969,24 +982,29 @@ void graphics::ImgSupport::flipVertical(QImage *qi) {
     int w = qi->width(), h = qi->height();
     int halfW = w / 2;
     --w;
-    for (int i = 0; i < halfW; ++i)
-        for (int j = 0; j < h; ++j) {
-            QRgb qc = qi->pixel(i, j);
-            qi->setPixel(i, j, qi->pixel(w - i, j));
-            qi->setPixel(w - i, j, qc);
+    for (int j = 0; j < h; ++j) {
+        QRgb *line = reinterpret_cast<QRgb *>(qi->scanLine(j));
+        for (int i = 0; i < halfW; ++i) {
+            QRgb temp = line[i];
+            line[i] = line[w - i];
+            line[w - i] = temp;
         }
+    }
 }
 
 void graphics::ImgSupport::flipHorizontal(QImage *qi) {
     int w = qi->width(), h = qi->height();
     int halfH = h / 2;
     --h;
-    for (int i = 0; i < w; ++i)
-        for (int j = 0; j < halfH; ++j) {
-            QRgb qc = qi->pixel(i, j);
-            qi->setPixel(i, j, qi->pixel(i, h - j));
-            qi->setPixel(i, h - j, qc);
+    for (int j = 0; j < halfH; ++j) {
+        QRgb *line = reinterpret_cast<QRgb *>(qi->scanLine(j));
+        QRgb *line2 = reinterpret_cast<QRgb *>(qi->scanLine(h - j));
+        for (int i = 0; i < w; ++i) {
+            QRgb temp = line[i];
+            line[i] = line2[i];
+            line2[i] = temp;
         }
+    }
 }
 
 KernelData graphics::ImgSupport::loadKernel(string fileName) {
@@ -1070,9 +1088,10 @@ QImage graphics::Color::Histogram(QImage *in, eType type) {
     QImage image = in->copy();
     // Fill the array(s) tht the histograms will be constructed from.
     int total = 0;
-    for (int x = 0; x < image.width(); ++x)
-        for (int y = 0; y < image.height(); ++y) {
-            QColor qc = image.pixelColor(x, y);
+    for (int y = 0; y < image.height(); ++y) {
+        QRgb *line = reinterpret_cast<QRgb *>(image.scanLine(y));
+        for (int x = 0; x < image.width(); ++x) {
+            QColor qc = line[x];
             if (qc.alpha() != 0) {
                 if (type == RGB) {
                     int intensity = static_cast<int>(static_cast<float>(qc.red() + qc.green() + qc.blue()) / 3.0 + 0.5);
@@ -1099,6 +1118,7 @@ QImage graphics::Color::Histogram(QImage *in, eType type) {
                 ++total;
             }
         }
+    }
     int maxI = 0, cutoff = (total) / 4;
     for (int j = 0; j < end; ++j)
         for (int i = 1; i < bins - 1; ++i)
@@ -1156,49 +1176,43 @@ QImage graphics::Color::Histogram(QImage *in, eType type) {
 }
 
 void graphics::Color::equalizeHistogramTo(QImage *qi, eType type) {
-    vector< vector <vec4> > img;
     int w = qi->width(), h = qi->height();
-    img.resize(w);
-    for (int i = 0; i < w; ++i)
-        img[i].resize(h);
-    for (int i = 0; i < w; ++i)
-        for (int j = 0; j < h; ++j) {
-            QColor qc = qi->pixelColor(i, j);
-            if (type == HSV)
-                img[i][j] = vec4(qc.hsvHueF(), qc.hsvSaturationF(), qc.valueF());
-            else if (type == HSL)
-                img[i][j] = vec4(qc.hslHueF(), qc.hslSaturationF(), qc.lightnessF());
-            else if (type == RGB)
-                img[i][j] = vec4(qc.redF(), qc.greenF(), qc.blueF());
-            else {
-                img[i][j] = getLabScaled(rgb2lab(qc));
-                img[i][j] /= 255.0;
-            }
-
-        }
+    vector< vector <vec4> > img(w, vector <vec4> (h, vec4()));
     //normalize into 0-255 range
-    int histo[bins];
-    for (int i = 0; i < bins; ++i)
-        histo[i] = 0;
+    int histo[bins] = {0};
     // Fill the array(s) tht the histograms will be constructed from.
     int value;
     int total = 0;
-    for (int x = 0; x < w; ++x)
-        for (int y = 0; y < h; ++y) {
-            if (qi->pixelColor(x, y).alpha() != 0) {
+    for (int j = 0; j < h; ++j) {
+        QRgb *line = reinterpret_cast<QRgb *>(qi->scanLine(j));
+        for (int i = 0; i < w; ++i) {
+            QColor qc = line[i];
+            if (qc.alpha() != 0) {
                 float vf;
-                if (type == RGB)
-                    vf = (img[x][y][0] + img[x][y][1] + img[x][y][2]) / 3.0;
-                else if (type == HSV || type == HSL)
-                    vf = img[x][y][2];
-                else
-                    vf = img[x][y][0];
+                if (type == HSV) {
+                    img[i][j] = vec4(qc.hsvHueF(), qc.hsvSaturationF(), qc.valueF());
+                    vf = img[i][j][2];
+                }
+                else if (type == HSL) {
+                    img[i][j] = vec4(qc.hslHueF(), qc.hslSaturationF(), qc.lightnessF());
+                    vf = img[i][j][2];
+                }
+                else if (type == RGB) {
+                    img[i][j] = vec4(qc.redF(), qc.greenF(), qc.blueF());
+                    vf = (img[i][j][0] + img[i][j][1] + img[i][j][2]) / 3.0;
+                }
+                else {
+                    img[i][j] = getLabScaled(rgb2lab(qc));
+                    img[i][j] /= 255.0;
+                    vf = img[i][j][0];
+                }
                 value = static_cast<int>(vf * static_cast<float>(bins - 1) + 0.4);
                 value = stdFuncs::clamp(value, 0, bins - 1);
                 ++total;
                 ++histo[value];
             }
         }
+    }
     int i = 0;
     while (i < bins && histo[i] == 0)
         ++i;
@@ -1213,15 +1227,22 @@ void graphics::Color::equalizeHistogramTo(QImage *qi, eType type) {
         sum += histo[i];
         lut[i] = stdFuncs::clamp(static_cast<int>(static_cast<float>(sum) * scale), 0, 255);
     }
-    for (int x = 0; x < w; ++x)
-        for (int y = 0; y < h; ++y) {
-            if (qi->pixelColor(x, y).alpha() != 0) {
+    for (int y = 0; y < h; ++y) {
+        QRgb *line = reinterpret_cast<QRgb *>(qi->scanLine(y));
+        for (int x = 0; x < w; ++x) {
+            QColor qc = line[i];
+            float a = qc.alphaF();
+            if (qc.alpha() != 0) {
                 if (type == HSV || type == HSL) {
                     float vf = img[x][y][2];
                     value = static_cast<int>(vf * static_cast<float>(bins - 1) + 0.4);
                     stdFuncs::clamp(value, 0, bins - 1);
                     vf = static_cast<float>(lut[value]) / 255.0;
                     img[x][y].xyzw[2] = vf;
+                    if (type == HSV)
+                        qc.setHsvF(img[x][y][0], img[x][y][1], img[x][y][2], a);
+                    else
+                        qc.setHslF(img[x][y][0], img[x][y][1], img[x][y][2], a);
                 }
                 if (type == RGB) {
                     int c1 = static_cast<int>(img[x][y][0] * 255.0);
@@ -1230,6 +1251,7 @@ void graphics::Color::equalizeHistogramTo(QImage *qi, eType type) {
                     img[x][y].set(0, static_cast<float>(lut[c1]) / 255.0);
                     img[x][y].set(1, static_cast<float>(lut[c2]) / 255.0);
                     img[x][y].set(2, static_cast<float>(lut[c3]) / 255.0);
+                    qc.setRgbF(img[x][y][0], img[x][y][1], img[x][y][2], a);
                 }
                 if (type == LAB) {
                     float vf = img[x][y][0];
@@ -1238,20 +1260,13 @@ void graphics::Color::equalizeHistogramTo(QImage *qi, eType type) {
                     vf = static_cast<float>(lut[value]) / 255.0;
                     img[x][y].xyzw[0] = vf;
                     img[x][y] *= 255.0;
-                }
-                QColor qc = qi->pixelColor(x, y);
-                float a = qc.alphaF();
-                if (type == HSV)
-                    qc.setHsvF(img[x][y][0], img[x][y][1], img[x][y][2], a);
-                else if (type == HSL)
-                    qc.setHslF(img[x][y][0], img[x][y][1], img[x][y][2], a);
-                else if (type == RGB)
-                    qc.setRgbF(img[x][y][0], img[x][y][1], img[x][y][2], a);
-                else if (type == LAB)
                     qc = toQColor(lab2rgb(getLabDescaled(img[x][y])));
-                qi->setPixelColor(x, y, qc);
+                    qc.setAlphaF(a);
+                }
+                line[x] = qc.rgba();
             }
         }
+    }
 }
 
 //clipLimit 0.0 to 1.0, 0.0 ahe, 1.0 og, inbetween clahe
@@ -1262,9 +1277,10 @@ void graphics::Color::claheTo(QImage *qi, eType type, float clipLimit, int divis
     int mi = 256, ma = -1;
     vector< vector<int> > edL;
     edL.resize(w, vector<int>(h, 0));
-    for (int i = 0; i < w; ++i)
-        for (int j = 0; j < h; ++j) {
-            QColor qc = qi->pixelColor(i, j);
+    for (int j = 0; j < h; ++j) {
+        QRgb *line = reinterpret_cast<QRgb *>(qi->scanLine(j));
+        for (int i = 0; i < w; ++i) {
+            QColor qc = line[i];
             if (type == HSL || type == RGB)
                 edL[i][j] = static_cast<int>(255.0 * qc.lightnessF());
             else if (type == HSV)
@@ -1276,6 +1292,7 @@ void graphics::Color::claheTo(QImage *qi, eType type, float clipLimit, int divis
             ma = max(ma, edL[i][j]);
             mi = min(mi, edL[i][j]);
         }
+    }
     // for automatic mode
     if (divisionX < 2 || divisionY < 2) {
         float sum = 0.0;
@@ -1307,7 +1324,6 @@ void graphics::Color::claheTo(QImage *qi, eType type, float clipLimit, int divis
         if (divisionY < 2)
             divisionY = divs;
     }
-    cout << "divisions " << divisionX << " " << divisionY << endl;
     int offX = 0, offY = 0;
     if (safe.width() % divisionX != 0 || safe.height() % divisionY != 0) {
         int divX = (static_cast<int>(safe.width() / divisionX) + 1) * divisionX;
@@ -1591,9 +1607,11 @@ void graphics::Color::brightnessAdjust(QImage *qi, double val, eType type) {
         int w = processed.width(), h = processed.height();
         if (type == RGB)
             val += 1.0;
-        for (int i = 0; i < w; ++i)
-            for (int j = 0; j < h; ++j) {
-                QColor qc = processed.pixelColor(i, j);
+        for (int j = 0; j < h; ++j) {
+            QRgb *line = reinterpret_cast<QRgb *>(processed.scanLine(j));
+            for (int i = 0; i < w; ++i) {
+                QColor qc = line[i];
+                float alpha = qc.alphaF();
                 if (type == RGB) {
                     qc.setRedF(stdFuncs::clamp(qc.redF() * val, 0.0, 1.0));
                     qc.setGreenF(stdFuncs::clamp(qc.greenF() * val, 0.0, 1.0));
@@ -1608,8 +1626,10 @@ void graphics::Color::brightnessAdjust(QImage *qi, double val, eType type) {
                     color.xyzw[0] += 100.0 * val;
                     qc = toQColor(lab2rgb(color));
                 }
-                processed.setPixelColor(i, j, qc);
+                qc.setAlphaF(alpha);
+                line[i] = qc.rgba();
             }
+        }
         *qi = processed.copy();
     }
 }
@@ -1619,15 +1639,17 @@ void graphics::Color::contrastAdjust(QImage *qi, double val) {
         QImage processed = qi->copy();
         int w = processed.width(), h = processed.height();
         float c = static_cast<float>(val);
-        for (int i = 0; i < w; ++i)
-            for (int j = 0; j < h; ++j) {
-                QColor qc = processed.pixelColor(i, j);
+        for (int j = 0; j < h; ++j) {
+            QRgb *line = reinterpret_cast<QRgb *>(processed.scanLine(j));
+            for (int i = 0; i < w; ++i) {
+                QColor qc = line[i];
                 float f = (259.0 * (c + 255.0)) / (255.0 * (259.0 - c));
                 qc.setRedF(stdFuncs::clamp(f * (qc.redF() - 128.0) + 128.0, 0.0, 1.0));
                 qc.setGreenF(stdFuncs::clamp(f * (qc.greenF() - 128.0) + 128.0, 0.0, 1.0));
                 qc.setBlueF(stdFuncs::clamp(f * (qc.blueF() - 128.0) + 128.0, 0.0, 1.0));
-                processed.setPixelColor(i, j, qc);
+                line[i] = qc.rgba();
             }
+        }
         *qi = processed.copy();
     }
 }
@@ -1637,15 +1659,17 @@ void graphics::Color::saturationAdjust(QImage *qi, double val, eType type) {
         QImage processed = qi->copy();
         int w = processed.width(), h = processed.height();
         val += 1.0;
-        for (int i = 0; i < w; ++i)
-            for (int j = 0; j < h; ++j) {
-                QColor qc = processed.pixelColor(i, j);
+        for (int j = 0; j < h; ++j) {
+            QRgb *line = reinterpret_cast<QRgb *>(processed.scanLine(j));
+            for (int i = 0; i < w; ++i) {
+                QColor qc = line[i];
                 if (type == HSV)
                     qc.setHsvF(qc.hsvHueF(), stdFuncs::clamp(qc.hsvSaturationF() * val, 0.0, 1.0), qc.valueF(), qc.alphaF());
                 else if (type == HSL)
                     qc.setHslF(qc.hslHueF(), stdFuncs::clamp(qc.hslSaturationF() * val, 0.0, 1.0), qc.lightnessF(), qc.alphaF());
-                processed.setPixelColor(i, j, qc);
+                line[i] = qc.rgba();
             }
+        }
         *qi = processed.copy();
     }
 }
@@ -1655,14 +1679,16 @@ void graphics::Color::gammaAdjust(QImage *qi, double val) {
         QImage processed = qi->copy();
         int w = processed.width(), h = processed.height();
         float c = static_cast<float>(val) + 1.0;
-        for (int i = 0; i < w; ++i)
-            for (int j = 0; j < h; ++j) {
-                QColor qc = processed.pixelColor(i, j);
+        for (int j = 0; j < h; ++j) {
+            QRgb *line = reinterpret_cast<QRgb *>(processed.scanLine(j));
+            for (int i = 0; i < w; ++i) {
+                QColor qc = line[i];
                 qc.setRedF(c == 0.0 ? 0.0 : stdFuncs::clamp(255.0 * (pow(qc.redF(), 1.0 / c) / pow(255.0, 1.0 / c)), 0.0, 1.0));
                 qc.setGreenF(c == 0.0 ? 0.0 : stdFuncs::clamp(255.0 * (pow(qc.greenF(), 1.0 / c) / pow(255.0, 1.0 / c)), 0.0, 1.0));
                 qc.setBlueF(c == 0.0 ? 0.0 : stdFuncs::clamp(255.0 * (pow(qc.blueF(), 1.0 / c) / pow(255.0, 1.0 / c)), 0.0, 1.0));
-                processed.setPixelColor(i, j, qc);
+                line[i] = qc.rgba();
             }
+        }
         *qi = processed.copy();
     }
 }
@@ -1671,15 +1697,17 @@ void graphics::Color::hueShift(QImage *qi, int val) {
     if (val != 0) {
         QImage processed = qi->copy();
         int w = processed.width(), h = processed.height();
-        for (int i = 0; i < w; ++i)
-            for (int j = 0; j < h; ++j) {
-                QColor qc = processed.pixelColor(i, j);
+        for (int j = 0; j < h; ++j) {
+            QRgb *line = reinterpret_cast<QRgb *>(processed.scanLine(j));
+            for (int i = 0; i < w; ++i) {
+                QColor qc = line[i];
                 int hue = qc.hslHue() + val;
                 if (hue >= 360)
                     hue -= 360;
                 qc.setHsl(hue, qc.hslSaturation(), qc.lightness(), qc.alpha());
-                processed.setPixelColor(i, j, qc);
+                line[i] = qc.rgba();
             }
+        }
         *qi = processed.copy();
     }
 }
@@ -1712,11 +1740,12 @@ Kernel graphics::Filtering::getConeBlur(int radius) {
     return vec;
 }
 
+//todo
 void graphics::Color::matchHistogram(QImage *qi, QImage toMatch, mType type) {
     QImage ret(qi->size(), QImage::Format_ARGB32_Premultiplied);
-    double intensities[256] = {0};
-    double intensities2[256] = {0};
-    double intensities3[256] = {-1};
+    double intensities[bins] = {0};
+    double intensities2[bins] = {0};
+    double intensities3[bins] = {-1};
     ret.fill(0xFF000000);
     int w1 = qi->width(), w2 = toMatch.width(), h1 = qi->height(), h2 = toMatch.height();
     int size = w1 * h1;
@@ -1781,15 +1810,15 @@ void graphics::Color::matchHistogram(QImage *qi, QImage toMatch, mType type) {
             intensities2[n] += 1.0;
         }
     }
-    for (int i = 1; i < 256; i++) {
+    for (int i = 1; i < bins; i++) {
         intensities[i] += intensities[i - 1];
         intensities2[i] += intensities2[i - 1];
     }
-    for (int i = 0; i < 256; i++) {
+    for (int i = 0; i < bins; i++) {
         intensities[i] = min(255.0, round(intensities[i] * 255.0 / static_cast<double>(size - offset1)));
         intensities2[i] = min(255.0, round(intensities2[i] * 255.0 / static_cast<double>(size2 - offset2)));
     }
-    for(int i = 0; i < 256; i++) {
+    for(int i = 0; i < bins; i++) {
         int j = 0;
         do {
             intensities3[i] = j;
@@ -1797,7 +1826,7 @@ void graphics::Color::matchHistogram(QImage *qi, QImage toMatch, mType type) {
         }
         while(intensities[i] > intensities2[j]);
     }
-    for (int i = 0; i < 256; i++) {
+    for (int i = 0; i < bins; i++) {
         max1 = max(max1, static_cast<int>(intensities3[i]));
         if (intensities3[i] != -1)
             min1 = min(min1, static_cast<int>(intensities3[i]));
@@ -2143,7 +2172,7 @@ QImage graphics::ImgSupport::avgLayers(QImage a, QImage b, eType type) {
 
 QImage graphics::ImgSupport::remLayers(QImage a, QImage b, eType type) {
     QImage diff = diffLayers(a, b, type);
-    float histogram[256] = {0.0};
+    float histogram[bins] = {0.0};
     float sum = 0.0;
     vector <vector <int> > remMap(diff.width(), vector <int> (diff.height(), 0));
     for (int i = 0; i < diff.width(); ++i)
@@ -2155,15 +2184,15 @@ QImage graphics::ImgSupport::remLayers(QImage a, QImage b, eType type) {
             sum += val;
             ++histogram[val];
         }
-    float probability[256];
+    float probability[bins];
     float invSize = 1.0 / (diff.width() * diff.height());
-    for (int i = 0; i < 256; ++i)
+    for (int i = 0; i < bins; ++i)
         probability[i] = histogram[i] * invSize;
     float p1 = probability[0];
     float q1 = p1, mu1 = 0.0, mu2 = 0.0;
     float mu = sum * invSize;
     float q1prev = q1, maxbetweenvariance = 0.0, optimizedthresh = 0.0;
-    for (int t = 1; t < 255; ++t){
+    for (int t = 1; t < bins - 1; ++t) {
         float q1next = q1prev + probability[t + 1];
         float mu1next = (q1prev * mu1 + (t + 1) * (probability[t + 1])) / q1next;
         float mu2next = (mu - q1next * mu1next) / (1 - q1next);
@@ -2264,6 +2293,5 @@ QImage graphics::ImgSupport::bitLayers(QImage a, QImage b, bType type) {
         }
     }
     return out;
-    //todo lab
 }
 

@@ -431,11 +431,14 @@ void Layer::release(QPoint qp, MouseButton button) {
                 rasterselectOg = QImage((1 + boundPt2.x()) - boundPt1.x(), (1 + boundPt2.y()) - boundPt1.y(), QImage::Format_ARGB32);
                 if (boundPt1.x() < 0 || boundPt1.y() < 0)
                     return;
-                for (int i = boundPt1.x(); i <= boundPt2.x(); ++i)
-                    for (int j = boundPt1.y(); j <= boundPt2.y(); ++j) {
-                        rasterselectOg.setPixel(i - boundPt1.x(), j - boundPt1.y(), qi->pixel(i, j));
-                        qi->setPixel(i, j, 0x00000000);
+                for (int j = boundPt1.y(); j <= boundPt2.y(); ++j) {
+                    QRgb *line = reinterpret_cast<QRgb *>(rasterselectOg.scanLine(j - boundPt1.y()));
+                    QRgb *line2 = reinterpret_cast<QRgb *>(qi->scanLine(j));
+                    for (int i = boundPt1.x(); i <= boundPt2.x(); ++i) {
+                        line[i - boundPt1.x()] = line2[i];
+                        line2[i] = 0x00000000;
                     }
+                }
                 selectOgActive = true;
                 ogLocation = boundPt1;
             }
@@ -1221,14 +1224,18 @@ void Layer::drawRasterSelection(QImage *img, Qt::TransformationMode tm) {
     QImage rasterOverlay(static_cast<int>(1.0 + abs(static_cast<float>(rasterEdit.width()) * cos(angle)) + abs(static_cast<float>(rasterEdit.height()) * sin(angle))), static_cast<int>(1.0 + abs(static_cast<float>(rasterEdit.width()) * sin(angle)) + abs(static_cast<float>(rasterEdit.height()) * cos(angle))), QImage::Format_ARGB32);
     rasterOverlay.fill(0x00000000);
     int midX2 = (rasterOverlay.width() - 1) / 2, midY2 = (rasterOverlay.height() - 1) / 2;
-    for (int i = -midX2; i <= midX2; ++i)
-        for (int j = -midY2; j <= midY2; ++j) {
+    for (int j = -midY2; j <= midY2; ++j) {
+        if (j + midY2 >= rasterOverlay.height() || j + midY2 < 0)
+            continue;
+        QRgb *line = reinterpret_cast<QRgb *>(rasterOverlay.scanLine(j + midY2));
+        for (int i = -midX2; i <= midX2; ++i) {
             QPoint pt;
             pt.setX(cos(-angle) * i + sin(-angle) * j);
             pt.setY(-sin(-angle) * i + cos(-angle) * j);
-            if (i + midX2 >= 0 && i + midX2 < rasterOverlay.width() && j + midY2 >= 0 && j + midY2 < rasterOverlay.height() && pt.x() + midX1 >= 0 && pt.x() + midX1 < rasterEdit.width() && pt.y() + midY1 >= 0 && pt.y() + midY1 < rasterEdit.height())
-                rasterOverlay.setPixel(i + midX2, j + midY2, rasterEdit.pixel(pt.x() + midX1, pt.y() + midY1));
+            if (i + midX2 >= 0 && i + midX2 < rasterOverlay.width() && pt.x() + midX1 >= 0 && pt.x() + midX1 < rasterEdit.width() && pt.y() + midY1 >= 0 && pt.y() + midY1 < rasterEdit.height())
+                line[i + midX2] = rasterEdit.pixel(pt.x() + midX1, pt.y() + midY1);
         }
+    }
     QPainter qp;
     qp.begin(img);
     qp.drawImage(boundPt1.x() + (rasterEdit.width() - rasterOverlay.width()) / 2, boundPt1.y() + (rasterEdit.height() - rasterOverlay.height()) / 2, rasterOverlay);
