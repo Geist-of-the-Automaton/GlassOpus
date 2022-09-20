@@ -53,7 +53,11 @@ The Microsoft coding guidelines are used. Found [here](https://www.cise.ufl.edu/
 
 ![Spline_Brush_Example_3](https://user-images.githubusercontent.com/44931507/109450440-dec22000-7a18-11eb-9de4-7f6569bb464c.png)
 
+![Radial Brush Example](https://user-images.githubusercontent.com/44931507/191343750-3bca7c51-ba96-43d5-b801-6f06bd664f3a.PNG)
+
 ![UiView2](https://user-images.githubusercontent.com/44931507/175762495-ded825d4-ef83-48d3-b896-7427ca21b58a.PNG)
+
+
 
 
 
