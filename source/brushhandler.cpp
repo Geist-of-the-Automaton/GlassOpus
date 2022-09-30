@@ -304,16 +304,17 @@ void brushHandler::overwrite(QImage *qi) {
     int radius = brush.getRadius(), xMax = qi->width(), yMax = qi->height();
     QRgb qc = brushColor.rgba();
     while (toProcess.size() > 0) {
-        QPoint p = toProcess.front();
-        lastPnt = currPnt;
-        currPnt = p;
+        currPnt = toProcess.front();
         if (symDiv == 1) {
-            int y = currPnt.y() - radius < 0 ? -(currPnt.y() - radius) : 0;
-            for (int j = currPnt.y() - radius + y; j <= min(currPnt.y() + radius, yMax); ++j) {
+            int yReset = currPnt.y() - radius < 0 ? -(currPnt.y() - radius) : 0;
+            int xReset = currPnt.x() - radius < 0 ? -(currPnt.x() - radius) : 0;
+            int xEnd = min(currPnt.x() + radius, xMax);
+            int y = 0;
+            for (int j = currPnt.y() - radius + yReset; j <= min(currPnt.y() + radius, yMax); ++j) {
                 QRgb *line = reinterpret_cast<QRgb *>(qi->scanLine(j));
-                int x = currPnt.x() - radius < 0 ? -(currPnt.x() - radius) : 0;
+                int x = xReset;
                 int J = j % patternMap[0].size();
-                for (int i = currPnt.x() - radius + x; i <= min(currPnt.x() + radius, xMax); ++i) {
+                for (int i = currPnt.x() - radius + x; i <= xEnd; ++i) {
                     if (brushMap[x][y] && (!sprayDensity || !(rand() % sprayDensity)) && (!patternInUse || patternMap[i % patternMap.size()][J]))
                         line[i] = qc;
                     ++x;
@@ -343,11 +344,13 @@ void brushHandler::overwrite(QImage *qi) {
                 y = ynew + symPt.y();
 
                 int Y = y - radius < 0 ? -(y - radius) : 0;
+                int xReset = x - radius < 0 ? -(x - radius) : 0;
+                int xEnd = fmin(xMax, x + radius);
                 for (int j = y - radius + Y; j <= fmin(yMax - 1, y + radius); ++j) {
                     QRgb *line = reinterpret_cast<QRgb *>(qi->scanLine(j));
-                    int X = x - radius < 0 ? -(x - radius) : 0;
+                    int X = xReset;
                     int J = j % patternMap[0].size();
-                    for (int i = x - radius + X; i <= fmin(xMax, x + radius); ++i) {
+                    for (int i = x - radius + X; i <= xEnd; ++i) {
                         if (brushMap[X][Y] && (!sprayDensity || !(rand() % sprayDensity)) && (!patternInUse || patternMap[i % patternMap.size()][J]))
                             line[i] = qc;
                         ++X;
@@ -384,11 +387,13 @@ void brushHandler::additive(QImage *qi) {
         currPnt = p;
         shift();
         int y = currPnt.y() - radius < 0 ? -(currPnt.y() - radius) : 0;
+        int xReset = currPnt.x() - radius < 0 ? -(currPnt.x() - radius) : 0;
+        int xEnd = min(currPnt.x() + radius, xMax);
         for (int j = currPnt.y() - radius + y; j <= min(currPnt.y() + radius, yMax); ++j) {
             QRgb *line = reinterpret_cast<QRgb *>(qi->scanLine(j));
-            int x = currPnt.x() - radius < 0 ? -(currPnt.x() - radius) : 0;
+            int x = xReset;
             int J = j % patternMap[0].size();
-            for (int i = currPnt.x() - radius + x; i <= min(currPnt.x() + radius, xMax); ++i) {
+            for (int i = currPnt.x() - radius + x; i <= xEnd; ++i) {
                 if (!checkMap[x + checkEdgeSize][y + checkEdgeSize] && brushMap[x][y] && (!sprayDensity || !(rand() % sprayDensity)) && (!patternInUse || patternMap[i % patternMap.size()][J])) {
                     QColor qc = line[i];
                     setColor.setRed(min(qc.red() + r, 255));
@@ -418,11 +423,13 @@ void brushHandler::subractive(QImage *qi) {
         currPnt = p;
         shift();
         int y = currPnt.y() - radius < 0 ? -(currPnt.y() - radius) : 0;
+        int xReset = currPnt.x() - radius < 0 ? -(currPnt.x() - radius) : 0;
+        int xEnd = min(currPnt.x() + radius, xMax);
         for (int j = currPnt.y() - radius + y; j <= min(currPnt.y() + radius, yMax); ++j) {
             QRgb *line = reinterpret_cast<QRgb *>(qi->scanLine(j));
-            int x = currPnt.x() - radius < 0 ? -(currPnt.x() - radius) : 0;
+            int x = xReset;
             int J = j % patternMap[0].size();
-            for (int i = currPnt.x() - radius + x; i <= min(currPnt.x() + radius, xMax); ++i) {
+            for (int i = currPnt.x() - radius + x; i <= xEnd; ++i) {
                 if (!checkMap[x + checkEdgeSize][y + checkEdgeSize] && brushMap[x][y] && (!sprayDensity || !(rand() % sprayDensity)) && (!patternInUse || patternMap[i % patternMap.size()][J])) {
                     QColor qc = line[i];
                     setColor.setRed(max(qc.red() - r, 0));
@@ -442,22 +449,20 @@ void brushHandler::subractive(QImage *qi) {
 void brushHandler::filter(QImage *qi) {
     const unsigned char *const *const brushMap = brush.getBrushMap();
     int radius = brush.getRadius(), xMax = qi->width(), yMax = qi->height();
-    int checkEdgeSize = radius / 2;
     while (toProcess.size() > 0) {
-        QPoint p = toProcess.front();
-        lastPnt = currPnt;
-        currPnt = p;
-        shift();
-        int y = currPnt.y() - radius < 0 ? -(currPnt.y() - radius) : 0;
-        for (int j = currPnt.y() - radius + y; j <= min(currPnt.y() + radius, yMax); ++j) {
+        currPnt = toProcess.front();
+        int yReset = currPnt.y() - radius < 0 ? -(currPnt.y() - radius) : 0;
+        int xReset = currPnt.x() - radius < 0 ? -(currPnt.x() - radius) : 0;
+        int y = 0, xEnd = min(currPnt.x() + radius, xMax);
+        for (int j = currPnt.y() - radius + yReset; j <= min(currPnt.y() + radius, yMax); ++j) {
             QRgb *line = reinterpret_cast<QRgb *>(qi->scanLine(j));
-            int x = currPnt.x() - radius < 0 ? -(currPnt.x() - radius) : 0;
             int J = j % patternMap[0].size();
-            for (int i = currPnt.x() - radius + x; i <= min(currPnt.x() + radius, xMax); ++i) {
-                if (!checkMap[x + checkEdgeSize][y + checkEdgeSize] && brushMap[x][y] && (!sprayDensity || !(rand() % sprayDensity)) && (!patternInUse || patternMap[i % patternMap.size()][J])) {
+            int x = xReset;
+            for (int i = currPnt.x() - radius + xReset; i <= xEnd; ++i) {
+                if (checkMap2[i][j] && brushMap[x][y] && (!sprayDensity || !(rand() % sprayDensity)) && (!patternInUse || patternMap[i % patternMap.size()][J])) {
                     QColor qc = line[i];
                     line[i] = brushFilter.applyTo(qc);
-                    checkMap[x + checkEdgeSize][y + checkEdgeSize] = 255;
+                    checkMap2[i][j] = 0;
                 }
                 ++x;
             }
@@ -486,6 +491,7 @@ void brushHandler::radial(QImage *qi) {
     const unsigned char *const *const brushMap = brush.getBrushMap();
     int radius = brush.getRadius(), xMax = qi->width(), yMax = qi->height();
     int checkEdgeSize = radius / 2;
+    float invRad = 1 / static_cast<float>(radius);
     QRgb qc = brushColor.rgba();
     while (toProcess.size() > 0) {
         QPoint p = toProcess.front();
@@ -493,21 +499,24 @@ void brushHandler::radial(QImage *qi) {
         currPnt = p;
         shift();
         int y = currPnt.y() - radius < 0 ? -(currPnt.y() - radius) : 0;
+        int xReset = currPnt.x() - radius < 0 ? -(currPnt.x() - radius) : 0;
+        int xEnd = min(currPnt.x() + radius, xMax);
         for (int j = currPnt.y() - radius + y; j <= min(currPnt.y() + radius, yMax); ++j) {
             QRgb *line = reinterpret_cast<QRgb *>(qi->scanLine(j));
-            int x = currPnt.x() - radius < 0 ? -(currPnt.x() - radius) : 0;
+            int x = xReset;
             int J = j % patternMap[0].size();
             int trueY = y - radius;
-            for (int i = currPnt.x() - radius + x; i <= min(currPnt.x() + radius, xMax); ++i) {
+            trueY *= trueY;
+            for (int i = currPnt.x() - radius + xReset; i <= xEnd; ++i) {
                 int trueX = x - radius;
-                int checkStr = sqrt(trueX * trueX + trueY * trueY) + 1;
+                int checkStr = sqrt(trueX * trueX + trueY) + 1;
                 if ((checkMap[x + checkEdgeSize][y + checkEdgeSize] > checkStr || checkMap[x + checkEdgeSize][y + checkEdgeSize] == 0) && brushMap[x][y] && (!sprayDensity || !(rand() % sprayDensity)) && (!patternInUse || patternMap[i % patternMap.size()][J])) {
                     QColor qcs(qc), pcs(line[i]);
-                    float g = static_cast<float>(checkStr - 1) / static_cast <float>(radius);
-                    float f = radialMap[x][y] * g;
-                    qcs.setRedF(stdFuncs::clamp(qcs.redF() * f + pcs.redF() * (1.0 - f), 0.0, 1.0));
-                    qcs.setGreenF(stdFuncs::clamp(qcs.greenF() * f + pcs.greenF() * (1.0 - f), 0.0, 1.0));
-                    qcs.setBlueF(stdFuncs::clamp(qcs.blueF() * f + pcs.blueF() * (1.0 - f), 0.0, 1.0));
+                    float g = static_cast<float>(checkStr - 1) * invRad;
+                    float f = stdFuncs::clamp(radialMap[x][y] * g, 0.0, 1.0);
+                    qcs.setRedF(qcs.redF() * f + pcs.redF() * (1.0 - f));
+                    qcs.setGreenF(qcs.greenF() * f + pcs.greenF() * (1.0 - f));
+                    qcs.setBlueF(qcs.blueF() * f + pcs.blueF() * (1.0 - f));
                     line[i] = qcs.rgba();
                     checkMap[x + checkEdgeSize][y + checkEdgeSize] = static_cast<unsigned char>(checkStr);
                 }
@@ -519,7 +528,6 @@ void brushHandler::radial(QImage *qi) {
     }
 }
 
-//todo
 void brushHandler::sample(QImage *qi) {
     const unsigned char *const *const brushMap = brush.getBrushMap();
     while (toProcess.size() > 0) {
@@ -528,20 +536,9 @@ void brushHandler::sample(QImage *qi) {
         currPnt = p;
         int radius = brush.getRadius(), xMax = qi->width(), yMax = qi->height();
         int rx = currPnt.x() - relativityPoint.x(), ry = currPnt.y() - relativityPoint.y();
-        /*
-        int x = 0;
-        for (int i = -radius; i <= radius; ++i) {
-            int y = 0;
-            for (int j = -radius; j <= radius; ++j) {
-                if (onScreen(samplePoint.x() + i + rx, samplePoint.y() + j + ry, xMax, yMax) && onScreen(currPnt.x() + i, currPnt.y() + j, xMax, yMax) && brushMap[x][y] && (!sprayDensity || !(rand() % sprayDensity)) && (!patternInUse || patternMap[i % patternMap.size()][j % patternMap[0].size()]))
-                    qi->setPixel(currPnt.x() + i, currPnt.y() + j, qi->pixel(samplePoint.x() + i+ rx, samplePoint.y() + j + ry));
-                ++y;
-            }
-            ++x;
-        }
-        */
-
         int y = currPnt.y() - radius < 0 ? -(currPnt.y() - radius) : 0;
+        int xReset = currPnt.x() - radius < 0 ? -(currPnt.x() - radius) : 0;
+        int xEnd = min(currPnt.x() + radius, xMax);
         for (int j = currPnt.y() - radius + y; j <= min(currPnt.y() + radius, yMax); ++j) {
             int ySample = samplePoint.y() + ry + j - currPnt.y();
             if (ySample < 0 || ySample > yMax) {
@@ -550,9 +547,9 @@ void brushHandler::sample(QImage *qi) {
             }
             QRgb *line = reinterpret_cast<QRgb *>(qi->scanLine(j));
             QRgb *line2 = reinterpret_cast<QRgb *>(qi->scanLine(ySample));
-            int x = currPnt.x() - radius < 0 ? -(currPnt.x() - radius) : 0;
+            int x = xReset;
             int J = j % patternMap[0].size();
-            for (int i = currPnt.x() - radius + x; i <= min(currPnt.x() + radius, xMax); ++i) {
+            for (int i = currPnt.x() - radius + x; i <= xEnd; ++i) {
                 int xSample = samplePoint.x() + rx + i - currPnt.x();
                 if (xSample >= 0 && xSample < xMax && brushMap[x][y] && (!sprayDensity || !(rand() % sprayDensity)) && (!patternInUse || patternMap[i % patternMap.size()][J]))
                     line[i] = line2[xSample];
@@ -587,5 +584,15 @@ void brushHandler::setSym(QPoint qp, int div, int ofEvery, int skip) {
 
 QPoint brushHandler::getSymPt() {
     return symPt;
+}
+
+void brushHandler::setCanvasSize(int w, int h) {
+    checkMap2 = vector <vector <unsigned char>> (w, vector <unsigned char> (h, 1));
+}
+
+void brushHandler::resetCheck2(QPoint least, QPoint most) {
+    for (int i = max(least.x(), 0); i <= min(most.x(), static_cast<int>(checkMap2.size() - 1)); ++i)
+        for (int j = max(least.y(), 0); j <= min(most.y(), static_cast<int>(checkMap2[0].size() - 1)); ++j)
+            checkMap2[i][j] = 1;
 }
 

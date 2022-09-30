@@ -66,6 +66,8 @@ public:
     Shape getBrushShape();
     void setSym(QPoint qp, int div, int ofEvery, int skip);
     QPoint getSymPt();
+    void setCanvasSize(int w, int h);
+    void resetCheck2(QPoint least, QPoint most);
 
 private:
 
@@ -88,6 +90,7 @@ private:
     int sprayDensity;
     unsigned char strength;
     unsigned char checkMap[3 * maxRadius + 1][3 * maxRadius + 1];
+    vector <vector <unsigned char>> checkMap2;
     appMethod method;
     Brush brush;
     QColor brushColor, fillColor;

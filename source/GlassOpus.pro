@@ -45,6 +45,7 @@ HEADERS = \
     rasterpanel.h \
     saturationadj.h \
     sidepanel.h \
+    special.h \
     symdialog.h \
     targettool.h \
     textpanel.h \
@@ -63,6 +64,7 @@ HEADERS = \
     ui_polypanel.h \
     ui_rasterpanel.h \
     ui_saturationadj.h \
+    ui_specialDialog.h \
     ui_symdialog.h \
     ui_targetdialog.h \
     ui_textpanel.h \
@@ -107,6 +109,7 @@ SOURCES = \
     rasterpanel.cpp \
     saturationadj.cpp \
     sidepanel.cpp \
+    special.cpp \
     symdialog.cpp \
     targettool.cpp \
     textpanel.cpp \
