@@ -112,8 +112,8 @@ void TargetTool::preprocess() {
     int opType = ui->opType->currentIndex();
     processed2 = processed.copy();
     if (op == 0) {
-        QImage alpha(processed.size(), QImage::Format_Alpha8);
-        processed2.setAlphaChannel(alpha);
+       processed2 = QImage(processed.size(), QImage::Format_ARGB32);
+       processed2.fill(0x00000000);
     }
     else if (op == 1) {
         Kernel k = opType == 0 ? graphics::Filtering::getBoxBlur(opVal) : graphics::Filtering::getConeBlur(opVal);
@@ -276,6 +276,24 @@ void TargetTool::process() {
 }
 
 void TargetTool::on_buttonBox_accepted() {
+    processed = qi->copy();
+    preprocess();
+    for (int j = 0; j < processed2.height(); ++j) {
+        QRgb *line = reinterpret_cast<QRgb *>(processed.scanLine(j));
+        QRgb *line2 = reinterpret_cast<QRgb *>(processed2.scanLine(j));
+        for (int i = 0; i < processed2.width(); ++i) {
+            QColor qc(line[i]);
+            int lHue = hueTar - hueBnd;
+            int hHue = hueTar + hueBnd;
+            int hue = qc.hslHue() + 1;
+            bool flag = hue >= hueTar - hueBnd && hue <= hueTar + hueBnd;
+            if (!flag)
+                flag = (lHue < 0 && hue >= lHue + 360) || (hHue > 360 && hue < hHue - 360);
+            if (flag && qc.hslSaturation() >= satTar - satBnd && qc.saturation() <= satTar + satBnd && qc.lightness() >= litTar - litBnd && qc.lightness() <= litTar + litBnd)
+                line[i] = line2[i];
+        }
+    }
+    *qi = processed;
     done(1);
 }
 

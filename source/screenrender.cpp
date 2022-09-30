@@ -384,7 +384,7 @@ void screenRender::paintEvent(QPaintEvent *event) {
     if (fgVisible && !fgLayers.isNull())
         qp.drawPixmap(0, 0, fgLayers);
     isDrawing = false;
-    cout << stdFuncs::getTime(time) << endl;
+    //cout << stdFuncs::getTime(time) << endl;
 }
 
 void screenRender::setSamplePt(QPoint qp) {

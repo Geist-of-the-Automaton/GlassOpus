@@ -11,9 +11,10 @@ using std::endl;
 using std::chrono::duration_cast;
 using std::chrono::high_resolution_clock;
 using std::chrono::milliseconds;
+using std::chrono::microseconds;
 
 #define tof static_cast<float>
-
+static long long autoTime;
 
 class stdFuncs {
 
@@ -26,6 +27,14 @@ public:
 
     static long long getTime(long long initial = 0) {
         return duration_cast<milliseconds>(high_resolution_clock::now().time_since_epoch()).count() - initial;
+    }
+
+    static void logTime() {
+        autoTime = getTime();
+    }
+
+    static void getDiff() {
+        cout << getTime(autoTime) << endl;
     }
 
     static void here(int i) {

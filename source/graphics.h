@@ -34,10 +34,18 @@ typedef pair<bool,Kernel> KernelData;
 
 namespace graphics {
 
-const string filterNames[] =   {"Normal (rgb)", "Greyscale", "Polarize", "Negative",   "Burn",      "Dodge",        "Enshadow",    "Red Channel", "Green Channel", "Blue Channel",  "Yellow Channel", "Cyan Channel", "Magenta Channel", "Hue Channel", "Saturation Channel", "Value Channel", "Lightness Channel", "Red Pass", "Green Pass", "Blue Pass", "Yellow Pass", "Cyan Pass", "Magenta Pass", "Red Filter", "Green Filter", "Blue Filter", "Yellow Filter", "Cyan Filter", "Magenta Filter", "Burn Red", "Burn Green", "Burn Blue", "Burn Yellow", "Burn Cyan", "Burn Magenta", "Dodge Red", "Dodge Green", "Dodge Blue", "Dodge Yellow", "Dodge Cyan", "Dodge Magenta", "RBG", "GRB", "GBR", "BRG", "BGR", "Color Noise", "Grey Noise"};
-const string vectorFilters[] = {"Greyscale",    "Polarize",  "Red Pass", "Green Pass", "Blue Pass", "Magenta Pass", "Yellow Pass", "Cyan Pass",   "Red Filter",    "Green Filter",  "Blue Filter", "Color Noise", "Grey Noise"};
-const int filterPresets[] =    {0             , 255        ,  128      , 0           , 20          , 20           , 64           ,  0           , 0              , 0             , 0                , 0             , 0                , 0            , 0                   , 0              , 0                  ,  255         ,  255     , 255        , 255           , 255          , 255        , 255         , 255           , 255          , 255            , 20           , 20              , 20        , 20          , 20         , 20           , 20         , 20            , 20         , 20           , 20          , 20            , 20          , 20             , 0    , 0    , 0    , 0    , 0    , 4            , 4           };
-const int numFilters = 48;
+const string filterNames[] =   {"Normal (rgb)", "Greyscale", "Polarize", "Negative",   "Burn",      "Dodge",        "Enshadow",    "Enlighten", "Enclose",      "Red Channel",  "Green Channel", "Blue Channel",  "Yellow Channel", "Cyan Channel", "Magenta Channel", "Hue Channel", "Saturation Channel", "Value Channel", "Lightness Channel", "Red Pass", "Green Pass", "Blue Pass", "Yellow Pass", "Cyan Pass", "Magenta Pass", "Red Filter", "Green Filter", "Blue Filter", "Yellow Filter", "Cyan Filter", "Magenta Filter", "Burn Red", "Burn Green", "Burn Blue", "Burn Yellow", "Burn Cyan", "Burn Magenta", "Dodge Red", "Dodge Green", "Dodge Blue", "Dodge Yellow", "Dodge Cyan", "Dodge Magenta", "RBG", "GRB", "GBR", "BRG", "BGR", "Color Noise", "Grey Noise", "Salt Noise", "Pepper Noise", "Salt Pepper Noise", "Palette Reduce", "Red Shift", "Green Shift", "Blue Shift", "Cyan Shift", "Yellow Shift", "Magenta Shift"};
+const string vectorFilters[] = {"Greyscale",    "Polarize",  "Enshadow", "Enlighten", "Enclose", "Red Pass", "Green Pass", "Blue Pass", "Magenta Pass", "Yellow Pass", "Cyan Pass", "Red Filter",   "Green Filter", "Blue Filter", "Color Noise", "Grey Noise", "Salt Noise", "Pepper Noise", "Salt Pepper Noise", "Palette Reduce", "Red Shift", "Green Shift", "Blue Shift", "Cyan Shift", "Yellow Shift", "Magenta Shift"};
+const int filterPresets[] =    {0             , 255        ,  128      , 0           , 20          , 20           , 64           ,  64        , 64            , 0             , 0              , 0             , 0                , 0             , 0                , 0            , 0                   , 0              , 0                  ,  255         ,  255     , 255        , 255          , 255        , 255           , 255         , 255           , 255          , 255            , 20           , 20              , 20        , 20          , 20         , 20           , 20         , 20            , 20         , 20           , 20          , 20            , 20          , 20             , 0    , 0    , 0    , 0    , 0    , 4            , 4           , 128         , 128           , 128                , 12              , 12         , 12           , 12          , 12          , 12            , 12             };
+const int numFilters = 60;
+
+const string specFilterNames[] = {"Kuwahara", "Pixelate", "Bubble", "Diamonds"};
+const int specMins[]           = {2         , 1         , 1       , 1         };
+const int specMaxs[]           = {50        , 500       , 500     , 500       };
+const bool needsEType[]        = {true      , false     , false   , false     };
+const int numSpecFilter = 4;
+
+
 const double minZoom = 1.0 / 4.0;
 const double maxZoom = 8.0;
 const int minColor = 0;
@@ -58,7 +66,6 @@ enum tType {sRGB, HunterLAB, CIELAB};
 class Filter {
 
 public:
-
     Filter(int strength = filterPresets[0], string filterName = filterNames[0]);
     Filter (const Filter &filter);
     Filter& operator = (const Filter &lhs);
@@ -72,7 +79,6 @@ public:
     int getFilterIndex();
 
 private:
-
     function <QRgb (QColor, int)> filterApplicator;
     int strength;
     size_t filterIndex;
@@ -81,7 +87,6 @@ private:
 class Filtering {
 
 public:
-
     static QRgb toRGB (int a, int r, int g, int b);
     static QRgb greyscale (QColor qc, int strength);
     static QRgb polarize (QColor qc, int strength);
@@ -89,6 +94,8 @@ public:
     static QRgb burn (QColor qc, int strength);
     static QRgb dodge (QColor qc, int strength);
     static QRgb enshadow(QColor qc, int strength);
+    static QRgb enlighten(QColor qc, int strength);
+    static QRgb enclose(QColor qc, int strength);
     static QRgb redChannel (QColor qc, int strength);
     static QRgb greenChannel (QColor qc, int strength);
     static QRgb blueChannel (QColor qc, int strength);
@@ -131,17 +138,33 @@ public:
     static QRgb bgr (QColor qc, int strength);
     static QRgb greyFilmGrain (QColor qc, int strength);
     static QRgb colorFilmGrain (QColor qc, int strength);
+    static QRgb soltNoise (QColor, int strength);
+    static QRgb pepporNoise (QColor, int strength);
+    static QRgb soltPepporNoise (QColor qc, int strength);
+    static QRgb paletteReduce (QColor qc, int strength);
+    static QRgb redShift (QColor qc, int strength);
+    static QRgb greenShift (QColor qc, int strength);
+    static QRgb blueShift (QColor qc, int strength);
+    static QRgb cyanShift (QColor qc, int strength);
+    static QRgb magentaShift (QColor qc, int strength);
+    static QRgb yellowShift (QColor qc, int strength);
     static void applyKernel(QProgressDialog *qpd, QImage *qi, KernelData kernalInfo);
     static Kernel getConeBlur(int radius);
     static Kernel getBoxBlur(int radius);
+    static void medianFilter(QImage *qi, int radius, eType type);
+    static void kuwahara(QImage *qi, int radius, eType type);
+    static void pixelate(QImage *qi, int radius, eType type);
+    static void bubble(QImage *qi, int radius, eType type);
+    static void diamonds(QImage *qi, int radius, eType type);
+    //anisotropic diffusion?
 
 private:
-
     static int Burn(int color, int strength);
     static int Dodge(int color, int strength);
 };
 
 class Color {
+
 public:
     static void brightnessAdjust(QImage *qi, double val, eType type);
     static void contrastAdjust(QImage *qi, double val);
@@ -164,6 +187,7 @@ public:
     static vec4 getLabDescaled(vec4 lab);
     static vec4 lab2rgb(vec4 lab);
     static QColor toQColor(vec4 rgb);
+
 
 private:
     static void ClipHistogram (unsigned long *, unsigned long);
@@ -206,7 +230,8 @@ private:
 };
 
 
-const function <QRgb (QColor, int)> filters[] = {Filtering::rgb, Filtering::greyscale, Filtering::polarize, Filtering::negative, Filtering::burn, Filtering::dodge, Filtering::enshadow, Filtering::redChannel, Filtering::greenChannel, Filtering::blueChannel, Filtering::yellowChannel, Filtering::cyanChannel, Filtering::magentaChannel, Filtering::hueChannel, Filtering::satChannel, Filtering::valChannel, Filtering::litChannel, Filtering::redPass, Filtering::greenPass, Filtering::bluePass, Filtering::yellowPass, Filtering::cyanPass, Filtering::magentaPass, Filtering::redFilter, Filtering::greenFilter, Filtering::blueFilter, Filtering::yellowFilter, Filtering::cyanFilter, Filtering::magentaFilter, Filtering::burnRed, Filtering::burnGreen, Filtering::burnBlue, Filtering::burnYellow, Filtering::burnCyan, Filtering::burnMagenta, Filtering::dodgeRed, Filtering::dodgeGreen, Filtering::dodgeBlue, Filtering::dodgeYellow, Filtering::dodgeCyan, Filtering::dodgeMagenta, Filtering::rbg, Filtering::grb, Filtering::gbr, Filtering::brg, Filtering::bgr, Filtering::colorFilmGrain, Filtering::greyFilmGrain};
+const function <QRgb (QColor, int)> filters[] = {Filtering::rgb, Filtering::greyscale, Filtering::polarize, Filtering::negative, Filtering::burn, Filtering::dodge, Filtering::enshadow, Filtering::enlighten, Filtering::enclose, Filtering::redChannel, Filtering::greenChannel, Filtering::blueChannel, Filtering::yellowChannel, Filtering::cyanChannel, Filtering::magentaChannel, Filtering::hueChannel, Filtering::satChannel, Filtering::valChannel, Filtering::litChannel, Filtering::redPass, Filtering::greenPass, Filtering::bluePass, Filtering::yellowPass, Filtering::cyanPass, Filtering::magentaPass, Filtering::redFilter, Filtering::greenFilter, Filtering::blueFilter, Filtering::yellowFilter, Filtering::cyanFilter, Filtering::magentaFilter, Filtering::burnRed, Filtering::burnGreen, Filtering::burnBlue, Filtering::burnYellow, Filtering::burnCyan, Filtering::burnMagenta, Filtering::dodgeRed, Filtering::dodgeGreen, Filtering::dodgeBlue, Filtering::dodgeYellow, Filtering::dodgeCyan, Filtering::dodgeMagenta, Filtering::rbg, Filtering::grb, Filtering::gbr, Filtering::brg, Filtering::bgr, Filtering::colorFilmGrain, Filtering::greyFilmGrain, Filtering::soltNoise, Filtering::pepporNoise, Filtering::soltPepporNoise, Filtering::paletteReduce, Filtering::redShift, Filtering::greenShift, Filtering::blueShift, Filtering::cyanShift, Filtering::yellowShift, Filtering::magentaShift};
+const function <void (QImage *, int, eType)> specFilters[] = {Filtering::kuwahara, Filtering::pixelate, Filtering::bubble, Filtering::diamonds};
 }
 
 #endif // GRAPHICS_H

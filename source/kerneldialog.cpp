@@ -93,7 +93,9 @@ void KernelDialog::process() {
 void KernelDialog::on_buttonBox_accepted() {
     QProgressDialog qpd("Updating Views", "", 0, 0, this, Qt::WindowType::FramelessWindowHint);
     qpd.setCancelButton(nullptr);
+    long long time = stdFuncs::getTime();
     Filtering::applyKernel(&qpd, qi, kd);
+    cout << stdFuncs::getTime(time) << endl;
     done(1);
 }
 

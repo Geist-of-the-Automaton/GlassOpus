@@ -22,9 +22,11 @@ void graphics::Filter::applyTo(QImage *qi) {
     int h = qi->height(), w = qi->width();
     for (int y = 0; y < h; ++y) {
         QRgb *line = reinterpret_cast<QRgb *>(qi->scanLine(y));
-        for (int x = 0; x < w; ++x)
-            if (line[x] & 0xFF000000)
-                line[x] = filterApplicator(QColor(line[x]), strength);
+        for (int x = 0; x < w; ++x) {
+            if (line[x] == 0x00000000)
+                continue;
+            line[x] = filterApplicator(QColor(line[x]), strength);
+        }
     }
 }
 
@@ -92,6 +94,17 @@ QRgb graphics::Filtering::negative(QColor qc, int strength) {
 QRgb graphics::Filtering::enshadow(QColor qc, int strength) {
     int combined = (qc.red() + qc.blue() + qc.green()) / 3;
     return combined > strength ? qc.rgba() : (static_cast<QRgb>(qc.alpha()) << 24);
+}
+
+QRgb graphics::Filtering::enlighten(QColor qc, int strength) {
+    int combined = (qc.red() + qc.blue() + qc.green()) / 3;
+    return combined < strength ? qc.rgba() : (static_cast<QRgb>(qc.alpha()) << 24) | 0x00FFFFFF;
+}
+
+QRgb graphics::Filtering::enclose(QColor qc, int strength) {
+    int combined = (qc.red() + qc.blue() + qc.green()) / 3;
+    strength /= 2;
+    return combined < 255 - strength ? (combined > strength ? qc.rgba() : (static_cast<QRgb>(qc.alpha()) << 24)) : (static_cast<QRgb>(qc.alpha()) << 24) | 0x00FFFFFF;
 }
 
 QRgb graphics::Filtering::redChannel(QColor qc, int strength) {
@@ -379,6 +392,71 @@ QRgb graphics::Filtering::colorFilmGrain (QColor qc, int strength) {
         grey = -grey;
     int blue = stdFuncs::clamp(qc.blue() + grey, minColor, maxColor);
     return toRGB(qc.alpha(), red, green, blue);
+}
+
+QRgb graphics::Filtering::soltNoise(QColor qc, int strength) {
+    if (rand() % (2 * strength + 1) == 0)
+        return (qc.alpha() << 24) | 0x00FFFFFF;
+    return qc.rgba();
+}
+
+QRgb graphics::Filtering::pepporNoise(QColor qc, int strength) {
+    if (rand() % (2 * strength + 1) == 0)
+        return qc.alpha() << 24;
+    return qc.rgba();
+}
+
+QRgb graphics::Filtering::soltPepporNoise(QColor qc, int strength) {
+    if (rand() % (2 * strength + 1) == 0)
+        return rand() % 2 ? qc.alpha() << 24 : (qc.alpha() << 24) | 0x00FFFFFF;
+    return qc.rgba();
+}
+
+QRgb graphics::Filtering::paletteReduce(QColor qc, int strength) {
+    int shift = log2(strength + 1);
+    qc.setRed((qc.red() >> shift) << shift);
+    qc.setGreen((qc.green() >> shift) << shift);
+    qc.setBlue((qc.blue() >> shift) << shift);
+    return qc.rgba();
+}
+
+QRgb graphics::Filtering::redShift(QColor qc, int strength) {
+    int shift = log2(strength + 1);
+    qc.setRed((qc.red() >> shift) << shift);
+    return qc.rgba();
+}
+
+QRgb graphics::Filtering::greenShift(QColor qc, int strength) {
+    int shift = log2(strength + 1);
+    qc.setGreen((qc.green() >> shift) << shift);
+    return qc.rgba();
+}
+
+QRgb graphics::Filtering::blueShift(QColor qc, int strength) {
+    int shift = log2(strength + 1);
+    qc.setBlue((qc.blue() >> shift) << shift);
+    return qc.rgba();
+}
+
+QRgb graphics::Filtering::cyanShift(QColor qc, int strength) {
+    int shift = log2(strength + 1);
+    qc.setBlue((qc.blue() >> shift) << shift);
+    qc.setGreen((qc.green() >> shift) << shift);
+    return qc.rgba();
+}
+
+QRgb graphics::Filtering::magentaShift(QColor qc, int strength) {
+    int shift = log2(strength + 1);
+    qc.setRed((qc.red() >> shift) << shift);
+    qc.setBlue((qc.blue() >> shift) << shift);
+    return qc.rgba();
+}
+
+QRgb graphics::Filtering::yellowShift(QColor qc, int strength) {
+    int shift = log2(strength + 1);
+    qc.setRed((qc.red() >> shift) << shift);
+    qc.setGreen((qc.green() >> shift) << shift);
+    return qc.rgba();
 }
 
 void graphics::Filtering::applyKernel(QProgressDialog *qpd, QImage *qi, KernelData kernalInfo) {
@@ -864,6 +942,7 @@ void graphics::Color::colorTransfer(QImage *to, QImage from, tType type) {
 vec4 graphics::Color::rgb2lab(QColor qc) {
     // D65/2°
     float xyzRef[3] = {95.047f, 100.0f, 108.883f};
+    //D50 uses  96.4212   100.0   82.5188
     // rgb to xyz
     float rgb[3] = {tof(qc.redF()), tof(qc.greenF()), tof(qc.blueF())};
     for (unsigned char i = 0; i < 3; ++i) {
@@ -905,6 +984,7 @@ vec4 graphics::Color::getLabDescaled(vec4 lab) {
 vec4 graphics::Color::lab2rgb(vec4 lab) {
     // D65/2°
     float xyzRef[3] = {95.047f, 100.0f, 108.883f};
+    //D50 uses  96.4212   100.0   82.5188
     // lab to xyz
     float xyz[3] = {0.0f};
     xyz[1] = (lab[0] + 16.0f) / 116.0f;
@@ -1610,6 +1690,8 @@ void graphics::Color::brightnessAdjust(QImage *qi, double val, eType type) {
         for (int j = 0; j < h; ++j) {
             QRgb *line = reinterpret_cast<QRgb *>(processed.scanLine(j));
             for (int i = 0; i < w; ++i) {
+                if (line[i] == 0x00000000)
+                    continue;
                 QColor qc = line[i];
                 float alpha = qc.alphaF();
                 if (type == RGB) {
@@ -1642,6 +1724,8 @@ void graphics::Color::contrastAdjust(QImage *qi, double val) {
         for (int j = 0; j < h; ++j) {
             QRgb *line = reinterpret_cast<QRgb *>(processed.scanLine(j));
             for (int i = 0; i < w; ++i) {
+                if (line[i] == 0x00000000)
+                    continue;
                 QColor qc = line[i];
                 float f = (259.0 * (c + 255.0)) / (255.0 * (259.0 - c));
                 qc.setRedF(stdFuncs::clamp(f * (qc.redF() - 128.0) + 128.0, 0.0, 1.0));
@@ -1663,6 +1747,8 @@ void graphics::Color::saturationAdjust(QImage *qi, double val, eType type) {
             QRgb *line = reinterpret_cast<QRgb *>(processed.scanLine(j));
             for (int i = 0; i < w; ++i) {
                 QColor qc = line[i];
+                if (line[i] == 0x00000000)
+                    continue;
                 if (type == HSV)
                     qc.setHsvF(qc.hsvHueF(), stdFuncs::clamp(qc.hsvSaturationF() * val, 0.0, 1.0), qc.valueF(), qc.alphaF());
                 else if (type == HSL)
@@ -1682,6 +1768,8 @@ void graphics::Color::gammaAdjust(QImage *qi, double val) {
         for (int j = 0; j < h; ++j) {
             QRgb *line = reinterpret_cast<QRgb *>(processed.scanLine(j));
             for (int i = 0; i < w; ++i) {
+                if (line[i] == 0x00000000)
+                    continue;
                 QColor qc = line[i];
                 qc.setRedF(c == 0.0 ? 0.0 : stdFuncs::clamp(255.0 * (pow(qc.redF(), 1.0 / c) / pow(255.0, 1.0 / c)), 0.0, 1.0));
                 qc.setGreenF(c == 0.0 ? 0.0 : stdFuncs::clamp(255.0 * (pow(qc.greenF(), 1.0 / c) / pow(255.0, 1.0 / c)), 0.0, 1.0));
@@ -1700,6 +1788,8 @@ void graphics::Color::hueShift(QImage *qi, int val) {
         for (int j = 0; j < h; ++j) {
             QRgb *line = reinterpret_cast<QRgb *>(processed.scanLine(j));
             for (int i = 0; i < w; ++i) {
+                if (line[i] == 0x00000000)
+                    continue;
                 QColor qc = line[i];
                 int hue = qc.hslHue() + val;
                 if (hue >= 360)
@@ -1716,6 +1806,342 @@ Kernel graphics::Filtering::getBoxBlur(int radius) {
     int width = radius * 2 + 1;
     float w = static_cast<float>(width * width);
     return Kernel (width, vector<float>(width, 1.0 / w));
+}
+
+void graphics::Filtering::medianFilter(QImage *qi, int radius, eType type) {
+    QImage img = qi->copy();
+    int h = qi->height(), w = qi->width();
+    for (int j = 0; j < h; ++j) {
+        QRgb* line2 = reinterpret_cast<QRgb *>(qi->scanLine(j));
+        for (int i = 0; i < w; ++i) {
+            QColor qc = line2[i];
+            vector <int> nums;
+            int jStart = j - radius;
+            int jEnd = j + radius;
+            int iStart = i - radius;
+            int iEnd = i + radius;
+            if (jStart < 0) {
+                int val;
+                if (type == HSV)
+                    val = qc.value();
+                else if (type == HSL || type == RGB)
+                    val = qc.lightness();
+                else if (type == LAB)
+                    val = Color::getLabScaled(Color::rgb2lab(qc))[0];
+                nums.insert(nums.end(), (-jStart) * w, val);
+                jStart = 0;
+            }
+            if (jEnd >= h) {
+                int val;
+                if (type == HSV)
+                    val = qc.value();
+                else if (type == HSL || type == RGB)
+                    val = qc.lightness();
+                else if (type == LAB)
+                    val = Color::getLabScaled(Color::rgb2lab(qc))[0];
+                nums.insert(nums.end(), (jEnd - h) * w, val);
+                jEnd = h;
+            }
+            if (iStart < 0) {
+                int val;
+                if (type == HSV)
+                    val = qc.value();
+                else if (type == HSL || type == RGB)
+                    val = qc.lightness();
+                else if (type == LAB)
+                    val = Color::getLabScaled(Color::rgb2lab(qc))[0];
+                nums.insert(nums.end(), -iStart, val);
+                iStart = 0;
+            }
+            if (iEnd >= w) {
+                int val;
+                if (type == HSV)
+                    val = qc.value();
+                else if (type == HSL || type == RGB)
+                    val = qc.lightness();
+                else if (type == LAB)
+                    val = Color::getLabScaled(Color::rgb2lab(qc))[0];
+                nums.insert(nums.end(), iEnd - w, val);
+                iEnd = w;
+            }
+            for (int y = jStart; y <= jEnd; ++y) {
+                QRgb* line = reinterpret_cast<QRgb *>(img.scanLine(y));
+                for (int x = iStart; x <= iEnd; ++x) {
+                    QColor color = line[x];
+                    int val;
+                    if (type == HSV)
+                        val = color.value();
+                    else if (type == HSL)
+                        val = color.lightness();
+                    else if (type == LAB)
+                        val = Color::getLabScaled(Color::rgb2lab(color))[0];
+                    nums.push_back(val);
+                }
+            }
+            std::sort(nums.begin(), nums.end());
+            int val = nums[nums.size() / 2];
+            if (type == HSV)
+                qc.setHsv(qc.hsvHue(), qc.hsvSaturation(), val);
+            else if (type == HSL)
+                qc.setHsl(qc.hslHue(), qc.hslSaturation(), val);
+            else if (type == LAB) {
+                vec4 vec = Color::getLabScaled(Color::rgb2lab(qc));
+                vec.xyzw[0] = val;
+                qc = Color::toQColor(Color::lab2rgb(Color::getLabDescaled(vec)));
+            }
+            line2[i] = qc.rgba();
+        }
+    }
+}
+
+void graphics::Filtering::kuwahara(QImage *qi, int radius, eType type) {
+    QImage toProcess = qi->copy();
+    int w = toProcess.width(), h = toProcess.height();
+    vector <vector <int>> og(w, vector <int> (h, 0));
+    for (int y = 0; y < h; ++y) {
+        QRgb *line = reinterpret_cast<QRgb *>(toProcess.scanLine(y));
+        for (int x = 0; x < w; ++x) {
+            QColor color = line[x];
+            if (type == RGB || type == HSL)
+                og[x][y] = static_cast<int>(255.0 * color.lightnessF());
+            else if (type == HSV)
+                og[x][y] = static_cast<int>(255.0 * color.valueF());
+            else if (type == LAB)
+                og[x][y] = static_cast<int>(Color::getLabScaled(Color::rgb2lab(color))[0]);
+        }
+    }
+    int rad2 = radius * radius;
+    int pad = radius - 1;
+    vector <vector <int>> Area = vector <vector <int>> (4, vector <int> (rad2, 0));
+    int Size[4] = {0};
+    unsigned long long Sum[4] = {0};
+    for (int y = 0; y < h; ++y) {
+        QRgb *line = reinterpret_cast<QRgb *>(toProcess.scanLine(y));
+        for (int x = 0; x < w; ++x) {
+            for (int i = 0; i < 4; ++i) {
+                for (int j = 0; j < rad2; ++j)
+                    Area[i][j] = 0;
+                Size[i] = 0;
+                Sum[i] = 0;
+            }
+            int jStart = max(y - pad, 0), jEnd = min(y, h - 1);
+            int iStart1 = max(x - pad, 0), iEnd1 = min(x, w - 1);
+            int iStart2 = x, iEnd2 = min(x + pad, w - 1);
+            for (int j = jStart; j <= jEnd; ++j) {
+                for (int i = iStart1; i <= iEnd1; ++i) {
+                    Area[1][Size[1]] = og[i][j];
+                    Sum[1] += og[i][j];
+                    ++Size[1];
+                }
+                for (int i = iStart2; i <= iEnd2; ++i) {
+                    Area[2][Size[2]] = og[i][j];
+                    Sum[2] += og[i][j];
+                    ++Size[2];
+                }
+            }
+            jStart = y;
+            jEnd = min(y + pad, h - 1);
+            for (int j = jStart; j <= jEnd; ++j) {
+                for (int i = iStart1; i <= iEnd1; ++i) {
+                    Area[3][Size[3]] = og[i][j];
+                    Sum[3] += og[i][j];
+                    ++Size[3];
+                }
+                for (int i = iStart2; i <= iEnd2; ++i) {
+                    Area[0][Size[0]] = og[i][j];
+                    Sum[0] += og[i][j];
+                    ++Size[0];
+                }
+            }
+            int index = 0;
+            double var = DBL_MAX;
+            for (int i = 0; i < 4; ++i) {
+                if (Size[i] <= 1)
+                    continue;
+                double mean = static_cast<double>(Sum[i]) / static_cast<double>(Size[i]);
+                double temp = 0.0;
+                for (int j = 0; j < Size[i]; ++j)
+                    temp += (static_cast<double>(Area[i][j]) - mean) * (static_cast<double>(Area[i][j]) - mean);
+                temp = sqrt(temp / (static_cast<double>(Size[i]) - 1));
+                if (temp < var) {
+                    index = i;
+                    var = temp;
+                }
+            }
+            var = static_cast<double>(Sum[index]) / static_cast<double>(Size[index]);
+            QColor color = line[x];
+            if (type == RGB || type == HSL)
+                color.setHslF(color.hslHueF(), color.hslSaturationF(), var / 255.0);
+            else if (type == HSV)
+                color.setHslF(color.hsvHueF(), color.hsvSaturationF(), var / 255.0);
+            else if (type == LAB) {
+                vec4 c = Color::getLabScaled(Color::rgb2lab(color));
+                c.xyzw[0] = var;
+                color = Color::toQColor(Color::lab2rgb(Color::getLabDescaled(c)));
+            }
+            line[x] = color.rgba();
+        }
+    }
+    *qi = toProcess;
+}
+
+void graphics::Filtering::pixelate(QImage *qi, int radius, eType type) {
+    QImage img = QImage(qi->size(), QImage::Format_ARGB32);
+    int w = img.width(), h = img.height(), d = 2 * radius + 1;
+    int xOff = (w % d) / 2, yOff = (h % d) / 2;
+    int xn = w / d, yn = h / d;
+    if (xOff != 0)
+        xn += 2;
+    if (yOff != 0)
+        yn += 2;
+    for (int j = 0; j < yn; ++j) {
+        int J = j * d + yOff - radius;
+        int yStart = max(0, J - radius);
+        int yEnd = min(h - 1, J + radius);
+        for (int i = 0; i < xn; ++i) {
+            int r = 0, g = 0, b = 0, c = 0;
+            int I = i * d + xOff - radius;
+            int xStart = max(0, I - radius);
+            int xEnd = min(w - 1, I + radius);
+            for (int y = yStart; y <= yEnd; ++y) {
+                QRgb *line = reinterpret_cast<QRgb *>(qi->scanLine(y));
+                for (int x = xStart; x <= xEnd; ++x) {
+                    QColor color = line[x];
+                    r += color.red();
+                    g += color.green();
+                    b += color.blue();
+                    ++c;
+                }
+            }
+            if (c == 0)
+                continue;
+            r /= c;
+            g /= c;
+            b /= c;
+            QRgb color = QColor(r, g, b, 255).rgba();
+            for (int y = yStart; y <= yEnd; ++y) {
+                QRgb *line = reinterpret_cast<QRgb *>(img.scanLine(y));
+                for (int x = xStart; x <= xEnd; ++x)
+                    line[x] = color;
+            }
+        }
+    }
+    *qi = img;
+}
+
+void graphics::Filtering::bubble(QImage *qi, int radius, eType type) {
+    QImage img = QImage(qi->size(), QImage::Format_ARGB32);
+    int w = img.width(), h = img.height(), d = 2 * radius + 1;
+    int xOff = (w % d) / 2, yOff = (h % d) / 2;
+    int xn = w / d, yn = h / d;
+    int R = radius * radius;
+    if (xOff != 0)
+        xn += 2;
+    if (yOff != 0)
+        yn += 2;
+    for (int j = 0; j < yn; ++j) {
+        int J = j * d + yOff - radius;
+        int yStart = max(0, J - radius);
+        int yEnd = min(h - 1, J + radius);
+        for (int i = 0; i < xn; ++i) {
+            int r = 0, g = 0, b = 0, c = 0;
+            int I = i * d + xOff - radius;
+            int xStart = max(0, I - radius);
+            int xEnd = min(w - 1, I + radius);
+            for (int y = yStart; y <= yEnd; ++y) {
+                QRgb *line = reinterpret_cast<QRgb *>(qi->scanLine(y));
+                for (int x = xStart; x <= xEnd; ++x) {
+                    QColor color = line[x];
+                    r += color.red();
+                    g += color.green();
+                    b += color.blue();
+                    ++c;
+                }
+            }
+            if (c == 0)
+                continue;
+            r /= c;
+            g /= c;
+            b /= c;
+            QRgb color = QColor(r, g, b, 255).rgba();
+            for (int y = yStart; y <= yEnd; ++y) {
+                int yd = (y - J) * (y - J);
+                QRgb *line = reinterpret_cast<QRgb *>(img.scanLine(y));
+                for (int x = xStart; x <= xEnd; ++x) {
+                    int xd = (x - I) * (x - I);
+                    if (xd + yd <= R)
+                        line[x] = color;
+                    else
+                        line[x] = 0xFF000000;
+                }
+            }
+        }
+    }
+    *qi = img;
+}
+
+void graphics::Filtering::diamonds(QImage *qi, int radius, eType type) {
+    QImage img = QImage(qi->size(), QImage::Format_ARGB32);
+    int w = img.width(), h = img.height(), d = 2 * radius + 1;
+    int xOff = (w % d) / 2, yOff = (h % d) / 2;
+    int xn = w / d, yn = h / d;
+    if (xOff != 0)
+        xn += 2;
+    if (yOff != 0)
+        yn += 2;
+    for (int j = 0; j < yn; ++j) {
+        int J = j * d + yOff - radius;
+        int yStart = max(0, J - radius);
+        int yEnd = min(h - 1, J + radius);
+        for (int i = 0; i < xn; ++i) {
+            int r = 0, g = 0, b = 0, c = 0;
+            int I = i * d + xOff - radius;
+            int xStart = max(0, I - radius);
+            int xEnd = min(w - 1, I + radius);
+            for (int y = yStart; y <= yEnd; ++y) {
+                QRgb *line = reinterpret_cast<QRgb *>(qi->scanLine(y));
+                for (int x = xStart; x <= xEnd; ++x) {
+                    QColor color = line[x];
+                    r += color.red();
+                    g += color.green();
+                    b += color.blue();
+                    ++c;
+                }
+            }
+            if (c == 0)
+                continue;
+            r /= c;
+            g /= c;
+            b /= c;
+            QRgb color = QColor(r, g, b, 255).rgba();
+            for (int y = yStart; y <= yEnd; ++y) {
+                int yd = abs(y - J);
+                QRgb *line = reinterpret_cast<QRgb *>(img.scanLine(y));
+                for (int x = xStart; x <= xEnd; ++x) {
+                    int xd = abs(x - I);
+                    int r = radius;
+                    while (r > 1) {
+                        if (xd + yd <= r) {
+                            if (max(xd, yd) <= r / 2) {
+                                r /= 2;
+                                if (r == 1)
+                                    line[x] = 0xFF000000;
+                            }
+                            else {
+                                line[x] = 0xFF000000;
+                                break;
+                            }
+                        }
+                        else {
+                            line[x] = color;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    *qi = img;
 }
 
 Kernel graphics::Filtering::getConeBlur(int radius) {

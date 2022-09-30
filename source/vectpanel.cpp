@@ -18,6 +18,8 @@ void VectPanel::updatePanel(pair <vType, unsigned int> dets) {
         for (int i = 0; i < graphics::vectorFilters->length(); ++i)
             if (name == graphics::vectorFilters[i]) {
                 ui->filterCB->setCurrentIndex(i);
+                ui->strengthS->setValue(graphics::filterPresets[dets.second]);
+                ui->strengthSB->setValue(graphics::filterPresets[dets.second]);
                 break;
             }
         break;
@@ -190,6 +192,10 @@ void VectPanel::on_modeCB_currentIndexChanged(int index) {
 
 void VectPanel::on_filterCB_currentIndexChanged(int index) {
     ret = pair <vType, unsigned int> (vFilter, index);
+    graphics::Filter filter;
+    filter.setFilter(graphics::vectorFilters[index]);
+    ui->strengthS->setValue(filter.getStrength());
+    ui->strengthSB->setValue(filter.getStrength());
     emit(actionGiven());
 }
 

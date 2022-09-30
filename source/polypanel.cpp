@@ -17,6 +17,8 @@ void PolyPanel::updatePanel(pair <pType, unsigned int> dets) {
         for (int i = 0; i < graphics::vectorFilters->length(); ++i)
             if (name == graphics::vectorFilters[i]) {
                 ui->filterCB->setCurrentIndex(i);
+                ui->strengthS->setValue(graphics::filterPresets[dets.second]);
+                ui->strengthSB->setValue(graphics::filterPresets[dets.second]);
                 break;
             }
         break;
@@ -156,6 +158,10 @@ void PolyPanel::on_modeCB_currentIndexChanged(int index) {
 void PolyPanel::on_filterCB_currentIndexChanged(int index) {
     ret = pair <pType, unsigned int> (pFilter, index);
     emit(actionGiven());
+    graphics::Filter filter;
+    filter.setFilter(graphics::vectorFilters[index]);
+    ui->strengthS->setValue(filter.getStrength());
+    ui->strengthSB->setValue(filter.getStrength());
 }
 
 void PolyPanel::on_strengthSB_valueChanged(int value) {

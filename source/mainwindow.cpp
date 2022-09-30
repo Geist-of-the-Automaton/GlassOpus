@@ -362,12 +362,15 @@ MainWindow::MainWindow(string startPath, string projectFile, QWidget *parent)
         changeOffsets();
         ioh->deleteLayer();
     });
+    bh.setCanvasSize(ioh->getdims().width(), ioh->getdims().height());
 }
 
 void MainWindow::mouseMoveEvent(QMouseEvent *event) {
     if (layerMenuInteract || ioh->getWorkingLayer() == nullptr || takeFlag || magicFlag)
         return;
     QPoint qp = sr->getZoomCorrected(vs->getScrollCorrected(event->pos() - QPoint(brushDetails->width() + 5, toolbar->height())));
+    mostPt = QPoint(max(event->pos().x(), mostPt.x()), max(event->pos().y(), mostPt.y()));
+    leastPt = QPoint(min(event->pos().x(), leastPt.x()), min(event->pos().y(), leastPt.y()));
     statusBar()->showMessage(("(" + to_string(qp.x()) + " , " + to_string(qp.y()) + ")").c_str(), 1000);
     if (altFlag) {
         sr->setSamplePt(qp);
@@ -427,6 +430,7 @@ void MainWindow::mousePressEvent(QMouseEvent *event) {
         refresh();
         return;
     }
+    mostPt = leastPt = event->pos();
     if (mode == Raster_Mode && event->button() == RightButton && !shiftFlag && !ioh->getWorkingLayer()->isRotating())
         ioh->getWorkingLayer()->fillColor(qp, bh.getFillColor());
     else if (mode == Brush_Mode) {
@@ -462,7 +466,17 @@ void MainWindow::mouseReleaseEvent(QMouseEvent *event) {
     }
     if (ioh->getWorkingLayer() == nullptr)
         return;
-    QPoint qp = sr->getZoomCorrected(vs->getScrollCorrected(event->pos() - QPoint(brushDetails->width() + 5,toolbar->height())));
+    QPoint qp = sr->getZoomCorrected(vs->getScrollCorrected(event->pos() - QPoint(brushDetails->width() + 5, toolbar->height())));
+    mostPt = QPoint(max(event->pos().x(), mostPt.x()) + bh.getSize(), max(event->pos().y(), mostPt.y()) + bh.getSize()) - QPoint(brushDetails->width() + 5,toolbar->height());
+    leastPt = QPoint(min(event->pos().x(), leastPt.x()) - bh.getSize(), min(event->pos().y(), leastPt.y()) - bh.getSize()) - QPoint(brushDetails->width() + 5,toolbar->height());
+    if (mode == Brush_Mode) {
+        //stdFuncs::logTime();
+        bh.resetCheck2(leastPt, mostPt);
+        //QImage img = ioh->getWorkingLayer()->getCanvas()->copy(50, 50, 200, 200);
+        //img.save("test.png");
+        //stdFuncs::getDiff();
+        //cout << img.width() << endl;
+    }
     if (altFlag) {
         if (bh.getMethodIndex() == appMethod::sample) {
             sr->setSamplePt(qp);
@@ -544,12 +558,10 @@ void MainWindow::mouseDoubleClickEvent(QMouseEvent *event) {
                 vectPanel->resetPanel();
         }
         else if (mode == Polygon_Mode) {
-            cout << "here" << endl;
             if (layer->getActiveGons().size() == 1)
                 polyPanel->updatePanel(layer->getPolgons()[layer->getActiveGons()[0]]);
             else
                 polyPanel->resetPanel();
-            cout << "there" << endl;
         }
         else if (mode == Text_Mode) {
             if (layer->getActiveTexts().size() == 1)
@@ -1359,6 +1371,13 @@ void MainWindow::doSomething(string btnPress) {
         tdia.setWork(img, QImage(fileName));
         tdia.exec();
     }
+    else if (btnPress == "Special Filter") {
+        Layer *l = ioh->getWorkingLayer();
+        QImage *img = l->getRaster().isNull() ? l->getCanvas() : l->getRasterPtr();
+        Special special(this);
+        special.setWork(img);
+        special.exec();
+    }
     else if (btnPress == "Fill Color") {
         QColor color = QColorDialog::getColor(bh.getFillColor(), this);
         bh.setFillColor(color);
@@ -1377,7 +1396,7 @@ void MainWindow::doSomething(string btnPress) {
     else if (btnPress == "Invert Selection")
         ioh->getWorkingLayer()->invertSelection();
     else if (btnPress == "Transparency Fill")
-        bh.setFillColor(QColor(255, 255, 255, 0));
+        bh.setFillColor(QColor(0, 0, 0, 0));
     else if (btnPress == "Filter") {
         FilterDialog fd(this);
         Layer *l = ioh->getWorkingLayer();

@@ -66,6 +66,7 @@
 #include <polypanel.h>
 #include <rasterpanel.h>
 #include <textpanel.h>
+#include <special.h>
 #include <Windows.h>
 
 using std::string;
@@ -209,6 +210,7 @@ private:
     PolyPanel *polyPanel;
     RasterPanel *rasterPanel;
     TextPanel *textPanel;
+    QPoint leastPt, mostPt;
 
 
 };
