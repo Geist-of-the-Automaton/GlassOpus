@@ -38,7 +38,7 @@ The Microsoft coding guidelines are used. Found [here](https://www.cise.ufl.edu/
 
 ![glassOpusGirl](https://user-images.githubusercontent.com/44931507/116170700-4f15b680-a6d5-11eb-851d-850b10630e07.png)
 
-![demo](https://user-images.githubusercontent.com/44931507/116170714-54730100-a6d5-11eb-87f5-9ba522397bc3.png)
+![Mountain](https://user-images.githubusercontent.com/44931507/193198248-c06e0cd7-fa2d-436e-8e06-44e055579712.png)
 
 ![menus](https://user-images.githubusercontent.com/44931507/175788824-37b0a479-1dbd-4e4e-8742-e2dbd231eb74.png)
 <!--![Icon_View](https://user-images.githubusercontent.com/44931507/109450387-c3571500-7a18-11eb-9ebe-5ec7456ffaed.png)-->
@@ -55,9 +55,12 @@ The Microsoft coding guidelines are used. Found [here](https://www.cise.ufl.edu/
 
 ![Radial Brush Example](https://user-images.githubusercontent.com/44931507/191343750-3bca7c51-ba96-43d5-b801-6f06bd664f3a.PNG)
 
-![UiView2](https://user-images.githubusercontent.com/44931507/175762495-ded825d4-ef83-48d3-b896-7427ca21b58a.PNG)
+![city 2](https://user-images.githubusercontent.com/44931507/193198359-c2817f33-59d6-4d6e-97df-3815ea3de3eb.png)
 
+<!--![UiView2](https://user-images.githubusercontent.com/44931507/175762495-ded825d4-ef83-48d3-b896-7427ca21b58a.PNG)-->
 
+![demo](https://user-images.githubusercontent.com/44931507/116170714-54730100-a6d5-11eb-87f5-9ba522397bc3.png)
 
+![city 3](https://user-images.githubusercontent.com/44931507/193198346-f83a7676-981f-4ff7-8c69-4b8ec91d0c3b.png)
 
 
