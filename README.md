@@ -20,7 +20,6 @@ The Microsoft coding guidelines are used. Found [here](https://www.cise.ufl.edu/
 
 [Demo showing most features](https://www.youtube.com/watch?v=sTZM2OrUnVs)
 
-![city11](https://user-images.githubusercontent.com/44931507/225761471-69e005a0-b042-4059-ae0f-1a3b7af7ad6c.png)
 
 [Creation of second image below](https://youtu.be/XCe56i6esuc)
 
@@ -36,6 +35,8 @@ The Microsoft coding guidelines are used. Found [here](https://www.cise.ufl.edu/
 (Some of the images show the old, not updated UI)
 
 ![UiView1](https://user-images.githubusercontent.com/44931507/175762431-2e0c5d52-c30c-4882-8871-96f23aa68ad1.png)
+
+![city11](https://user-images.githubusercontent.com/44931507/225761471-69e005a0-b042-4059-ae0f-1a3b7af7ad6c.png)
 
 ![view 1](https://user-images.githubusercontent.com/44931507/179319540-1c2e8ad5-fadf-4b7c-82d7-aadd0ec813f3.PNG)
 
