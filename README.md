@@ -20,6 +20,8 @@ The Microsoft coding guidelines are used. Found [here](https://www.cise.ufl.edu/
 
 [Demo showing most features](https://www.youtube.com/watch?v=sTZM2OrUnVs)
 
+![city11](https://user-images.githubusercontent.com/44931507/225761471-69e005a0-b042-4059-ae0f-1a3b7af7ad6c.png)
+
 [Creation of second image below](https://youtu.be/XCe56i6esuc)
 
 [Vectoring](https://youtu.be/YO4rZiHFvdQ)
@@ -66,5 +68,4 @@ The Microsoft coding guidelines are used. Found [here](https://www.cise.ufl.edu/
 
 ![city 3](https://user-images.githubusercontent.com/44931507/193198346-f83a7676-981f-4ff7-8c69-4b8ec91d0c3b.png)
 
-![city11](https://user-images.githubusercontent.com/44931507/225761471-69e005a0-b042-4059-ae0f-1a3b7af7ad6c.png)
 
